@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../lib/api';
 import { API } from '../lib/api';
-import { Trophy, Medal, Download } from 'lucide-react';
+import { Trophy, Medal, Download, MapPin, GraduationCap, User, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
 import { Button } from '../components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
 import html2canvas from 'html2canvas';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const CLASSES = ['1a', '2a', '3a', '4a', '5a', '6a', 'Duplas'];
 const CATEGORIES = ['Masculino', 'Feminino'];
@@ -16,6 +20,9 @@ const Rankings = () => {
   const [selectedClass, setSelectedClass] = useState('1a');
   const [selectedCategory, setSelectedCategory] = useState('Masculino');
   const [loading, setLoading] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [playerDetails, setPlayerDetails] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
 
   useEffect(() => {
     fetchRankings();
@@ -30,6 +37,28 @@ const Rankings = () => {
       toast.error('Erro ao carregar rankings');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handlePlayerClick = async (playerId) => {
+    setDetailsLoading(true);
+    
+    try {
+      // Get player basic info first
+      const playersResponse = await axios.get(`${API}/players`);
+      const player = playersResponse.data.find(p => p.id === playerId);
+      
+      if (player) {
+        setSelectedPlayer(player);
+        
+        // Then get detailed info
+        const detailsResponse = await axios.get(`${API}/players/${playerId}/details`);
+        setPlayerDetails(detailsResponse.data);
+      }
+    } catch (error) {
+      toast.error('Erro ao carregar detalhes do jogador');
+    } finally {
+      setDetailsLoading(false);
     }
   };
 
@@ -158,14 +187,17 @@ const Rankings = () => {
                         </div>
                       </td>
                       <td className="py-4 px-4">
-                        <div className="flex items-center space-x-3">
+                        <div 
+                          className="flex items-center space-x-3 cursor-pointer hover:text-green-400 transition-colors"
+                          onClick={() => handlePlayerClick(player.player_id)}
+                        >
                           <Avatar>
                             <AvatarImage src={player.photo_url} />
                             <AvatarFallback className="bg-green-500 text-white">
                               {player.player_name.charAt(0)}
                             </AvatarFallback>
                           </Avatar>
-                          <span className="text-white font-medium">{player.player_name}</span>
+                          <span className="text-white font-medium hover:underline">{player.player_name}</span>
                         </div>
                       </td>
                       <td className="py-4 px-4 text-right">
@@ -211,6 +243,137 @@ const Rankings = () => {
           ))}
         </div>
       </div>
+
+      {/* Player Details Modal */}
+      <Dialog open={!!selectedPlayer} onOpenChange={() => {
+        setSelectedPlayer(null);
+        setPlayerDetails(null);
+      }}>
+        <DialogContent className="bg-slate-800 border-green-500/20 max-w-4xl max-h-[80vh] overflow-y-auto">
+          {selectedPlayer && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center space-x-4">
+                  <Avatar className="w-20 h-20">
+                    <AvatarImage src={selectedPlayer.photo_url} />
+                    <AvatarFallback className="bg-green-500 text-white text-2xl">
+                      {selectedPlayer.name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <DialogTitle className="text-white text-2xl">{selectedPlayer.name}</DialogTitle>
+                    {selectedPlayer.main_class && (
+                      <Badge className="bg-blue-500 mt-1">{selectedPlayer.main_class}</Badge>
+                    )}
+                  </div>
+                </div>
+              </DialogHeader>
+              
+              {detailsLoading ? (
+                <div className="py-12 text-center text-gray-400">Carregando detalhes...</div>
+              ) : playerDetails ? (
+                <div className="space-y-6">
+                  {/* Info Cards */}
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {selectedPlayer.city && (
+                      <div className="bg-slate-900/50 rounded-lg p-4">
+                        <div className="flex items-center text-gray-400 mb-1">
+                          <MapPin className="w-4 h-4 mr-2" />
+                          <span className="text-sm">Cidade</span>
+                        </div>
+                        <p className="text-white font-semibold">{selectedPlayer.city}</p>
+                      </div>
+                    )}
+                    {selectedPlayer.academy && (
+                      <div className="bg-slate-900/50 rounded-lg p-4">
+                        <div className="flex items-center text-gray-400 mb-1">
+                          <GraduationCap className="w-4 h-4 mr-2" />
+                          <span className="text-sm">Academia</span>
+                        </div>
+                        <p className="text-white font-semibold">{selectedPlayer.academy}</p>
+                      </div>
+                    )}
+                    {selectedPlayer.coach && (
+                      <div className="bg-slate-900/50 rounded-lg p-4">
+                        <div className="flex items-center text-gray-400 mb-1">
+                          <User className="w-4 h-4 mr-2" />
+                          <span className="text-sm">Treinador</span>
+                        </div>
+                        <p className="text-white font-semibold">{selectedPlayer.coach}</p>
+                      </div>
+                    )}
+                    <div className="bg-slate-900/50 rounded-lg p-4">
+                      <div className="flex items-center text-gray-400 mb-1">
+                        <Trophy className="w-4 h-4 mr-2" />
+                        <span className="text-sm">Torneios Disputados</span>
+                      </div>
+                      <p className="text-white font-semibold text-2xl">{playerDetails.total_tournaments}</p>
+                    </div>
+                  </div>
+
+                  {/* Rankings */}
+                  {Object.keys(playerDetails.rankings).length > 0 && (
+                    <div className="bg-slate-900/50 rounded-lg p-4">
+                      <h3 className="text-white font-semibold mb-3 flex items-center">
+                        <TrendingUp className="w-5 h-5 mr-2 text-green-400" />
+                        Posição nos Rankings
+                      </h3>
+                      <div className="grid md:grid-cols-2 gap-3">
+                        {Object.values(playerDetails.rankings).map((ranking, idx) => (
+                          <div key={idx} className="bg-slate-800 rounded p-3">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-gray-400 text-sm">
+                                {ranking.class} - {ranking.category}
+                              </span>
+                              <Badge className="bg-green-500">{ranking.points} pts</Badge>
+                            </div>
+                            <p className="text-white font-bold text-xl">
+                              {ranking.rank}º lugar <span className="text-sm text-gray-400">de {ranking.total}</span>
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recent Tournaments */}
+                  {playerDetails.recent_tournaments.length > 0 && (
+                    <div className="bg-slate-900/50 rounded-lg p-4">
+                      <h3 className="text-white font-semibold mb-3 flex items-center">
+                        <Trophy className="w-5 h-5 mr-2 text-green-400" />
+                        Últimos Torneios
+                      </h3>
+                      <div className="space-y-2">
+                        {playerDetails.recent_tournaments.map((tournament, idx) => (
+                          <div key={idx} className="bg-slate-800 rounded p-3">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-white font-medium">{tournament.tournament_name}</span>
+                              <span className="text-green-400 font-semibold">{tournament.points} pts</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-sm text-gray-400">
+                              <span>{format(new Date(tournament.tournament_date), 'dd/MM/yyyy', { locale: ptBR })}</span>
+                              <span>•</span>
+                              <span>{tournament.class_category}</span>
+                              <span>•</span>
+                              <span>{tournament.gender_category}</span>
+                              <span>•</span>
+                              <span className="text-white font-semibold">{tournament.placement}º lugar</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="py-12 text-center text-gray-400">
+                  Nenhum dado disponível
+                </div>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

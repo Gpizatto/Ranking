@@ -25,6 +25,7 @@ const AdminResults = () => {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [filterTournament, setFilterTournament] = useState('all');
   const [filterClass, setFilterClass] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
   const [formData, setFormData] = useState({
     tournament_id: '',
     player_id: '',
@@ -51,8 +52,12 @@ const AdminResults = () => {
       filtered = filtered.filter(r => r.class_category === filterClass);
     }
     
+    if (filterCategory && filterCategory !== 'all') {
+      filtered = filtered.filter(r => r.gender_category === filterCategory);
+    }
+    
     setFilteredResults(filtered);
-  }, [results, filterTournament, filterClass]);
+  }, [results, filterTournament, filterClass, filterCategory]);
 
   const fetchData = async () => {
     try {

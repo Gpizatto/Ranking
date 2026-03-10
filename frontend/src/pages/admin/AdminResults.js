@@ -23,8 +23,8 @@ const AdminResults = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
-  const [filterTournament, setFilterTournament] = useState('');
-  const [filterClass, setFilterClass] = useState('');
+  const [filterTournament, setFilterTournament] = useState('all');
+  const [filterClass, setFilterClass] = useState('all');
   const [formData, setFormData] = useState({
     tournament_id: '',
     player_id: '',
@@ -43,11 +43,11 @@ const AdminResults = () => {
   useEffect(() => {
     let filtered = results;
     
-    if (filterTournament) {
+    if (filterTournament && filterTournament !== 'all') {
       filtered = filtered.filter(r => r.tournament_id === filterTournament);
     }
     
-    if (filterClass) {
+    if (filterClass && filterClass !== 'all') {
       filtered = filtered.filter(r => r.class_category === filterClass);
     }
     
@@ -450,7 +450,7 @@ const AdminResults = () => {
                   <SelectValue placeholder="Todos os torneios" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos os torneios</SelectItem>
+                  <SelectItem value="all">Todos os torneios</SelectItem>
                   {tournaments.map(tournament => (
                     <SelectItem key={tournament.id} value={tournament.id}>
                       {tournament.name}
@@ -466,7 +466,7 @@ const AdminResults = () => {
                   <SelectValue placeholder="Todas as classes" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas as classes</SelectItem>
+                  <SelectItem value="all">Todas as classes</SelectItem>
                   {CLASSES.map(cls => (
                     <SelectItem key={cls} value={cls}>{cls}</SelectItem>
                   ))}

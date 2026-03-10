@@ -142,6 +142,13 @@ const Layout = () => {
                 Resultados
               </Link>
               <Link
+                to="/admin/matches"
+                className={`px-3 py-1.5 text-sm rounded ${location.pathname === '/admin/matches' ? 'bg-blue-500 text-white' : 'text-gray-400 hover:bg-slate-700'}`}
+                data-testid="admin-nav-matches"
+              >
+                Partidas
+              </Link>
+              <Link
                 to="/admin/config"
                 className={`px-3 py-1.5 text-sm rounded ${location.pathname === '/admin/config' ? 'bg-blue-500 text-white' : 'text-gray-400 hover:bg-slate-700'}`}
                 data-testid="admin-nav-config"

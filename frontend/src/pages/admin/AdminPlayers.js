@@ -25,7 +25,9 @@ const AdminPlayers = () => {
     main_class: '1a'
   });
   const [uploading, setUploading] = useState(false);
+  const [importResult, setImportResult] = useState(null);
   const fileInputRef = useRef(null);
+  const excelInputRef = useRef(null);
 
   useEffect(() => {
     fetchPlayers();
@@ -122,6 +124,33 @@ const AdminPlayers = () => {
     }
   };
 
+  const handleImportExcel = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formDataUpload = new FormData();
+    formDataUpload.append('file', file);
+
+    try {
+      const response = await axios.post(`${API}/import-players-excel`, formDataUpload, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+
+      setImportResult(response.data);
+      
+      if (response.data.players_created > 0 || response.data.players_updated > 0) {
+        toast.success(`${response.data.players_created} criados, ${response.data.players_updated} atualizados!`);
+        fetchPlayers();
+      }
+      
+      if (response.data.errors.length > 0) {
+        toast.error(`${response.data.errors.length} erros encontrados`);
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao importar Excel');
+    }
+  };
+
   const resetForm = () => {
     setFormData({ name: '', photo_url: '', city: '', academy: '', coach: '', main_class: '1a' });
     setEditingPlayer(null);
@@ -137,16 +166,33 @@ const AdminPlayers = () => {
           <h1 className="text-4xl font-bold text-white mb-2" data-testid="admin-players-title">Gerenciar Jogadores</h1>
           <p className="text-gray-400">Cadastre e edite jogadores</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) resetForm();
-        }}>
-          <DialogTrigger asChild>
-            <Button className="bg-green-500 hover:bg-green-600" data-testid="add-player-button">
-              <Plus className="w-4 h-4 mr-2" />
-              Novo Jogador
-            </Button>
-          </DialogTrigger>
+        <div className="flex gap-2">
+          <Button
+            onClick={() => excelInputRef.current?.click()}
+            className="bg-purple-500 hover:bg-purple-600"
+            data-testid="import-players-button"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Importar Excel
+          </Button>
+          <input
+            ref={excelInputRef}
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleImportExcel}
+            className="hidden"
+          />
+          
+          <Dialog open={dialogOpen} onOpenChange={(open) => {
+            setDialogOpen(open);
+            if (!open) resetForm();
+          }}>
+            <DialogTrigger asChild>
+              <Button className="bg-green-500 hover:bg-green-600" data-testid="add-player-button">
+                <Plus className="w-4 h-4 mr-2" />
+                Novo Jogador
+              </Button>
+            </DialogTrigger>
           <DialogContent className="bg-slate-800 border-green-500/20">
             <DialogHeader>
               <DialogTitle className="text-white">
@@ -249,6 +295,27 @@ const AdminPlayers = () => {
         </Dialog>
       </div>
 
+      {/* Import Result */}
+      {importResult && (
+        <Card className="bg-blue-500/10 border-blue-500/50">
+          <CardContent className="pt-6">
+            <h3 className="text-white font-semibold mb-2">Resultado da Importação:</h3>
+            <p className="text-green-400">✅ {importResult.players_created} jogadores criados</p>
+            <p className="text-blue-400">🔄 {importResult.players_updated} jogadores atualizados</p>
+            {importResult.errors.length > 0 && (
+              <div className="mt-2">
+                <p className="text-red-400">❌ {importResult.errors.length} erros:</p>
+                <ul className="text-xs text-gray-400 mt-1 max-h-32 overflow-y-auto">
+                  {importResult.errors.map((error, idx) => (
+                    <li key={idx}>{error}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {loading ? (
         <div className="text-center py-12 text-gray-400">Carregando...</div>
       ) : players.length === 0 ? (
@@ -301,6 +368,26 @@ const AdminPlayers = () => {
           ))}
         </div>
       )}
+
+      {/* Excel Format Guide */}
+      <Card className="bg-slate-800/50 border-purple-500/20">
+        <CardHeader>
+          <CardTitle className="text-white text-sm">📋 Formato do Excel para Importação de Jogadores</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-gray-400 space-y-2">
+          <p><strong className="text-white">Sheet "Players"</strong> com colunas:</p>
+          <p className="font-mono bg-slate-900 p-2 rounded text-xs">
+            Name | City | Academy | Coach | Class
+          </p>
+          <p>Exemplo:</p>
+          <p className="font-mono bg-slate-900 p-2 rounded text-xs">
+            João Silva | Curitiba, PR | Academia XYZ | Carlos Souza | 1a
+          </p>
+          <p className="text-xs text-yellow-400">
+            ℹ️ Se o jogador já existir (mesmo nome), os dados serão atualizados.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 };

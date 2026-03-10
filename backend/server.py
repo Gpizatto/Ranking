@@ -453,6 +453,75 @@ async def upload_photo(file: UploadFile = File(...), current_user: User = Depend
     photo_url = f"data:{file.content_type};base64,{base64_encoded}"
     return {"photo_url": photo_url}
 
+@api_router.post("/import-players-excel")
+async def import_players_excel(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="File must be Excel format (.xlsx or .xls)")
+    
+    try:
+        contents = await file.read()
+        workbook = load_workbook(BytesIO(contents))
+        
+        if 'Players' not in workbook.sheetnames:
+            raise HTTPException(status_code=400, detail="Excel must have a sheet named 'Players'")
+        
+        sheet = workbook['Players']
+        
+        players_created = 0
+        players_updated = 0
+        errors = []
+        
+        # Skip header row
+        for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+            if not row[0]:  # Skip empty rows
+                continue
+                
+            try:
+                name = str(row[0]).strip()
+                city = str(row[1]).strip() if row[1] else None
+                academy = str(row[2]).strip() if row[2] else None
+                coach = str(row[3]).strip() if row[3] else None
+                main_class = str(row[4]).strip() if row[4] else None
+                
+                # Check if player exists
+                existing = await db.players.find_one({"name": name}, {"_id": 0})
+                
+                if existing:
+                    # Update player
+                    update_data = {
+                        "city": city,
+                        "academy": academy,
+                        "coach": coach,
+                        "main_class": main_class
+                    }
+                    await db.players.update_one({"id": existing['id']}, {"$set": update_data})
+                    players_updated += 1
+                else:
+                    # Create new player
+                    player = Player(
+                        name=name,
+                        city=city,
+                        academy=academy,
+                        coach=coach,
+                        main_class=main_class
+                    )
+                    doc = player.model_dump()
+                    doc['created_at'] = doc['created_at'].isoformat()
+                    await db.players.insert_one(doc)
+                    players_created += 1
+                
+            except Exception as e:
+                errors.append(f"Row {row_idx}: {str(e)}")
+        
+        return {
+            "players_created": players_created,
+            "players_updated": players_updated,
+            "errors": errors
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing Excel: {str(e)}")
+
 @api_router.get("/players/{player_id}/details")
 async def get_player_details(player_id: str):
     # Get player info

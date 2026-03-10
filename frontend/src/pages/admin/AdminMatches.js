@@ -18,11 +18,13 @@ const ROUNDS = ['Final', 'Semi Final', 'Quarter Final', 'Round of 16', 'Round of
 const AdminMatches = () => {
   const [matches, setMatches] = useState([]);
   const [players, setPlayers] = useState([]);
+  const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
-    tournament_name: '',
+    tournament_id: '',
+    category: '1a',
     player1_id: '',
     player2_id: '',
     winner_id: '',
@@ -39,13 +41,15 @@ const AdminMatches = () => {
 
   const fetchData = async () => {
     try {
-      const [matchesRes, playersRes] = await Promise.all([
+      const [matchesRes, playersRes, tournamentsRes] = await Promise.all([
         axios.get(`${API}/matches`),
-        axios.get(`${API}/players`)
+        axios.get(`${API}/players`),
+        axios.get(`${API}/tournaments`)
       ]);
       
       setMatches(matchesRes.data);
       setPlayers(playersRes.data);
+      setTournaments(tournamentsRes.data);
     } catch (error) {
       toast.error('Erro ao carregar dados');
     } finally {
@@ -121,7 +125,8 @@ const AdminMatches = () => {
 
   const resetForm = () => {
     setFormData({
-      tournament_name: '',
+      tournament_id: '',
+      category: '1a',
       player1_id: '',
       player2_id: '',
       winner_id: '',
@@ -185,16 +190,48 @@ const AdminMatches = () => {
                 <DialogTitle className="text-white">Registrar Nova Partida</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label className="text-gray-300">Nome do Torneio</Label>
-                  <Input
-                    value={formData.tournament_name}
-                    onChange={(e) => setFormData({ ...formData, tournament_name: e.target.value })}
-                    className="bg-slate-700 border-slate-600 text-white"
-                    placeholder="Copa Paraná 2025"
-                    required
-                    data-testid="tournament-name-input"
-                  />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-gray-300">Torneio</Label>
+                    <Select
+                      value={formData.tournament_id}
+                      onValueChange={(value) => setFormData({ ...formData, tournament_id: value })}
+                      required
+                    >
+                      <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="tournament-select">
+                        <SelectValue placeholder="Selecione o torneio" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {tournaments.map(tournament => (
+                          <SelectItem key={tournament.id} value={tournament.id}>
+                            {tournament.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-gray-300">Categoria</Label>
+                    <Select
+                      value={formData.category}
+                      onValueChange={(value) => setFormData({ ...formData, category: value })}
+                      required
+                    >
+                      <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="category-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1a">1ª Classe</SelectItem>
+                        <SelectItem value="2a">2ª Classe</SelectItem>
+                        <SelectItem value="3a">3ª Classe</SelectItem>
+                        <SelectItem value="4a">4ª Classe</SelectItem>
+                        <SelectItem value="5a">5ª Classe</SelectItem>
+                        <SelectItem value="6a">6ª Classe</SelectItem>
+                        <SelectItem value="Duplas">Duplas</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -382,6 +419,7 @@ const AdminMatches = () => {
                   <tr className="border-b border-slate-700">
                     <th className="text-left py-3 px-4 text-gray-400 font-semibold">Data</th>
                     <th className="text-left py-3 px-4 text-gray-400 font-semibold">Torneio</th>
+                    <th className="text-left py-3 px-4 text-gray-400 font-semibold">Categoria</th>
                     <th className="text-left py-3 px-4 text-gray-400 font-semibold">Partida</th>
                     <th className="text-left py-3 px-4 text-gray-400 font-semibold">Placar</th>
                     <th className="text-left py-3 px-4 text-gray-400 font-semibold">Rodada</th>
@@ -395,6 +433,9 @@ const AdminMatches = () => {
                         {format(new Date(match.date), 'dd/MM/yyyy', { locale: ptBR })}
                       </td>
                       <td className="py-3 px-4 text-white">{match.tournament_name}</td>
+                      <td className="py-3 px-4">
+                        <Badge className="bg-blue-500">{match.category}</Badge>
+                      </td>
                       <td className="py-3 px-4">
                         <div className="text-white">
                           <span className={match.winner_id === match.player1_id ? 'font-bold text-green-400' : ''}>
@@ -439,11 +480,11 @@ const AdminMatches = () => {
         <CardContent className="text-sm text-gray-400 space-y-2">
           <p><strong className="text-white">Sheet "Matches"</strong> com colunas:</p>
           <p className="font-mono bg-slate-900 p-2 rounded text-xs">
-            Tournament | Round | Player1 | Player2 | Score | Winner | Date
+            Tournament | Category | Round | Player1 | Player2 | Score | Winner | Date
           </p>
           <p>Exemplo:</p>
           <p className="font-mono bg-slate-900 p-2 rounded text-xs">
-            Copa PR | Final | João Silva | Pedro Lima | 11-7 8-11 11-6 | João Silva | 2025-01-15
+            Copa PR | 1a | Final | João Silva | Pedro Lima | 11-7 8-11 11-6 | João Silva | 2025-01-15
           </p>
         </CardContent>
       </Card>

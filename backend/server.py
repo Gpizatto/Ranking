@@ -170,8 +170,9 @@ class ImportData(BaseModel):
 class Match(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    tournament_id: str  # Obrigatório - ID do torneio
     tournament_name: str
-    tournament_id: Optional[str] = None
+    category: str  # "1a", "2a", etc.
     player1_id: str
     player1_name: str
     player2_id: str
@@ -183,8 +184,8 @@ class Match(BaseModel):
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class MatchCreate(BaseModel):
-    tournament_name: str
-    tournament_id: Optional[str] = None
+    tournament_id: str
+    category: str
     player1_id: str
     player2_id: str
     winner_id: str
@@ -714,6 +715,40 @@ async def delete_tournament(tournament_id: str, current_user: User = Depends(get
         raise HTTPException(status_code=404, detail="Tournament not found")
     return {"message": "Tournament deleted"}
 
+@api_router.get("/tournaments/{tournament_id}/matches")
+async def get_tournament_matches(tournament_id: str, category: Optional[str] = None):
+    # Get tournament info
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    
+    # Build query
+    query = {"tournament_id": tournament_id}
+    if category:
+        query["category"] = category
+    
+    # Get matches
+    matches = await db.matches.find(query, {"_id": 0}).sort("date", -1).to_list(1000)
+    for match in matches:
+        if isinstance(match.get('date'), str):
+            match['date'] = datetime.fromisoformat(match['date'])
+        if isinstance(match.get('created_at'), str):
+            match['created_at'] = datetime.fromisoformat(match['created_at'])
+    
+    # Group by category
+    grouped_matches = {}
+    for match in matches:
+        cat = match['category']
+        if cat not in grouped_matches:
+            grouped_matches[cat] = []
+        grouped_matches[cat].append(match)
+    
+    return {
+        "tournament": tournament,
+        "categories": list(grouped_matches.keys()),
+        "matches": grouped_matches
+    }
+
 # Result Routes
 @api_router.get("/results", response_model=List[Result])
 async def get_results():
@@ -945,6 +980,11 @@ async def get_matches(player_id: Optional[str] = None, tournament_id: Optional[s
 
 @api_router.post("/matches", response_model=Match)
 async def create_match(match_data: MatchCreate, current_user: User = Depends(get_current_user)):
+    # Get tournament name
+    tournament = await db.tournaments.find_one({"id": match_data.tournament_id}, {"_id": 0})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    
     # Get player names
     player1 = await db.players.find_one({"id": match_data.player1_id}, {"_id": 0})
     player2 = await db.players.find_one({"id": match_data.player2_id}, {"_id": 0})
@@ -954,6 +994,7 @@ async def create_match(match_data: MatchCreate, current_user: User = Depends(get
     
     match = Match(
         **match_data.model_dump(),
+        tournament_name=tournament['name'],
         player1_name=player1['name'],
         player2_name=player2['name']
     )
@@ -991,22 +1032,34 @@ async def import_matches_excel(file: UploadFile = File(...), current_user: User 
         players = await db.players.find({}, {"_id": 0}).to_list(1000)
         players_dict = {p['name'].lower().strip(): p for p in players}
         
+        # Get all tournaments for lookup
+        tournaments = await db.tournaments.find({}, {"_id": 0}).to_list(1000)
+        tournaments_dict = {t['name'].lower().strip(): t for t in tournaments}
+        
         matches_created = 0
         errors = []
         
         # Skip header row
+        # Expected columns: Tournament | Category | Round | Player1 | Player2 | Score | Winner | Date
         for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
             if not row[0]:  # Skip empty rows
                 continue
                 
             try:
                 tournament_name = str(row[0]).strip()
-                round_name = str(row[1]).strip()
-                player1_name = str(row[2]).strip()
-                player2_name = str(row[3]).strip()
-                score_str = str(row[4]).strip()
-                winner_name = str(row[5]).strip()
-                date_val = row[6]
+                category = str(row[1]).strip() if row[1] else "1a"
+                round_name = str(row[2]).strip()
+                player1_name = str(row[3]).strip()
+                player2_name = str(row[4]).strip()
+                score_str = str(row[5]).strip()
+                winner_name = str(row[6]).strip()
+                date_val = row[7]
+                
+                # Find tournament
+                tournament = tournaments_dict.get(tournament_name.lower())
+                if not tournament:
+                    errors.append(f"Row {row_idx}: Tournament '{tournament_name}' not found")
+                    continue
                 
                 # Find players
                 player1 = players_dict.get(player1_name.lower())
@@ -1034,7 +1087,9 @@ async def import_matches_excel(file: UploadFile = File(...), current_user: User 
                 
                 # Create match
                 match = Match(
-                    tournament_name=tournament_name,
+                    tournament_id=tournament['id'],
+                    tournament_name=tournament['name'],
+                    category=category,
                     player1_id=player1['id'],
                     player1_name=player1['name'],
                     player2_id=player2['id'],

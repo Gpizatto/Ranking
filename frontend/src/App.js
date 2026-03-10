@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Rankings from './pages/Rankings';
 import Tournaments from './pages/Tournaments';
+import TournamentDetails from './pages/TournamentDetails';
 import Players from './pages/Players';
 import Login from './pages/Login';
 import AdminDashboard from './pages/admin/AdminDashboard';
@@ -25,6 +26,7 @@ function App() {
             <Route index element={<Rankings />} />
             <Route path="rankings" element={<Rankings />} />
             <Route path="tournaments" element={<Tournaments />} />
+            <Route path="tournaments/:id" element={<TournamentDetails />} />
             <Route path="players" element={<Players />} />
             <Route path="login" element={<Login />} />
             

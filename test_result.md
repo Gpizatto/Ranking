@@ -101,3 +101,124 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "SquashRank Pro - Sistema de gerenciamento de rankings de squash. Objetivo atual: Vincular partidas a torneios e categorias específicas, criando uma página de detalhes do torneio que exibe resultados e partidas organizadas por categoria."
+
+backend:
+  - task: "Atualizar modelo Match para incluir tournament_id e category"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py (linhas 170-184)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Modelo Match atualizado para incluir campos obrigatórios tournament_id e category. Campos denormalizados mantidos para performance (tournament_name, player names)"
+
+  - task: "Endpoint POST /api/matches - Criar partida com tournament_id"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py (linhas 1017-1043)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Endpoint atualizado para buscar tournament por ID e popular campos denormalizados automaticamente"
+
+  - task: "Endpoint GET /api/tournaments/{tournament_id}/matches - Buscar partidas por torneio"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py (linhas 718-786)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Endpoint criado para retornar partidas de um torneio específico, agrupadas por categoria. Suporta filtro opcional por categoria"
+
+  - task: "Atualizar importação de Excel para incluir tournament_id e category"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py (linhas 1053-1155)"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Endpoint de importação atualizado para novo formato: Tournament | Category | Round | Player1 | Player2 | Score | Winner | Date. Busca tournament_id pelo nome"
+
+frontend:
+  - task: "Atualizar AdminMatches.js - Adicionar seletores de Torneio e Categoria"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/admin/AdminMatches.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Formulário atualizado com Select para escolher Torneio (busca da API) e Select para Categoria (1a-6a, Duplas). Campo tournament_name removido do formData"
+
+  - task: "Criar página TournamentDetails.js"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/TournamentDetails.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Nova página criada com abas para Resultados e Partidas. Aba de Partidas inclui filtro por categoria e exibe partidas agrupadas. Usa useParams para pegar tournament_id da rota"
+
+  - task: "Atualizar Tournaments.js - Tornar cards clicáveis"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/Tournaments.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Cards de torneio agora usam Link do react-router para navegar para /tournaments/:id. Modal antigo removido"
+
+  - task: "Adicionar rota /tournaments/:id no App.js"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/App.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Nova rota adicionada para TournamentDetails. Import do componente adicionado"
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Criar partida via formulário AdminMatches com tournament_id e category"
+    - "Visualizar página de detalhes do torneio (/tournaments/:id)"
+    - "Verificar abas de Resultados e Partidas"
+    - "Testar filtro de categoria na aba de Partidas"
+    - "Importar partidas via Excel com novo formato"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Implementação completa da vinculação de partidas a torneios. Backend atualizado com novo modelo Match incluindo tournament_id obrigatório e category. Frontend atualizado com nova página de detalhes do torneio (TournamentDetails.js) que exibe resultados e partidas em abas separadas. AdminMatches.js agora tem seletores para torneio e categoria. Página Tournaments.js usa Links para navegar. Necessário testar: 1) Criação de partida via formulário, 2) Visualização da página de detalhes, 3) Filtro de categoria, 4) Importação via Excel"

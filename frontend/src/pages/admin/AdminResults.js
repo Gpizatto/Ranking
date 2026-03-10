@@ -447,7 +447,7 @@ const AdminResults = () => {
       {/* Filters */}
       <Card className="bg-slate-800/50 border-blue-500/20">
         <CardContent className="pt-6">
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid md:grid-cols-3 gap-4">
             <div>
               <Label className="text-gray-300 mb-2 block">Filtrar por Torneio</Label>
               <Select value={filterTournament} onValueChange={setFilterTournament}>
@@ -474,6 +474,20 @@ const AdminResults = () => {
                   <SelectItem value="all">Todas as classes</SelectItem>
                   {CLASSES.map(cls => (
                     <SelectItem key={cls} value={cls}>{cls}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-gray-300 mb-2 block">Filtrar por Categoria</Label>
+              <Select value={filterCategory} onValueChange={setFilterCategory}>
+                <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="filter-category-select">
+                  <SelectValue placeholder="Todas as categorias" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as categorias</SelectItem>
+                  {CATEGORIES.map(cat => (
+                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

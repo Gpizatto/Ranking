@@ -13,6 +13,10 @@ from datetime import datetime, timezone, timedelta
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 import base64
+import asyncio
+import random
+import string
+import resend
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 
 ROOT_DIR = Path(__file__).parent
@@ -30,6 +34,14 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 security = HTTPBearer()
+
+# Email Configuration
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
+SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
+ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'gustavopizatto@hotmail.com')
+
+if RESEND_API_KEY:
+    resend.api_key = RESEND_API_KEY
 
 # Create the main app
 app = FastAPI()
@@ -56,6 +68,24 @@ class UserLogin(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+class RegistrationRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    username: str
+    password_hash: str
+    approval_code: str
+    status: str = "pending"  # pending, approved, rejected
+    requested_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    expires_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc) + timedelta(hours=24))
+
+class RegistrationRequestCreate(BaseModel):
+    username: str
+    password: str
+
+class RegistrationApproval(BaseModel):
+    username: str
+    approval_code: str
 
 class Player(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -150,6 +180,75 @@ def create_access_token(data: dict) -> str:
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
+def generate_approval_code() -> str:
+    """Generate a 6-character alphanumeric code"""
+    return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+
+async def send_approval_email(username: str, approval_code: str):
+    """Send approval code to admin email"""
+    if not RESEND_API_KEY:
+        logger.warning("RESEND_API_KEY not set. Skipping email.")
+        return
+    
+    html_content = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+            .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+            .header {{ background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
+            .content {{ background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; }}
+            .code-box {{ background: #22c55e; color: white; font-size: 32px; font-weight: bold; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0; letter-spacing: 4px; }}
+            .info {{ background: white; padding: 15px; border-left: 4px solid #3b82f6; margin: 20px 0; }}
+            .footer {{ text-align: center; color: #666; font-size: 12px; margin-top: 20px; }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>🎾 Nova Solicitação de Registro</h1>
+                <p>SquashRank Pro - Federação de Squash do Paraná</p>
+            </div>
+            <div class="content">
+                <h2>Tentativa de Registro Detectada</h2>
+                <div class="info">
+                    <strong>Usuário:</strong> {username}<br>
+                    <strong>Data/Hora:</strong> {datetime.now(timezone.utc).strftime('%d/%m/%Y %H:%M:%S')} UTC
+                </div>
+                <p>Alguém está tentando se registrar como administrador no sistema SquashRank Pro.</p>
+                <p><strong>Código de Aprovação:</strong></p>
+                <div class="code-box">{approval_code}</div>
+                <p>Para aprovar este registro:</p>
+                <ol>
+                    <li>Verifique se você reconhece este usuário</li>
+                    <li>Forneça o código acima para o usuário</li>
+                    <li>O usuário deve inserir este código para completar o registro</li>
+                </ol>
+                <p><strong>⏰ Este código expira em 24 horas.</strong></p>
+                <div class="footer">
+                    <p>Este é um email automático do sistema SquashRank Pro</p>
+                    <p>Se você não esperava este email, ignore-o com segurança</p>
+                </div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    params = {
+        "from": SENDER_EMAIL,
+        "to": [ADMIN_EMAIL],
+        "subject": f"🎾 Nova Solicitação de Registro - {username}",
+        "html": html_content
+    }
+    
+    try:
+        await asyncio.to_thread(resend.Emails.send, params)
+        logger.info(f"Approval email sent to {ADMIN_EMAIL} for user {username}")
+    except Exception as e:
+        logger.error(f"Failed to send approval email: {str(e)}")
+
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -177,19 +276,93 @@ async def root():
     return {"message": "SquashRank Pro API"}
 
 # Auth Routes
-@api_router.post("/auth/register", response_model=Token)
-async def register(user_data: UserCreate):
-    existing = await db.users.find_one({"username": user_data.username})
-    if existing:
+@api_router.post("/auth/request-registration")
+async def request_registration(user_data: RegistrationRequestCreate):
+    # Check if username already exists
+    existing_user = await db.users.find_one({"username": user_data.username})
+    if existing_user:
         raise HTTPException(status_code=400, detail="Username already exists")
     
+    # Check if there's already a pending request
+    existing_request = await db.registration_requests.find_one({
+        "username": user_data.username,
+        "status": "pending"
+    })
+    
+    if existing_request:
+        raise HTTPException(
+            status_code=400, 
+            detail="Registration request already pending. Check your email for the approval code."
+        )
+    
+    # Generate approval code
+    approval_code = generate_approval_code()
+    
+    # Hash password
     hashed_password = get_password_hash(user_data.password)
-    user = User(username=user_data.username, hashed_password=hashed_password, is_admin=True)
     
-    doc = user.model_dump()
-    doc['created_at'] = doc['created_at'].isoformat()
-    await db.users.insert_one(doc)
+    # Create registration request
+    request = RegistrationRequest(
+        username=user_data.username,
+        password_hash=hashed_password,
+        approval_code=approval_code
+    )
     
+    doc = request.model_dump()
+    doc['requested_at'] = doc['requested_at'].isoformat()
+    doc['expires_at'] = doc['expires_at'].isoformat()
+    await db.registration_requests.insert_one(doc)
+    
+    # Send approval email to admin
+    await send_approval_email(user_data.username, approval_code)
+    
+    return {
+        "message": "Registration request submitted. Please wait for admin approval.",
+        "username": user_data.username
+    }
+
+@api_router.post("/auth/complete-registration", response_model=Token)
+async def complete_registration(approval_data: RegistrationApproval):
+    # Find registration request
+    request_doc = await db.registration_requests.find_one({
+        "username": approval_data.username,
+        "status": "pending"
+    }, {"_id": 0})
+    
+    if not request_doc:
+        raise HTTPException(status_code=404, detail="Registration request not found or already processed")
+    
+    # Check if expired
+    expires_at = datetime.fromisoformat(request_doc['expires_at'])
+    if datetime.now(timezone.utc) > expires_at:
+        await db.registration_requests.update_one(
+            {"id": request_doc['id']},
+            {"$set": {"status": "expired"}}
+        )
+        raise HTTPException(status_code=400, detail="Registration request expired. Please request again.")
+    
+    # Verify approval code
+    if request_doc['approval_code'] != approval_data.approval_code:
+        raise HTTPException(status_code=401, detail="Invalid approval code")
+    
+    # Create user
+    user = User(
+        username=request_doc['username'],
+        hashed_password=request_doc['password_hash'],
+        is_admin=True
+    )
+    
+    user_doc = user.model_dump()
+    user_doc['created_at'] = user_doc['created_at'].isoformat()
+    await db.users.insert_one(user_doc)
+    
+    # Mark request as approved
+    await db.registration_requests.update_one(
+        {"id": request_doc['id']},
+        {"$set": {"status": "approved"}}
+    )
+    
+    # Generate token
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 

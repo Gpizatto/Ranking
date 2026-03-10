@@ -17,6 +17,24 @@ const Layout = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      {/* Hero Image Banner - Only on home/rankings */}
+      {(location.pathname === '/' || location.pathname === '/rankings') && (
+        <div className="relative h-64 overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/70 to-transparent z-10" />
+          <img 
+            src="https://i0.wp.com/worldsquashchamps.com/wp-content/uploads/world-champs-finals-62-of-74-scaled.jpg?ssl=1"
+            alt="Squash Action"
+            className="w-full h-full object-cover opacity-40"
+          />
+          <div className="absolute inset-0 z-20 flex items-center justify-center">
+            <div className="text-center">
+              <h1 className="text-5xl font-bold text-white mb-2">SquashRank Pro</h1>
+              <p className="text-xl text-green-400">Federação de Squash do Paraná</p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Header */}
       <header className="bg-slate-900/50 backdrop-blur-lg border-b border-green-500/20 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">

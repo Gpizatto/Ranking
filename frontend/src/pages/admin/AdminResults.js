@@ -17,11 +17,14 @@ const CATEGORIES = ['Masculino', 'Feminino'];
 
 const AdminResults = () => {
   const [results, setResults] = useState([]);
+  const [filteredResults, setFilteredResults] = useState([]);
   const [players, setPlayers] = useState([]);
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [filterTournament, setFilterTournament] = useState('');
+  const [filterClass, setFilterClass] = useState('');
   const [formData, setFormData] = useState({
     tournament_id: '',
     player_id: '',
@@ -37,6 +40,20 @@ const AdminResults = () => {
     fetchData();
   }, []);
 
+  useEffect(() => {
+    let filtered = results;
+    
+    if (filterTournament) {
+      filtered = filtered.filter(r => r.tournament_id === filterTournament);
+    }
+    
+    if (filterClass) {
+      filtered = filtered.filter(r => r.class_category === filterClass);
+    }
+    
+    setFilteredResults(filtered);
+  }, [results, filterTournament, filterClass]);
+
   const fetchData = async () => {
     try {
       const [resultsRes, playersRes, tournamentsRes] = await Promise.all([
@@ -46,6 +63,7 @@ const AdminResults = () => {
       ]);
       
       setResults(resultsRes.data);
+      setFilteredResults(resultsRes.data);
       setPlayers(playersRes.data);
       setTournaments(tournamentsRes.data);
     } catch (error) {
@@ -421,6 +439,44 @@ const AdminResults = () => {
         </div>
       </div>
 
+      {/* Filters */}
+      <Card className="bg-slate-800/50 border-blue-500/20">
+        <CardContent className="pt-6">
+          <div className="grid md:grid-cols-2 gap-4">
+            <div>
+              <Label className="text-gray-300 mb-2 block">Filtrar por Torneio</Label>
+              <Select value={filterTournament} onValueChange={setFilterTournament}>
+                <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="filter-tournament-select">
+                  <SelectValue placeholder="Todos os torneios" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todos os torneios</SelectItem>
+                  {tournaments.map(tournament => (
+                    <SelectItem key={tournament.id} value={tournament.id}>
+                      {tournament.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-gray-300 mb-2 block">Filtrar por Classe</Label>
+              <Select value={filterClass} onValueChange={setFilterClass}>
+                <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="filter-class-select">
+                  <SelectValue placeholder="Todas as classes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">Todas as classes</SelectItem>
+                  {CLASSES.map(cls => (
+                    <SelectItem key={cls} value={cls}>{cls}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       {loading ? (
         <div className="text-center py-12 text-gray-400">Carregando...</div>
       ) : results.length === 0 ? (
@@ -451,7 +507,7 @@ const AdminResults = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {results.map((result) => (
+                  {filteredResults.map((result) => (
                     <tr key={result.id} className="border-b border-slate-700/50 hover:bg-slate-700/30" data-testid={`result-row-${result.id}`}>
                       <td className="py-3 px-4 text-white">{result.player_name}</td>
                       <td className="py-3 px-4 text-gray-300">{result.class_category}</td>

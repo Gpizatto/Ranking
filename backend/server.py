@@ -62,11 +62,19 @@ class Player(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     photo_url: Optional[str] = None
+    city: Optional[str] = None
+    academy: Optional[str] = None
+    coach: Optional[str] = None
+    main_class: Optional[str] = None  # Classe principal que joga
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class PlayerCreate(BaseModel):
     name: str
     photo_url: Optional[str] = None
+    city: Optional[str] = None
+    academy: Optional[str] = None
+    coach: Optional[str] = None
+    main_class: Optional[str] = None
 
 class Tournament(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -74,12 +82,14 @@ class Tournament(BaseModel):
     name: str
     date: datetime
     location: Optional[str] = None
+    is_completed: bool = False
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class TournamentCreate(BaseModel):
     name: str
     date: datetime
     location: Optional[str] = None
+    is_completed: bool = False
 
 class Result(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -105,16 +115,16 @@ class RankingConfig(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     formula: str = "top_n"  # "sum_all", "top_n", "decay"
     top_n_count: int = 5
-    points_table: Dict[int, float] = Field(default_factory=lambda: {
-        1: 100, 2: 75, 3: 50, 4: 50, 5: 25, 6: 25, 7: 25, 8: 25,
-        9: 10, 10: 10, 11: 10, 12: 10, 13: 10, 14: 10, 15: 10, 16: 10
+    points_table: Dict[str, float] = Field(default_factory=lambda: {
+        "1": 100, "2": 75, "3": 50, "4": 50, "5": 25, "6": 25, "7": 25, "8": 25,
+        "9": 10, "10": 10, "11": 10, "12": 10, "13": 10, "14": 10, "15": 10, "16": 10
     })
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class RankingConfigUpdate(BaseModel):
     formula: str
     top_n_count: int
-    points_table: Dict[int, float]
+    points_table: Dict[str, float]
 
 class ImportResult(BaseModel):
     player_name: str
@@ -243,6 +253,94 @@ async def upload_photo(file: UploadFile = File(...), current_user: User = Depend
     photo_url = f"data:{file.content_type};base64,{base64_encoded}"
     return {"photo_url": photo_url}
 
+@api_router.get("/players/{player_id}/details")
+async def get_player_details(player_id: str):
+    # Get player info
+    player = await db.players.find_one({"id": player_id}, {"_id": 0})
+    if not player:
+        raise HTTPException(status_code=404, detail="Player not found")
+    
+    # Get player results
+    results = await db.results.find({"player_id": player_id}, {"_id": 0}).sort("created_at", -1).to_list(100)
+    
+    # Get tournaments for these results
+    tournament_ids = list(set([r['tournament_id'] for r in results]))
+    tournaments_cursor = db.tournaments.find({"id": {"$in": tournament_ids}}, {"_id": 0})
+    tournaments_list = await tournaments_cursor.to_list(100)
+    tournaments_dict = {t['id']: t for t in tournaments_list}
+    
+    # Build recent tournaments with results
+    recent_tournaments = []
+    for result in results[:10]:  # Last 10 tournaments
+        tournament = tournaments_dict.get(result['tournament_id'])
+        if tournament:
+            recent_tournaments.append({
+                "tournament_name": tournament['name'],
+                "tournament_date": tournament['date'],
+                "class_category": result['class_category'],
+                "gender_category": result['gender_category'],
+                "placement": result['placement'],
+                "points": result['points']
+            })
+    
+    # Get ranking position for each class/category combination
+    rankings = {}
+    classes_played = list(set([(r['class_category'], r['gender_category']) for r in results]))
+    
+    config = await get_ranking_config()
+    
+    for class_cat, gender_cat in classes_played:
+        # Get all results for this class/category
+        all_results = await db.results.find(
+            {"class_category": class_cat, "gender_category": gender_cat},
+            {"_id": 0}
+        ).to_list(10000)
+        
+        # Calculate rankings
+        player_results = {}
+        for r in all_results:
+            pid = r['player_id']
+            if pid not in player_results:
+                player_results[pid] = {'player_name': r['player_name'], 'results': []}
+            player_results[pid]['results'].append(r['points'])
+        
+        # Calculate points based on formula
+        ranking_list = []
+        for pid, data in player_results.items():
+            points_list = sorted(data['results'], reverse=True)
+            if config.formula == "sum_all":
+                total_points = sum(points_list)
+            elif config.formula == "top_n":
+                total_points = sum(points_list[:config.top_n_count])
+            else:
+                total_points = sum([p * (0.9 ** i) for i, p in enumerate(points_list)])
+            
+            ranking_list.append({
+                'player_id': pid,
+                'total_points': total_points
+            })
+        
+        ranking_list.sort(key=lambda x: x['total_points'], reverse=True)
+        
+        # Find player position
+        for i, r in enumerate(ranking_list, 1):
+            if r['player_id'] == player_id:
+                rankings[f"{class_cat}_{gender_cat}"] = {
+                    "rank": i,
+                    "total": len(ranking_list),
+                    "points": round(r['total_points'], 2),
+                    "class": class_cat,
+                    "category": gender_cat
+                }
+                break
+    
+    return {
+        "player": player,
+        "recent_tournaments": recent_tournaments,
+        "rankings": rankings,
+        "total_tournaments": len(results)
+    }
+
 # Tournament Routes
 @api_router.get("/tournaments", response_model=List[Tournament])
 async def get_tournaments():
@@ -253,6 +351,42 @@ async def get_tournaments():
         if isinstance(tournament.get('created_at'), str):
             tournament['created_at'] = datetime.fromisoformat(tournament['created_at'])
     return tournaments
+
+@api_router.get("/tournaments/{tournament_id}/results")
+async def get_tournament_results(tournament_id: str):
+    # Get tournament info
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    
+    # Get all results for this tournament
+    results = await db.results.find({"tournament_id": tournament_id}, {"_id": 0}).to_list(1000)
+    
+    # Group by class and category
+    grouped_results = {}
+    for result in results:
+        key = f"{result['class_category']}_{result['gender_category']}"
+        if key not in grouped_results:
+            grouped_results[key] = {
+                "class": result['class_category'],
+                "category": result['gender_category'],
+                "results": []
+            }
+        grouped_results[key]["results"].append({
+            "player_id": result['player_id'],
+            "player_name": result['player_name'],
+            "placement": result['placement'],
+            "points": result['points']
+        })
+    
+    # Sort results by placement
+    for key in grouped_results:
+        grouped_results[key]["results"].sort(key=lambda x: x['placement'])
+    
+    return {
+        "tournament": tournament,
+        "results": list(grouped_results.values())
+    }
 
 @api_router.post("/tournaments", response_model=Tournament)
 async def create_tournament(tournament_data: TournamentCreate, current_user: User = Depends(get_current_user)):
@@ -303,7 +437,7 @@ async def create_result(result_data: ResultCreate, current_user: User = Depends(
     
     # Get points from config
     config = await get_ranking_config()
-    points = config.points_table.get(result_data.placement, 0.0)
+    points = config.points_table.get(str(result_data.placement), 0.0)
     
     result = Result(
         **result_data.model_dump(),

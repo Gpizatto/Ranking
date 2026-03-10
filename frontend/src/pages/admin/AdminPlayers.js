@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Label } from '../../components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { toast } from 'sonner';
@@ -17,7 +18,11 @@ const AdminPlayers = () => {
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
-    photo_url: ''
+    photo_url: '',
+    city: '',
+    academy: '',
+    coach: '',
+    main_class: '1a'
   });
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -96,7 +101,11 @@ const AdminPlayers = () => {
     setEditingPlayer(player);
     setFormData({
       name: player.name,
-      photo_url: player.photo_url || ''
+      photo_url: player.photo_url || '',
+      city: player.city || '',
+      academy: player.academy || '',
+      coach: player.coach || '',
+      main_class: player.main_class || '1a'
     });
     setDialogOpen(true);
   };
@@ -114,7 +123,7 @@ const AdminPlayers = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', photo_url: '' });
+    setFormData({ name: '', photo_url: '', city: '', academy: '', coach: '', main_class: '1a' });
     setEditingPlayer(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -182,6 +191,54 @@ const AdminPlayers = () => {
                   className="bg-slate-700 border-slate-600 text-white"
                   required
                   data-testid="player-name-input"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-gray-300">Cidade</Label>
+                  <Input
+                    value={formData.city}
+                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
+                    className="bg-slate-700 border-slate-600 text-white"
+                    placeholder="Curitiba, PR"
+                    data-testid="player-city-input"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-300">Classe Principal</Label>
+                  <Select
+                    value={formData.main_class}
+                    onValueChange={(value) => setFormData({ ...formData, main_class: value })}
+                  >
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="player-class-select">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {['1a', '2a', '3a', '4a', '5a', '6a', 'Duplas'].map(cls => (
+                        <SelectItem key={cls} value={cls}>{cls}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label className="text-gray-300">Academia</Label>
+                <Input
+                  value={formData.academy}
+                  onChange={(e) => setFormData({ ...formData, academy: e.target.value })}
+                  className="bg-slate-700 border-slate-600 text-white"
+                  placeholder="Nome da academia"
+                  data-testid="player-academy-input"
+                />
+              </div>
+              <div>
+                <Label className="text-gray-300">Treinador</Label>
+                <Input
+                  value={formData.coach}
+                  onChange={(e) => setFormData({ ...formData, coach: e.target.value })}
+                  className="bg-slate-700 border-slate-600 text-white"
+                  placeholder="Nome do treinador"
+                  data-testid="player-coach-input"
                 />
               </div>
               <Button type="submit" className="w-full bg-blue-500 hover:bg-blue-600" data-testid="player-submit-button">

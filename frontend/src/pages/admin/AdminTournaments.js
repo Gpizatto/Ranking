@@ -19,7 +19,8 @@ const AdminTournaments = () => {
   const [formData, setFormData] = useState({
     name: '',
     date: '',
-    location: ''
+    location: '',
+    is_completed: false
   });
 
   useEffect(() => {
@@ -67,7 +68,8 @@ const AdminTournaments = () => {
     setFormData({
       name: tournament.name,
       date: new Date(tournament.date).toISOString().split('T')[0],
-      location: tournament.location || ''
+      location: tournament.location || '',
+      is_completed: tournament.is_completed || false
     });
     setDialogOpen(true);
   };
@@ -85,7 +87,7 @@ const AdminTournaments = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', date: '', location: '' });
+    setFormData({ name: '', date: '', location: '', is_completed: false });
     setEditingTournament(null);
   };
 
@@ -142,6 +144,19 @@ const AdminTournaments = () => {
                   className="bg-slate-700 border-slate-600 text-white"
                   data-testid="tournament-location-input"
                 />
+              </div>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="is_completed"
+                  checked={formData.is_completed}
+                  onChange={(e) => setFormData({ ...formData, is_completed: e.target.checked })}
+                  className="w-4 h-4 text-green-500 bg-slate-700 border-slate-600 rounded focus:ring-green-500"
+                  data-testid="tournament-completed-checkbox"
+                />
+                <Label htmlFor="is_completed" className="text-gray-300 cursor-pointer">
+                  Torneio concluído
+                </Label>
               </div>
               <Button type="submit" className="w-full bg-blue-500 hover:bg-blue-600" data-testid="tournament-submit-button">
                 {editingTournament ? 'Atualizar' : 'Criar'}

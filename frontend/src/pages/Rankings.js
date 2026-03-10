@@ -83,9 +83,10 @@ const Rankings = () => {
   };
 
   const top10 = rankings.slice(0, 10);
+  const top5 = rankings.slice(0, 5);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-4xl font-bold text-white mb-2" data-testid="rankings-title">Rankings Oficiais</h1>
@@ -148,11 +149,108 @@ const Rankings = () => {
         </Card>
       </div>
 
-      {/* Rankings Table */}
+      {/* Top Players Cards - PSA Style */}
+      {!loading && rankings.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-3xl font-bold text-white">Top Players</h2>
+            <Badge className="bg-green-500 text-white px-3 py-1">
+              {selectedClass} - {selectedCategory}
+            </Badge>
+          </div>
+
+          <div className="grid md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {top5.map((player, index) => {
+              const isTop3 = index < 3;
+              const gradients = [
+                'from-yellow-500/20 to-yellow-600/20 border-yellow-500/50', // 1st - Gold
+                'from-gray-400/20 to-gray-500/20 border-gray-400/50',       // 2nd - Silver
+                'from-orange-500/20 to-orange-600/20 border-orange-500/50', // 3rd - Bronze
+                'from-blue-500/20 to-blue-600/20 border-blue-500/30',       // 4th
+                'from-green-500/20 to-green-600/20 border-green-500/30'     // 5th
+              ];
+              
+              const medalColors = [
+                'text-yellow-400',    // 1st
+                'text-gray-300',      // 2nd
+                'text-orange-400',    // 3rd
+                'text-blue-400',      // 4th
+                'text-green-400'      // 5th
+              ];
+
+              return (
+                <Card
+                  key={player.player_id}
+                  className={`bg-gradient-to-br ${gradients[index]} border-2 cursor-pointer transform transition-all hover:scale-105 hover:shadow-2xl`}
+                  onClick={() => handlePlayerClick(player.player_id)}
+                  data-testid={`top-player-card-${index + 1}`}
+                >
+                  <CardContent className="pt-6 space-y-4">
+                    {/* Rank Badge */}
+                    <div className="flex justify-between items-start">
+                      <div className={`text-5xl font-black ${medalColors[index]}`}>
+                        #{player.rank}
+                      </div>
+                      {isTop3 && (
+                        <Trophy className={`w-8 h-8 ${medalColors[index]}`} />
+                      )}
+                    </div>
+
+                    {/* Player Photo */}
+                    <div className="flex justify-center">
+                      <Avatar className="w-32 h-32 border-4 border-white/20">
+                        <AvatarImage src={player.photo_url} />
+                        <AvatarFallback className="bg-slate-700 text-white text-4xl">
+                          {player.player_name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
+
+                    {/* Player Info */}
+                    <div className="text-center space-y-2">
+                      <h3 className="text-xl font-bold text-white line-clamp-2 min-h-[3.5rem]">
+                        {player.player_name}
+                      </h3>
+                      
+                      {/* Points */}
+                      <div className="bg-slate-900/50 rounded-lg py-2 px-3">
+                        <div className="text-3xl font-bold text-green-400">
+                          {player.total_points}
+                        </div>
+                        <div className="text-xs text-gray-400">pontos</div>
+                      </div>
+
+                      {/* Additional Info */}
+                      <div className="space-y-1 text-sm">
+                        <div className="flex items-center justify-center text-gray-300">
+                          <Trophy className="w-3 h-3 mr-1" />
+                          {player.results_count} torneios
+                        </div>
+                      </div>
+
+                      {/* View Profile Button */}
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="w-full text-white hover:bg-white/10 mt-2"
+                      >
+                        Ver Perfil →
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Complete Rankings Table */}
       <Card className="bg-slate-800/50 border-green-500/20">
         <CardHeader>
-          <CardTitle className="text-white text-2xl">
-            Ranking {selectedClass} - {selectedCategory}
+          <CardTitle className="text-white text-2xl flex items-center justify-between">
+            <span>Ranking Completo - {selectedClass} {selectedCategory}</span>
+            <span className="text-sm text-gray-400 font-normal">{rankings.length} jogadores</span>
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -164,50 +262,74 @@ const Rankings = () => {
             <div className="overflow-x-auto">
               <table className="w-full" data-testid="rankings-table">
                 <thead>
-                  <tr className="border-b border-slate-700">
-                    <th className="text-left py-3 px-4 text-gray-400 font-semibold">Posição</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-semibold">Jogador</th>
-                    <th className="text-right py-3 px-4 text-gray-400 font-semibold">Pontos</th>
-                    <th className="text-center py-3 px-4 text-gray-400 font-semibold">Torneios</th>
+                  <tr className="border-b-2 border-slate-700">
+                    <th className="text-left py-4 px-4 text-gray-400 font-semibold uppercase text-xs">Rank</th>
+                    <th className="text-left py-4 px-4 text-gray-400 font-semibold uppercase text-xs">Jogador</th>
+                    <th className="text-left py-4 px-4 text-gray-400 font-semibold uppercase text-xs hidden md:table-cell">Classe</th>
+                    <th className="text-left py-4 px-4 text-gray-400 font-semibold uppercase text-xs hidden lg:table-cell">Categoria</th>
+                    <th className="text-right py-4 px-4 text-gray-400 font-semibold uppercase text-xs">Pontos</th>
+                    <th className="text-center py-4 px-4 text-gray-400 font-semibold uppercase text-xs hidden sm:table-cell">Torneios</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {rankings.map((player, index) => (
-                    <tr
-                      key={player.player_id}
-                      className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-colors"
-                      data-testid={`ranking-row-${index}`}
-                    >
-                      <td className="py-4 px-4">
-                        <div className="flex items-center">
-                          {index === 0 && <Trophy className="w-5 h-5 text-yellow-400 mr-2" />}
-                          {index === 1 && <Medal className="w-5 h-5 text-gray-300 mr-2" />}
-                          {index === 2 && <Medal className="w-5 h-5 text-orange-400 mr-2" />}
-                          <span className="text-white font-bold text-lg">{player.rank}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4">
-                        <div 
-                          className="flex items-center space-x-3 cursor-pointer hover:text-green-400 transition-colors"
-                          onClick={() => handlePlayerClick(player.player_id)}
-                        >
-                          <Avatar>
-                            <AvatarImage src={player.photo_url} />
-                            <AvatarFallback className="bg-green-500 text-white">
-                              {player.player_name.charAt(0)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-white font-medium hover:underline">{player.player_name}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-4 text-right">
-                        <span className="text-green-400 font-bold text-lg">{player.total_points}</span>
-                      </td>
-                      <td className="py-4 px-4 text-center">
-                        <span className="text-gray-400">{player.results_count}</span>
-                      </td>
-                    </tr>
-                  ))}
+                  {rankings.map((player, index) => {
+                    const isTop3 = index < 3;
+                    const medalColors = ['text-yellow-400', 'text-gray-300', 'text-orange-400'];
+                    
+                    return (
+                      <tr
+                        key={player.player_id}
+                        className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-all cursor-pointer group"
+                        data-testid={`ranking-row-${index}`}
+                      >
+                        <td className="py-4 px-4">
+                          <div className="flex items-center">
+                            {isTop3 ? (
+                              <>
+                                {index === 0 && <Trophy className="w-5 h-5 text-yellow-400 mr-2" />}
+                                {index === 1 && <Medal className="w-5 h-5 text-gray-300 mr-2" />}
+                                {index === 2 && <Medal className="w-5 h-5 text-orange-400 mr-2" />}
+                                <span className={`font-black text-xl ${medalColors[index]}`}>
+                                  {player.rank}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-white font-bold text-lg">{player.rank}</span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-4 px-4">
+                          <div 
+                            className="flex items-center space-x-3 group-hover:text-green-400 transition-colors"
+                            onClick={() => handlePlayerClick(player.player_id)}
+                          >
+                            <Avatar className="w-12 h-12 ring-2 ring-transparent group-hover:ring-green-500 transition-all">
+                              <AvatarImage src={player.photo_url} />
+                              <AvatarFallback className="bg-green-500 text-white">
+                                {player.player_name.charAt(0)}
+                              </AvatarFallback>
+                            </Avatar>
+                            <span className="text-white font-semibold group-hover:underline">{player.player_name}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-4 hidden md:table-cell">
+                          <Badge className="bg-blue-500">{selectedClass}</Badge>
+                        </td>
+                        <td className="py-4 px-4 hidden lg:table-cell">
+                          <Badge className="bg-purple-500">{selectedCategory}</Badge>
+                        </td>
+                        <td className="py-4 px-4 text-right">
+                          <span className="text-green-400 font-bold text-xl">{player.total_points}</span>
+                        </td>
+                        <td className="py-4 px-4 text-center hidden sm:table-cell">
+                          <span className="text-gray-400 font-medium">{player.results_count}</span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
                 </tbody>
               </table>
             </div>

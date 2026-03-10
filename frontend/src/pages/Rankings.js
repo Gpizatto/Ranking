@@ -330,9 +330,6 @@ const Rankings = () => {
                 </tbody>
               </table>
             </div>
-                </tbody>
-              </table>
-            </div>
           )}
         </CardContent>
       </Card>

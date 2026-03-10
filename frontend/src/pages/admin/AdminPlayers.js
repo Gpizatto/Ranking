@@ -293,6 +293,7 @@ const AdminPlayers = () => {
             </form>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Import Result */}

@@ -17,6 +17,8 @@ import asyncio
 import random
 import string
 import resend
+from openpyxl import load_workbook
+from io import BytesIO
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 
 ROOT_DIR = Path(__file__).parent
@@ -164,6 +166,31 @@ class ImportResult(BaseModel):
 class ImportData(BaseModel):
     tournament_name: str
     results: List[ImportResult]
+
+class Match(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    tournament_name: str
+    tournament_id: Optional[str] = None
+    player1_id: str
+    player1_name: str
+    player2_id: str
+    player2_name: str
+    winner_id: str
+    score: List[str]  # ["11-7", "8-11", "11-6", "11-9"]
+    round: str  # "Final", "Semi Final", "Quarter Final", "Round of 16", etc.
+    date: datetime
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class MatchCreate(BaseModel):
+    tournament_name: str
+    tournament_id: Optional[str] = None
+    player1_id: str
+    player2_id: str
+    winner_id: str
+    score: List[str]
+    round: str
+    date: datetime
 
 # ============= AUTH FUNCTIONS =============
 
@@ -507,11 +534,37 @@ async def get_player_details(player_id: str):
                 }
                 break
     
+    # Get player matches
+    matches = await db.matches.find(
+        {"$or": [{"player1_id": player_id}, {"player2_id": player_id}]},
+        {"_id": 0}
+    ).sort("date", -1).to_list(100)
+    
+    # Process matches to add opponent and result info
+    match_history = []
+    for match in matches:
+        is_player1 = match['player1_id'] == player_id
+        opponent_name = match['player2_name'] if is_player1 else match['player1_name']
+        opponent_id = match['player2_id'] if is_player1 else match['player1_id']
+        is_winner = match['winner_id'] == player_id
+        
+        match_history.append({
+            "id": match['id'],
+            "tournament_name": match['tournament_name'],
+            "opponent_name": opponent_name,
+            "opponent_id": opponent_id,
+            "result": "Win" if is_winner else "Loss",
+            "score": " ".join(match['score']),
+            "round": match['round'],
+            "date": match['date']
+        })
+    
     return {
         "player": player,
         "recent_tournaments": recent_tournaments,
         "rankings": rankings,
-        "total_tournaments": len(results)
+        "total_tournaments": len(results),
+        "match_history": match_history
     }
 
 # Tournament Routes
@@ -803,6 +856,143 @@ Retorne os dados no formato JSON:
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
+
+# Match Routes
+@api_router.get("/matches", response_model=List[Match])
+async def get_matches(player_id: Optional[str] = None, tournament_id: Optional[str] = None):
+    query = {}
+    if player_id:
+        query["$or"] = [{"player1_id": player_id}, {"player2_id": player_id}]
+    if tournament_id:
+        query["tournament_id"] = tournament_id
+    
+    matches = await db.matches.find(query, {"_id": 0}).sort("date", -1).to_list(1000)
+    for match in matches:
+        if isinstance(match.get('date'), str):
+            match['date'] = datetime.fromisoformat(match['date'])
+        if isinstance(match.get('created_at'), str):
+            match['created_at'] = datetime.fromisoformat(match['created_at'])
+    return matches
+
+@api_router.post("/matches", response_model=Match)
+async def create_match(match_data: MatchCreate, current_user: User = Depends(get_current_user)):
+    # Get player names
+    player1 = await db.players.find_one({"id": match_data.player1_id}, {"_id": 0})
+    player2 = await db.players.find_one({"id": match_data.player2_id}, {"_id": 0})
+    
+    if not player1 or not player2:
+        raise HTTPException(status_code=404, detail="Player not found")
+    
+    match = Match(
+        **match_data.model_dump(),
+        player1_name=player1['name'],
+        player2_name=player2['name']
+    )
+    
+    doc = match.model_dump()
+    doc['date'] = doc['date'].isoformat()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.matches.insert_one(doc)
+    
+    return match
+
+@api_router.delete("/matches/{match_id}")
+async def delete_match(match_id: str, current_user: User = Depends(get_current_user)):
+    result = await db.matches.delete_one({"id": match_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Match not found")
+    return {"message": "Match deleted"}
+
+# Import matches from Excel
+@api_router.post("/import-matches-excel")
+async def import_matches_excel(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="File must be Excel format (.xlsx or .xls)")
+    
+    try:
+        contents = await file.read()
+        workbook = load_workbook(BytesIO(contents))
+        
+        if 'Matches' not in workbook.sheetnames:
+            raise HTTPException(status_code=400, detail="Excel must have a sheet named 'Matches'")
+        
+        sheet = workbook['Matches']
+        
+        # Get all players for lookup
+        players = await db.players.find({}, {"_id": 0}).to_list(1000)
+        players_dict = {p['name'].lower().strip(): p for p in players}
+        
+        matches_created = 0
+        errors = []
+        
+        # Skip header row
+        for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+            if not row[0]:  # Skip empty rows
+                continue
+                
+            try:
+                tournament_name = str(row[0]).strip()
+                round_name = str(row[1]).strip()
+                player1_name = str(row[2]).strip()
+                player2_name = str(row[3]).strip()
+                score_str = str(row[4]).strip()
+                winner_name = str(row[5]).strip()
+                date_val = row[6]
+                
+                # Find players
+                player1 = players_dict.get(player1_name.lower())
+                player2 = players_dict.get(player2_name.lower())
+                winner = players_dict.get(winner_name.lower())
+                
+                if not player1:
+                    errors.append(f"Row {row_idx}: Player1 '{player1_name}' not found")
+                    continue
+                if not player2:
+                    errors.append(f"Row {row_idx}: Player2 '{player2_name}' not found")
+                    continue
+                if not winner:
+                    errors.append(f"Row {row_idx}: Winner '{winner_name}' not found")
+                    continue
+                
+                # Parse score
+                score = [s.strip() for s in score_str.split() if s.strip()]
+                
+                # Parse date
+                if isinstance(date_val, datetime):
+                    match_date = date_val
+                else:
+                    match_date = datetime.strptime(str(date_val), '%Y-%m-%d')
+                
+                # Create match
+                match = Match(
+                    tournament_name=tournament_name,
+                    player1_id=player1['id'],
+                    player1_name=player1['name'],
+                    player2_id=player2['id'],
+                    player2_name=player2['name'],
+                    winner_id=winner['id'],
+                    score=score,
+                    round=round_name,
+                    date=match_date
+                )
+                
+                doc = match.model_dump()
+                doc['date'] = doc['date'].isoformat()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.matches.insert_one(doc)
+                
+                matches_created += 1
+                
+            except Exception as e:
+                errors.append(f"Row {row_idx}: {str(e)}")
+        
+        return {
+            "matches_created": matches_created,
+            "errors": errors
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing Excel: {str(e)}")
 
 # Include router
 app.include_router(api_router)

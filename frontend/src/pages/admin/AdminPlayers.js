@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from '../../lib/api';
 import { API } from '../../lib/api';
-import { Users, Plus, Edit, Trash2, Upload, Camera } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Upload, Camera, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -159,6 +159,27 @@ const AdminPlayers = () => {
     }
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await axios.get(`${API}/players/template`, {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'modelo_jogadores.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Modelo baixado com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao baixar modelo');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -167,6 +188,13 @@ const AdminPlayers = () => {
           <p className="text-gray-400">Cadastre e edite jogadores</p>
         </div>
         <div className="flex gap-2">
+          <Button
+            onClick={handleDownloadTemplate}
+            className="bg-blue-500 hover:bg-blue-600"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Baixar Modelo
+          </Button>
           <Button
             onClick={() => excelInputRef.current?.click()}
             className="bg-purple-500 hover:bg-purple-600"

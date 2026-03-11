@@ -529,6 +529,43 @@ async def upload_photo(file: UploadFile = File(...), current_user: User = Depend
     photo_url = f"data:{file.content_type};base64,{base64_encoded}"
     return {"photo_url": photo_url}
 
+@api_router.get("/players/template")
+async def download_players_template():
+    """Generate and download Excel template for players import"""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Players"
+    
+    # Headers
+    headers = ["Name", "City", "Academy", "Coach", "Main Class"]
+    ws.append(headers)
+    
+    # Example row
+    example = ["João Silva", "Curitiba", "Academia XYZ", "Pedro Treinador", "1a"]
+    ws.append(example)
+    
+    # Style headers (bold)
+    for cell in ws[1]:
+        cell.font = cell.font.copy(bold=True)
+    
+    # Adjust column widths
+    ws.column_dimensions['A'].width = 25
+    ws.column_dimensions['B'].width = 20
+    ws.column_dimensions['C'].width = 25
+    ws.column_dimensions['D'].width = 25
+    ws.column_dimensions['E'].width = 15
+    
+    # Save to BytesIO
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=modelo_jogadores.xlsx"}
+    )
+
 @api_router.post("/import-players-excel")
 async def import_players_excel(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
     if not file.filename.endswith(('.xlsx', '.xls')):
@@ -1406,6 +1443,46 @@ async def delete_match(match_id: str, current_user: User = Depends(get_current_u
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Match not found")
     return {"message": "Match deleted"}
+
+@api_router.get("/matches/template")
+async def download_matches_template():
+    """Generate and download Excel template for matches import"""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Matches"
+    
+    # Headers
+    headers = ["Tournament", "Category", "Round", "Player1", "Player2", "Score", "Winner", "Date"]
+    ws.append(headers)
+    
+    # Example row
+    example = ["Copa PR", "1a", "Final", "João Silva", "Pedro Lima", "11-7 8-11 11-6", "João Silva", "2025-01-15"]
+    ws.append(example)
+    
+    # Style headers (bold)
+    for cell in ws[1]:
+        cell.font = cell.font.copy(bold=True)
+    
+    # Adjust column widths
+    ws.column_dimensions['A'].width = 25
+    ws.column_dimensions['B'].width = 12
+    ws.column_dimensions['C'].width = 15
+    ws.column_dimensions['D'].width = 25
+    ws.column_dimensions['E'].width = 25
+    ws.column_dimensions['F'].width = 20
+    ws.column_dimensions['G'].width = 25
+    ws.column_dimensions['H'].width = 15
+    
+    # Save to BytesIO
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=modelo_partidas.xlsx"}
+    )
 
 # Import matches from Excel
 @api_router.post("/import-matches-excel")

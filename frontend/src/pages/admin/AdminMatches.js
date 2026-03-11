@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from '../../lib/api';
 import { API } from '../../lib/api';
-import { Swords, Plus, Trash2, Upload, FileSpreadsheet } from 'lucide-react';
+import { Swords, Plus, Trash2, Upload, FileSpreadsheet, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -151,6 +151,27 @@ const AdminMatches = () => {
     setFormData({ ...formData, score: newScore });
   };
 
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await axios.get(`${API}/matches/template`, {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'modelo_partidas.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Modelo baixado com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao baixar modelo');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -159,6 +180,13 @@ const AdminMatches = () => {
           <p className="text-gray-400">Registre partidas e histórico de jogos</p>
         </div>
         <div className="flex gap-2">
+          <Button
+            onClick={handleDownloadTemplate}
+            className="bg-blue-500 hover:bg-blue-600"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Baixar Modelo
+          </Button>
           <Button
             onClick={() => fileInputRef.current?.click()}
             className="bg-purple-500 hover:bg-purple-600"

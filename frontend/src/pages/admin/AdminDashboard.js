@@ -4,6 +4,7 @@ import { API } from '../../lib/api';
 import { Trophy, Users, Calendar, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { toast } from 'sonner';
+import SubscriptionCard from '../../components/SubscriptionCard';
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState({
@@ -53,24 +54,30 @@ const AdminDashboard = () => {
       {loading ? (
         <div className="text-center py-12 text-gray-400">Carregando...</div>
       ) : (
-        <div className="grid md:grid-cols-3 gap-6">
-          {statCards.map((stat) => {
-            const Icon = stat.icon;
-            return (
-              <Card key={stat.title} className="bg-slate-800/50 border-blue-500/20" data-testid={`stat-card-${stat.title.toLowerCase()}`}>
-                <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium text-gray-400">{stat.title}</CardTitle>
-                  <div className={`w-12 h-12 bg-gradient-to-br ${stat.color} rounded-lg flex items-center justify-center`}>
-                    <Icon className="w-6 h-6 text-white" />
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-white">{stat.value}</div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+        <>
+          {/* Subscription Card */}
+          <SubscriptionCard />
+
+          {/* Stats Cards */}
+          <div className="grid md:grid-cols-3 gap-6">
+            {statCards.map((stat) => {
+              const Icon = stat.icon;
+              return (
+                <Card key={stat.title} className="bg-slate-800/50 border-blue-500/20" data-testid={`stat-card-${stat.title.toLowerCase()}`}>
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-gray-400">{stat.title}</CardTitle>
+                    <div className={`w-12 h-12 bg-gradient-to-br ${stat.color} rounded-lg flex items-center justify-center`}>
+                      <Icon className="w-6 h-6 text-white" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-3xl font-bold text-white">{stat.value}</div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </>
       )}
 
       <Card className="bg-slate-800/50 border-blue-500/20">

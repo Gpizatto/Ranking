@@ -102,9 +102,114 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "SquashRank Pro - Sistema de gerenciamento de rankings de squash. Objetivo atual: Vincular partidas a torneios e categorias específicas, criando uma página de detalhes do torneio que exibe resultados e partidas organizadas por categoria."
+user_problem_statement: "SquashRank Pro - Melhorias no sistema de exibição de resultados e cálculo automático. Objetivo: 1) Mostrar última partida no card do jogador, 2) Calcular automaticamente resultado do torneio baseado na rodada (Final→Champion/Runner-up, Semi Final→Semi Finalist, etc), 3) Atualizar histórico de torneios automaticamente, 4) Formatar placar com resultado em sets (ex: 11-2, 11-2, 11-2 (3-0))"
 
 backend:
+  - task: "Criar funções helper para cálculo automático (calculate_set_result, calculate_placement_from_round, get_result_label)"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py (linhas 54-121)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Funções criadas para calcular resultado em sets (3-0, 3-1, etc) e placement baseado no round. Regras: Final (Winner=1º, Loser=2º), Semi (Loser=3º/4º), Quarter (Loser=5º-8º)"
+
+  - task: "Auto-create/update Results ao criar Match"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py - POST /api/matches (linhas 1090-1165)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Endpoint POST /api/matches agora automaticamente cria/atualiza documentos em 'results' baseado no round da partida. Sistema calcula placement e points automaticamente. Não altera cálculo do ranking (mantém pontuação atual)"
+
+  - task: "Adicionar last_match e score_formatted no endpoint /api/players/{id}/details"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py (linhas 681-727)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Endpoint atualizado para incluir last_match com score_formatted e set_result calculado. Também atualiza match_history com formatação"
+
+  - task: "Adicionar last_match no endpoint /api/rankings"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py (linhas 937-988)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Endpoint de rankings agora busca última partida de cada jogador e inclui score_formatted e set_result"
+
+frontend:
+  - task: "Adicionar 'Last Match' nos cards dos top players"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/Rankings.js (linhas 231-243)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Cards dos top 5 jogadores agora exibem seção 'Last Match' com oponente e placar formatado (ex: 11-2, 11-2, 11-2 (3-0))"
+
+  - task: "Adicionar 'Last Match' e melhorar histórico de torneios no modal de detalhes"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/Rankings.js (linhas 469-554)"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Modal de detalhes do jogador agora mostra: 1) Seção 'Última Partida' com detalhes, 2) Histórico de Torneios em formato tabela (Tournament | Year | Result | Points) com labels automáticos (Champion, Runner-up, etc)"
+
+  - task: "Formatar score com resultado em sets em TournamentDetails"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/pages/TournamentDetails.js"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Adicionada função calculateSetResult e atualizada exibição de score para formato: '11-2, 11-2, 11-2 (3-0)'"
+
+metadata:
+  created_by: "main_agent"
+  version: "2.0"
+  test_sequence: 2
+  run_ui: true
+
+test_plan:
+  current_focus:
+    - "Criar uma partida de Final e verificar auto-create de results (Winner=1º, Loser=2º)"
+    - "Verificar exibição de last_match nos cards do ranking"
+    - "Verificar histórico de torneios no modal com labels automáticos"
+    - "Verificar formatação de score com resultado em sets"
+    - "Verificar que cálculo do ranking não foi alterado"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Implementação completa do sistema de cálculo automático de resultados e exibição de última partida. Backend: Funções helper criadas, POST /api/matches agora auto-cria/atualiza results baseado no round, endpoints de detalhes e rankings incluem last_match formatado. Frontend: Cards mostram last match, modal de detalhes com histórico melhorado em formato tabela, score formatado em todos os lugares. IMPORTANTE: Cálculo do ranking não foi alterado. Necessário testar: 1) Criar partida de Final e verificar auto-create, 2) Verificar exibição de last_match, 3) Verificar labels automáticos no histórico"
   - task: "Atualizar modelo Match para incluir tournament_id e category"
     implemented: true
     working: "NA"

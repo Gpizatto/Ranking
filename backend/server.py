@@ -49,6 +49,80 @@ if RESEND_API_KEY:
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
 
+# ============= HELPER FUNCTIONS =============
+
+def calculate_set_result(score: List[str]) -> str:
+    """
+    Calculate set result from score list.
+    Example: ["11-2", "11-9", "9-11", "11-7"] -> "3-1"
+    """
+    if not score:
+        return "0-0"
+    
+    player1_sets = 0
+    player2_sets = 0
+    
+    for game in score:
+        try:
+            parts = game.split('-')
+            if len(parts) == 2:
+                score1 = int(parts[0])
+                score2 = int(parts[1])
+                if score1 > score2:
+                    player1_sets += 1
+                else:
+                    player2_sets += 1
+        except (ValueError, IndexError):
+            continue
+    
+    return f"{player1_sets}-{player2_sets}"
+
+def calculate_placement_from_round(round_name: str, is_winner: bool) -> int:
+    """
+    Calculate tournament placement based on round and whether player won.
+    
+    Rules:
+    - Final: Winner = 1st, Loser = 2nd
+    - Semi Final: Loser = 3rd/4th
+    - Quarter Final: Loser = 5th-8th
+    - Round of 16: Loser = 9th-16th
+    - Round of 32: Loser = 17th-32nd
+    """
+    round_lower = round_name.lower()
+    
+    if 'final' in round_lower and 'semi' not in round_lower and 'quarter' not in round_lower:
+        # Final
+        return 1 if is_winner else 2
+    elif 'semi' in round_lower:
+        # Semi Final
+        return 1 if is_winner else 3  # Winner goes to final, loser is 3rd/4th
+    elif 'quarter' in round_lower:
+        # Quarter Final
+        return 3 if is_winner else 5  # Winner goes to semi, loser is 5th-8th
+    elif '16' in round_lower:
+        # Round of 16
+        return 5 if is_winner else 9
+    elif '32' in round_lower:
+        # Round of 32
+        return 9 if is_winner else 17
+    else:
+        # Group stage or other
+        return 9  # Default placement
+
+def get_result_label(placement: int) -> str:
+    """Get human-readable result label from placement"""
+    labels = {
+        1: "Champion",
+        2: "Runner-up",
+        3: "Semi Finalist",
+        4: "Semi Finalist",
+        5: "Quarter Finalist",
+        6: "Quarter Finalist",
+        7: "Quarter Finalist",
+        8: "Quarter Finalist"
+    }
+    return labels.get(placement, f"{placement}º Place")
+
 # ============= MODELS =============
 
 class User(BaseModel):
@@ -612,29 +686,44 @@ async def get_player_details(player_id: str):
     
     # Process matches to add opponent and result info
     match_history = []
-    for match in matches:
+    last_match = None
+    
+    for idx, match in enumerate(matches):
         is_player1 = match['player1_id'] == player_id
         opponent_name = match['player2_name'] if is_player1 else match['player1_name']
         opponent_id = match['player2_id'] if is_player1 else match['player1_id']
         is_winner = match['winner_id'] == player_id
         
-        match_history.append({
+        # Calculate set result
+        set_result = calculate_set_result(match['score'])
+        score_formatted = f"{', '.join(match['score'])} ({set_result})"
+        
+        match_info = {
             "id": match['id'],
             "tournament_name": match['tournament_name'],
             "opponent_name": opponent_name,
             "opponent_id": opponent_id,
             "result": "Win" if is_winner else "Loss",
             "score": " ".join(match['score']),
+            "score_formatted": score_formatted,
+            "set_result": set_result,
             "round": match['round'],
             "date": match['date']
-        })
+        }
+        
+        match_history.append(match_info)
+        
+        # Save first match as last_match
+        if idx == 0:
+            last_match = match_info
     
     return {
         "player": player,
         "recent_tournaments": recent_tournaments,
         "rankings": rankings,
         "total_tournaments": len(results),
-        "match_history": match_history
+        "match_history": match_history,
+        "last_match": last_match
     }
 
 # Tournament Routes
@@ -863,12 +952,37 @@ async def get_rankings(class_category: Optional[str] = None, gender_category: Op
         # Get player photo
         player = await db.players.find_one({"id": player_id}, {"_id": 0})
         
+        # Get last match for this player
+        last_match_doc = await db.matches.find_one(
+            {"$or": [{"player1_id": player_id}, {"player2_id": player_id}]},
+            {"_id": 0},
+            sort=[("date", -1)]
+        )
+        
+        last_match = None
+        if last_match_doc:
+            is_player1 = last_match_doc['player1_id'] == player_id
+            opponent_name = last_match_doc['player2_name'] if is_player1 else last_match_doc['player1_name']
+            is_winner = last_match_doc['winner_id'] == player_id
+            set_result = calculate_set_result(last_match_doc['score'])
+            
+            last_match = {
+                "opponent_name": opponent_name,
+                "score": last_match_doc['score'],
+                "score_formatted": f"{', '.join(last_match_doc['score'])} ({set_result})",
+                "set_result": set_result,
+                "result": "Win" if is_winner else "Loss",
+                "tournament_name": last_match_doc.get('tournament_name', ''),
+                "date": last_match_doc['date']
+            }
+        
         rankings.append({
             'player_id': player_id,
             'player_name': data['player_name'],
             'photo_url': player.get('photo_url') if player else None,
             'total_points': round(total_points, 2),
-            'results_count': len(points_list)
+            'results_count': len(points_list),
+            'last_match': last_match
         })
     
     # Sort by points
@@ -1003,6 +1117,89 @@ async def create_match(match_data: MatchCreate, current_user: User = Depends(get
     doc['date'] = doc['date'].isoformat()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.matches.insert_one(doc)
+    
+    # ============= AUTO-CREATE/UPDATE RESULTS =============
+    # Calculate placements based on round
+    winner_placement = calculate_placement_from_round(match.round, True)
+    loser_placement = calculate_placement_from_round(match.round, False)
+    
+    # Get ranking config for points
+    config = await get_ranking_config()
+    winner_points = config.points_table.get(str(winner_placement), 0.0)
+    loser_points = config.points_table.get(str(loser_placement), 0.0)
+    
+    # Determine winner and loser
+    winner_id = match.winner_id
+    loser_id = match.player2_id if winner_id == match.player1_id else match.player1_id
+    winner_name = match.player1_name if winner_id == match.player1_id else match.player2_name
+    loser_name = match.player2_name if winner_id == match.player1_id else match.player1_name
+    
+    # Check if results already exist for these players in this tournament and category
+    # Update or create winner result
+    existing_winner_result = await db.results.find_one({
+        "tournament_id": match.tournament_id,
+        "player_id": winner_id,
+        "class_category": match.category,
+        "gender_category": "Masculino"  # Default, could be enhanced
+    }, {"_id": 0})
+    
+    if existing_winner_result:
+        # Update if new placement is better (lower number = better)
+        if winner_placement < existing_winner_result.get('placement', 999):
+            await db.results.update_one(
+                {"id": existing_winner_result['id']},
+                {"$set": {
+                    "placement": winner_placement,
+                    "points": winner_points
+                }}
+            )
+    else:
+        # Create new result
+        winner_result = Result(
+            tournament_id=match.tournament_id,
+            player_id=winner_id,
+            player_name=winner_name,
+            class_category=match.category,
+            gender_category="Masculino",  # Default
+            placement=winner_placement,
+            points=winner_points
+        )
+        winner_doc = winner_result.model_dump()
+        winner_doc['created_at'] = winner_doc['created_at'].isoformat()
+        await db.results.insert_one(winner_doc)
+    
+    # Update or create loser result
+    existing_loser_result = await db.results.find_one({
+        "tournament_id": match.tournament_id,
+        "player_id": loser_id,
+        "class_category": match.category,
+        "gender_category": "Masculino"
+    }, {"_id": 0})
+    
+    if existing_loser_result:
+        # Update if new placement is better
+        if loser_placement < existing_loser_result.get('placement', 999):
+            await db.results.update_one(
+                {"id": existing_loser_result['id']},
+                {"$set": {
+                    "placement": loser_placement,
+                    "points": loser_points
+                }}
+            )
+    else:
+        # Create new result
+        loser_result = Result(
+            tournament_id=match.tournament_id,
+            player_id=loser_id,
+            player_name=loser_name,
+            class_category=match.category,
+            gender_category="Masculino",
+            placement=loser_placement,
+            points=loser_points
+        )
+        loser_doc = loser_result.model_dump()
+        loser_doc['created_at'] = loser_doc['created_at'].isoformat()
+        await db.results.insert_one(loser_doc)
     
     return match
 

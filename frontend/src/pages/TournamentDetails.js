@@ -11,6 +11,29 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+// Helper function to calculate set result
+const calculateSetResult = (score) => {
+  if (!score || score.length === 0) return '0-0';
+  
+  let player1Sets = 0;
+  let player2Sets = 0;
+  
+  score.forEach(game => {
+    const parts = game.split('-');
+    if (parts.length === 2) {
+      const score1 = parseInt(parts[0]);
+      const score2 = parseInt(parts[1]);
+      if (score1 > score2) {
+        player1Sets++;
+      } else {
+        player2Sets++;
+      }
+    }
+  });
+  
+  return `${player1Sets}-${player2Sets}`;
+};
+
 const TournamentDetails = () => {
   const { id } = useParams();
   const [tournament, setTournament] = useState(null);
@@ -251,7 +274,7 @@ const TournamentDetails = () => {
                           </span>
                         </div>
                         <span className="text-gray-300 font-mono text-sm">
-                          {match.score.join(' ')}
+                          {match.score.join(', ')} ({calculateSetResult(match.score)})
                         </span>
                       </div>
                     </div>

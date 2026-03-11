@@ -225,31 +225,127 @@ const Players = () => {
                     </div>
                   )}
 
+                  {/* Last Match */}
+                  {playerDetails.last_match && (
+                    <div className="bg-slate-900/50 rounded-lg p-4">
+                      <h3 className="text-white font-semibold mb-3">Última Partida</h3>
+                      <div className="bg-slate-800 rounded p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div>
+                            <p className="text-gray-400 text-sm">{playerDetails.last_match.tournament_name}</p>
+                            <p className="text-white font-medium text-lg">
+                              vs {playerDetails.last_match.opponent_name}
+                            </p>
+                          </div>
+                          <Badge className={playerDetails.last_match.result === 'Win' ? 'bg-green-500' : 'bg-red-500'}>
+                            {playerDetails.last_match.result === 'Win' ? 'Vitória' : 'Derrota'}
+                          </Badge>
+                        </div>
+                        <p className="text-gray-300 font-mono">
+                          {playerDetails.last_match.score_formatted}
+                        </p>
+                        <p className="text-gray-400 text-sm mt-2">
+                          {format(new Date(playerDetails.last_match.date), 'dd/MM/yyyy', { locale: ptBR })}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Recent Tournaments */}
                   {playerDetails.recent_tournaments.length > 0 && (
                     <div className="bg-slate-900/50 rounded-lg p-4">
                       <h3 className="text-white font-semibold mb-3 flex items-center">
                         <Trophy className="w-5 h-5 mr-2 text-green-400" />
-                        Últimos Torneios
+                        Histórico de Torneios
                       </h3>
-                      <div className="space-y-2">
-                        {playerDetails.recent_tournaments.map((tournament, idx) => (
-                          <div key={idx} className="bg-slate-800 rounded p-3">
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-white font-medium">{tournament.tournament_name}</span>
-                              <span className="text-green-400 font-semibold">{tournament.points} pts</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-sm text-gray-400">
-                              <span>{format(new Date(tournament.tournament_date), 'dd/MM/yyyy', { locale: ptBR })}</span>
-                              <span>•</span>
-                              <span>{tournament.class_category}</span>
-                              <span>•</span>
-                              <span>{tournament.gender_category}</span>
-                              <span>•</span>
-                              <span className="text-white font-semibold">{tournament.placement}º lugar</span>
-                            </div>
-                          </div>
-                        ))}
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-slate-700">
+                              <th className="text-left py-2 px-2 text-gray-400 text-sm">Torneio</th>
+                              <th className="text-left py-2 px-2 text-gray-400 text-sm">Ano</th>
+                              <th className="text-left py-2 px-2 text-gray-400 text-sm">Resultado</th>
+                              <th className="text-right py-2 px-2 text-gray-400 text-sm">Pontos</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {playerDetails.recent_tournaments.map((tournament, idx) => {
+                              const placementLabels = {
+                                1: "Champion",
+                                2: "Runner-up",
+                                3: "Semi Finalist",
+                                4: "Semi Finalist",
+                                5: "Quarter Finalist",
+                                6: "Quarter Finalist",
+                                7: "Quarter Finalist",
+                                8: "Quarter Finalist"
+                              };
+                              const resultLabel = placementLabels[tournament.placement] || `${tournament.placement}º Place`;
+                              const year = new Date(tournament.tournament_date).getFullYear();
+                              
+                              return (
+                                <tr key={idx} className="border-b border-slate-700/50">
+                                  <td className="py-3 px-2 text-white">{tournament.tournament_name}</td>
+                                  <td className="py-3 px-2 text-gray-300">{year}</td>
+                                  <td className="py-3 px-2">
+                                    <Badge className={tournament.placement <= 3 ? 'bg-yellow-500' : 'bg-blue-500'}>
+                                      {resultLabel}
+                                    </Badge>
+                                  </td>
+                                  <td className="py-3 px-2 text-right text-green-400 font-semibold">
+                                    {tournament.points} pts
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Match History */}
+                  {playerDetails.match_history && playerDetails.match_history.length > 0 && (
+                    <div className="bg-slate-900/50 rounded-lg p-4">
+                      <h3 className="text-white font-semibold mb-3 flex items-center">
+                        <Trophy className="w-5 h-5 mr-2 text-green-400" />
+                        Histórico de Partidas
+                      </h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-slate-700">
+                              <th className="text-left py-2 px-2 text-gray-400 text-sm">Oponente</th>
+                              <th className="text-left py-2 px-2 text-gray-400 text-sm">Torneio</th>
+                              <th className="text-left py-2 px-2 text-gray-400 text-sm">Rodada</th>
+                              <th className="text-left py-2 px-2 text-gray-400 text-sm">Placar</th>
+                              <th className="text-left py-2 px-2 text-gray-400 text-sm">Resultado</th>
+                              <th className="text-left py-2 px-2 text-gray-400 text-sm">Data</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {playerDetails.match_history.slice(0, 10).map((match, idx) => (
+                              <tr key={idx} className="border-b border-slate-700/50">
+                                <td className="py-3 px-2 text-white">{match.opponent_name}</td>
+                                <td className="py-3 px-2 text-gray-300 text-sm">{match.tournament_name}</td>
+                                <td className="py-3 px-2">
+                                  <Badge className="bg-purple-500 text-xs">{match.round}</Badge>
+                                </td>
+                                <td className="py-3 px-2 text-gray-300 font-mono text-xs">
+                                  {match.score_formatted}
+                                </td>
+                                <td className="py-3 px-2">
+                                  <Badge className={match.result === 'Win' ? 'bg-green-500' : 'bg-red-500'}>
+                                    {match.result === 'Win' ? 'Vitória' : 'Derrota'}
+                                  </Badge>
+                                </td>
+                                <td className="py-3 px-2 text-gray-400 text-sm">
+                                  {format(new Date(match.date), 'dd/MM/yyyy', { locale: ptBR })}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   )}

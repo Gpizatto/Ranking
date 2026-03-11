@@ -546,6 +546,52 @@ const Rankings = () => {
                       </div>
                     </div>
                   )}
+
+                  {/* Match History */}
+                  {playerDetails.match_history && playerDetails.match_history.length > 0 && (
+                    <div className="bg-slate-900/50 rounded-lg p-4">
+                      <h3 className="text-white font-semibold mb-3 flex items-center">
+                        <Trophy className="w-5 h-5 mr-2 text-green-400" />
+                        Histórico de Partidas
+                      </h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-slate-700">
+                              <th className="text-left py-2 px-2 text-gray-400 text-sm">Oponente</th>
+                              <th className="text-left py-2 px-2 text-gray-400 text-sm">Torneio</th>
+                              <th className="text-left py-2 px-2 text-gray-400 text-sm">Rodada</th>
+                              <th className="text-left py-2 px-2 text-gray-400 text-sm">Placar</th>
+                              <th className="text-left py-2 px-2 text-gray-400 text-sm">Resultado</th>
+                              <th className="text-left py-2 px-2 text-gray-400 text-sm">Data</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {playerDetails.match_history.slice(0, 10).map((match, idx) => (
+                              <tr key={idx} className="border-b border-slate-700/50">
+                                <td className="py-3 px-2 text-white">{match.opponent_name}</td>
+                                <td className="py-3 px-2 text-gray-300 text-sm">{match.tournament_name}</td>
+                                <td className="py-3 px-2">
+                                  <Badge className="bg-purple-500 text-xs">{match.round}</Badge>
+                                </td>
+                                <td className="py-3 px-2 text-gray-300 font-mono text-xs">
+                                  {match.score_formatted}
+                                </td>
+                                <td className="py-3 px-2">
+                                  <Badge className={match.result === 'Win' ? 'bg-green-500' : 'bg-red-500'}>
+                                    {match.result === 'Win' ? 'Vitória' : 'Derrota'}
+                                  </Badge>
+                                </td>
+                                <td className="py-3 px-2 text-gray-400 text-sm">
+                                  {format(new Date(match.date), 'dd/MM/yyyy', { locale: ptBR })}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="py-12 text-center text-gray-400">

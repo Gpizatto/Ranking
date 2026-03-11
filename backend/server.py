@@ -687,6 +687,7 @@ async def get_player_details(player_id: str):
     # Process matches to add opponent and result info
     match_history = []
     last_match = None
+    head_to_head = {}  # Dictionary to store head-to-head stats
     
     for idx, match in enumerate(matches):
         is_player1 = match['player1_id'] == player_id
@@ -716,6 +717,29 @@ async def get_player_details(player_id: str):
         # Save first match as last_match
         if idx == 0:
             last_match = match_info
+        
+        # Calculate head-to-head stats
+        if opponent_id not in head_to_head:
+            head_to_head[opponent_id] = {
+                "opponent_id": opponent_id,
+                "opponent_name": opponent_name,
+                "matches_played": 0,
+                "wins": 0,
+                "losses": 0
+            }
+        
+        head_to_head[opponent_id]["matches_played"] += 1
+        if is_winner:
+            head_to_head[opponent_id]["wins"] += 1
+        else:
+            head_to_head[opponent_id]["losses"] += 1
+    
+    # Convert head_to_head to sorted list (by matches played)
+    head_to_head_list = sorted(
+        head_to_head.values(),
+        key=lambda x: x["matches_played"],
+        reverse=True
+    )
     
     return {
         "player": player,
@@ -723,7 +747,8 @@ async def get_player_details(player_id: str):
         "rankings": rankings,
         "total_tournaments": len(results),
         "match_history": match_history,
-        "last_match": last_match
+        "last_match": last_match,
+        "head_to_head": head_to_head_list
     }
 
 # Tournament Routes

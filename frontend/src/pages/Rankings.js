@@ -181,76 +181,94 @@ const Rankings = () => {
               return (
                 <Card
                   key={player.player_id}
-                  className={`bg-gradient-to-br ${gradients[index]} border-2 cursor-pointer transform transition-all hover:scale-105 hover:shadow-2xl`}
                   onClick={() => handlePlayerClick(player.player_id)}
+                  className="relative overflow-hidden cursor-pointer group bg-slate-800/50 border-green-500/20 hover:border-green-400/60 transition-all duration-300"
                   data-testid={`top-player-card-${index + 1}`}
                 >
-                  <CardContent className="pt-6 space-y-4">
-                    {/* Rank Badge */}
-                    <div className="flex justify-between items-start">
-                      <div className={`text-5xl font-black ${medalColors[index]}`}>
-                        #{player.rank}
-                      </div>
-                      {isTop3 && (
-                        <Trophy className={`w-8 h-8 ${medalColors[index]}`} />
+                  {/* Background Image */}
+                  <div className="relative h-96">
+                    {/* Player Photo - covers 70% of card */}
+                    <div className="absolute inset-0 overflow-hidden">
+                      {player.photo_url ? (
+                        <img 
+                          src={player.photo_url} 
+                          alt={player.player_name}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                        />
+                      ) : (
+                        <div className="w-full h-full bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center">
+                          <span className="text-9xl text-white/20 font-bold">
+                            {player.player_name.charAt(0)}
+                          </span>
+                        </div>
                       )}
                     </div>
 
-                    {/* Player Photo */}
-                    <div className="flex justify-center">
-                      <Avatar className="w-32 h-32 border-4 border-white/20">
-                        <AvatarImage src={player.photo_url} />
-                        <AvatarFallback className="bg-slate-700 text-white text-4xl">
-                          {player.player_name.charAt(0)}
-                        </AvatarFallback>
-                      </Avatar>
+                    {/* Gradient Overlay (always visible) */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/50 to-transparent" />
+
+                    {/* Rank Badge */}
+                    <div className="absolute top-4 left-4 z-10">
+                      <div className="bg-slate-900/80 backdrop-blur-sm rounded-full w-16 h-16 flex items-center justify-center border-2 border-white/20">
+                        <span className="text-3xl font-bold text-white">#{player.rank}</span>
+                      </div>
                     </div>
 
-                    {/* Player Info */}
-                    <div className="text-center space-y-2">
-                      <h3 className="text-xl font-bold text-white line-clamp-2 min-h-[3.5rem]">
+                    {/* Medal Icon */}
+                    {isTop3 && (
+                      <div className="absolute top-4 right-4 z-10">
+                        <Trophy className={`w-10 h-10 ${medalColors[index]} drop-shadow-lg`} />
+                      </div>
+                    )}
+
+                    {/* Player Name & Points (always visible at bottom) */}
+                    <div className="absolute bottom-0 left-0 right-0 p-6 z-10">
+                      <h3 className="text-2xl font-bold text-white mb-2 line-clamp-2">
                         {player.player_name}
                       </h3>
-                      
-                      {/* Points */}
-                      <div className="bg-slate-900/50 rounded-lg py-2 px-3">
-                        <div className="text-3xl font-bold text-green-400">
-                          {player.total_points}
+                      <div className="flex items-center gap-4">
+                        <div className="bg-green-500/20 backdrop-blur-sm rounded-lg px-4 py-2 border border-green-500/30">
+                          <div className="text-2xl font-bold text-green-400">
+                            {player.total_points}
+                          </div>
+                          <div className="text-xs text-gray-300">pontos</div>
                         </div>
-                        <div className="text-xs text-gray-400">pontos</div>
-                      </div>
-
-                      {/* Additional Info */}
-                      <div className="space-y-1 text-sm">
-                        <div className="flex items-center justify-center text-gray-300">
-                          <Trophy className="w-3 h-3 mr-1" />
+                        <div className="flex items-center text-gray-300 text-sm">
+                          <Trophy className="w-4 h-4 mr-1" />
                           {player.results_count} torneios
                         </div>
                       </div>
+                    </div>
 
-                      {/* Last Match */}
+                    {/* Hover Overlay - shows additional info */}
+                    <div className="absolute inset-0 bg-slate-900/95 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex flex-col items-center justify-center p-6 gap-4">
+                      {/* Last Match Info */}
                       {player.last_match && (
-                        <div className="bg-slate-900/50 rounded-lg p-3 mt-2 text-left">
-                          <div className="text-xs text-gray-400 mb-1 font-semibold">Last Match</div>
-                          <div className="text-sm text-white mb-1">
+                        <div className="text-center space-y-2 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-300">
+                          <div className="text-sm text-green-400 font-semibold uppercase tracking-wide">
+                            Última Partida
+                          </div>
+                          <div className="text-xl text-white font-medium">
                             vs {player.last_match.opponent_name}
                           </div>
-                          <div className="text-xs text-gray-300">
+                          <div className="text-gray-300 font-mono">
                             {player.last_match.score_formatted}
                           </div>
+                          <Badge className={player.last_match.result === 'Win' ? 'bg-green-500' : 'bg-red-500'}>
+                            {player.last_match.result === 'Win' ? 'Vitória' : 'Derrota'}
+                          </Badge>
                         </div>
                       )}
 
                       {/* View Profile Button */}
                       <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="w-full text-white hover:bg-white/10 mt-2"
+                        variant="outline" 
+                        className="border-green-500 text-green-400 hover:bg-green-500 hover:text-white transform translate-y-4 group-hover:translate-y-0 transition-all duration-300 delay-75"
                       >
-                        Ver Perfil →
+                        Ver Perfil Completo →
                       </Button>
                     </div>
-                  </CardContent>
+                  </div>
                 </Card>
               );
             })}
@@ -587,6 +605,51 @@ const Rankings = () => {
                                 </td>
                               </tr>
                             ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Head-to-Head */}
+                  {playerDetails.head_to_head && playerDetails.head_to_head.length > 0 && (
+                    <div className="bg-slate-900/50 rounded-lg p-4">
+                      <h3 className="text-white font-semibold mb-3 flex items-center">
+                        <Trophy className="w-5 h-5 mr-2 text-green-400" />
+                        Head-to-Head
+                      </h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-slate-700">
+                              <th className="text-left py-2 px-2 text-gray-400 text-sm">Oponente</th>
+                              <th className="text-center py-2 px-2 text-gray-400 text-sm">Partidas</th>
+                              <th className="text-center py-2 px-2 text-gray-400 text-sm">Vitórias</th>
+                              <th className="text-center py-2 px-2 text-gray-400 text-sm">Derrotas</th>
+                              <th className="text-center py-2 px-2 text-gray-400 text-sm">Taxa de Vitória</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {playerDetails.head_to_head.map((h2h, idx) => {
+                              const winRate = ((h2h.wins / h2h.matches_played) * 100).toFixed(0);
+                              return (
+                                <tr key={idx} className="border-b border-slate-700/50">
+                                  <td className="py-3 px-2 text-white">{h2h.opponent_name}</td>
+                                  <td className="py-3 px-2 text-center">
+                                    <Badge className="bg-blue-500">{h2h.matches_played}</Badge>
+                                  </td>
+                                  <td className="py-3 px-2 text-center">
+                                    <Badge className="bg-green-500">{h2h.wins}</Badge>
+                                  </td>
+                                  <td className="py-3 px-2 text-center">
+                                    <Badge className="bg-red-500">{h2h.losses}</Badge>
+                                  </td>
+                                  <td className="py-3 px-2 text-center text-gray-300 font-semibold">
+                                    {winRate}%
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>

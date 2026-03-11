@@ -1,5 +1,6 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -17,7 +18,7 @@ import asyncio
 import random
 import string
 import resend
-from openpyxl import load_workbook
+from openpyxl import load_workbook, Workbook
 from io import BytesIO
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
 
@@ -899,6 +900,177 @@ async def delete_result(result_id: str, current_user: User = Depends(get_current
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Result not found")
     return {"message": "Result deleted"}
+
+@api_router.get("/results/template")
+async def download_results_template():
+    """Generate and download Excel template for results import"""
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Results"
+    
+    # Headers
+    headers = ["Player", "Classe", "Position"]
+    ws.append(headers)
+    
+    # Example row
+    example = ["João Silva", "Masculino A", "Champion"]
+    ws.append(example)
+    
+    # Style headers (bold)
+    for cell in ws[1]:
+        cell.font = cell.font.copy(bold=True)
+    
+    # Adjust column widths
+    ws.column_dimensions['A'].width = 25
+    ws.column_dimensions['B'].width = 20
+    ws.column_dimensions['C'].width = 20
+    
+    # Save to BytesIO
+    output = BytesIO()
+    wb.save(output)
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=modelo_resultados.xlsx"}
+    )
+
+@api_router.post("/results/import")
+async def import_results(
+    tournament_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """Import results from Excel file"""
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="File must be Excel format (.xlsx or .xls)")
+    
+    # Get tournament
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Tournament not found")
+    
+    try:
+        # Read Excel file
+        content = await file.read()
+        wb = load_workbook(BytesIO(content))
+        sheet = wb.active
+        
+        # Get all players for lookup
+        players = await db.players.find({}, {"_id": 0}).to_list(1000)
+        players_dict = {p['name'].lower().strip(): p for p in players}
+        
+        # Get ranking config for points
+        config = await get_ranking_config()
+        
+        results_created = 0
+        errors = []
+        
+        # Map position names to placement numbers
+        position_map = {
+            "champion": 1,
+            "runner-up": 2,
+            "runner up": 2,
+            "semi final": 3,
+            "semi finalist": 3,
+            "quarter final": 5,
+            "quarter finalist": 5,
+            "round of 16": 9,
+            "round of 32": 17
+        }
+        
+        # Skip header row
+        for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+            if not row[0]:  # Skip empty rows
+                continue
+                
+            try:
+                player_name = str(row[0]).strip()
+                classe = str(row[1]).strip() if row[1] else ""
+                position = str(row[2]).strip() if row[2] else ""
+                
+                # Validate required fields
+                if not player_name or not classe or not position:
+                    errors.append(f"Row {row_idx}: Missing required fields (Player, Classe, or Position)")
+                    continue
+                
+                # Find player
+                player = players_dict.get(player_name.lower())
+                if not player:
+                    errors.append(f"Row {row_idx}: Player '{player_name}' not found")
+                    continue
+                
+                # Parse classe (format: "Masculino A" or "Feminino B")
+                parts = classe.split()
+                if len(parts) >= 2:
+                    gender_category = parts[0]  # Masculino or Feminino
+                    class_category = parts[1]    # A, B, C, etc
+                else:
+                    errors.append(f"Row {row_idx}: Invalid Classe format. Expected 'Masculino A' or 'Feminino B'")
+                    continue
+                
+                # Convert position to placement number
+                position_lower = position.lower().strip()
+                placement = position_map.get(position_lower)
+                
+                if not placement:
+                    # Try to parse as number (e.g., "3rd", "5th")
+                    try:
+                        placement = int(''.join(filter(str.isdigit, position)))
+                    except (ValueError, TypeError):
+                        errors.append(f"Row {row_idx}: Invalid position '{position}'")
+                        continue
+                
+                # Get points for this placement
+                points = config.points_table.get(str(placement), 0.0)
+                
+                # Check if result already exists
+                existing = await db.results.find_one({
+                    "tournament_id": tournament_id,
+                    "player_id": player['id'],
+                    "class_category": class_category,
+                    "gender_category": gender_category
+                }, {"_id": 0})
+                
+                if existing:
+                    # Update if new placement is better (lower number = better)
+                    if placement < existing.get('placement', 999):
+                        await db.results.update_one(
+                            {"id": existing['id']},
+                            {"$set": {
+                                "placement": placement,
+                                "points": points
+                            }}
+                        )
+                        results_created += 1
+                else:
+                    # Create new result
+                    result = Result(
+                        tournament_id=tournament_id,
+                        player_id=player['id'],
+                        player_name=player['name'],
+                        class_category=class_category,
+                        gender_category=gender_category,
+                        placement=placement,
+                        points=points
+                    )
+                    result_doc = result.model_dump()
+                    result_doc['created_at'] = result_doc['created_at'].isoformat()
+                    await db.results.insert_one(result_doc)
+                    results_created += 1
+                    
+            except Exception as e:
+                errors.append(f"Row {row_idx}: {str(e)}")
+        
+        return {
+            "message": f"{results_created} results imported successfully",
+            "results_created": results_created,
+            "errors": errors if errors else None
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")
 
 # Ranking Config Routes
 @api_router.get("/ranking-config", response_model=RankingConfig)

@@ -227,6 +227,80 @@ const AdminResults = () => {
     });
   };
 
+  // Download template
+  const handleDownloadTemplate = async () => {
+    try {
+      const response = await axios.get(`${API}/results/template`, {
+        responseType: 'blob'
+      });
+      
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'modelo_resultados.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success('Modelo baixado com sucesso!');
+    } catch (error) {
+      toast.error('Erro ao baixar modelo');
+    }
+  };
+
+  // Import from Excel
+  const [importResultsDialogOpen, setImportResultsDialogOpen] = useState(false);
+  const [selectedTournamentForImport, setSelectedTournamentForImport] = useState('');
+  const [importFile, setImportFile] = useState(null);
+  const [importResultsLoading, setImportResultsLoading] = useState(false);
+  const importFileInputRef = useRef(null);
+
+  const handleImportResults = async () => {
+    if (!selectedTournamentForImport) {
+      toast.error('Selecione um torneio');
+      return;
+    }
+    
+    if (!importFile) {
+      toast.error('Selecione um arquivo Excel');
+      return;
+    }
+
+    setImportResultsLoading(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', importFile);
+
+      const response = await axios.post(
+        `${API}/results/import?tournament_id=${selectedTournamentForImport}`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+
+      toast.success(response.data.message);
+      
+      if (response.data.errors && response.data.errors.length > 0) {
+        console.warn('Import warnings:', response.data.errors);
+        toast.warning(`${response.data.errors.length} avisos encontrados. Verifique o console.`);
+      }
+
+      setImportResultsDialogOpen(false);
+      setSelectedTournamentForImport('');
+      setImportFile(null);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao importar resultados');
+    } finally {
+      setImportResultsLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -235,6 +309,93 @@ const AdminResults = () => {
           <p className="text-gray-400">Registre resultados de torneios</p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            onClick={handleDownloadTemplate}
+            className="bg-blue-500 hover:bg-blue-600"
+          >
+            <FileText className="w-4 h-4 mr-2" />
+            Baixar Modelo
+          </Button>
+
+          <Dialog open={importResultsDialogOpen} onOpenChange={setImportResultsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-green-500 hover:bg-green-600">
+                <Upload className="w-4 h-4 mr-2" />
+                Importar Resultados
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="bg-slate-800 border-green-500/20">
+              <DialogHeader>
+                <DialogTitle className="text-white">Importar Resultados via Excel</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-gray-300">Selecione o Torneio</Label>
+                  <Select
+                    value={selectedTournamentForImport}
+                    onValueChange={setSelectedTournamentForImport}
+                  >
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue placeholder="Escolha um torneio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tournaments.map(t => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name} - {format(new Date(t.date), 'dd/MM/yyyy', { locale: ptBR })}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-gray-300">Arquivo Excel</Label>
+                  <input
+                    ref={importFileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={(e) => setImportFile(e.target.files[0])}
+                    className="hidden"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={() => importFileInputRef.current?.click()}
+                      variant="outline"
+                      className="flex-1 bg-slate-700 border-slate-600 text-white hover:bg-slate-600"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {importFile ? importFile.name : 'Escolher arquivo'}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Formato: Player | Classe | Position
+                  </p>
+                </div>
+
+                <div className="flex gap-2 pt-4">
+                  <Button
+                    onClick={handleImportResults}
+                    disabled={importResultsLoading || !selectedTournamentForImport || !importFile}
+                    className="flex-1 bg-green-500 hover:bg-green-600"
+                  >
+                    {importResultsLoading ? 'Importando...' : 'Importar'}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setImportResultsDialogOpen(false);
+                      setSelectedTournamentForImport('');
+                      setImportFile(null);
+                    }}
+                    variant="outline"
+                    className="border-slate-600 text-white hover:bg-slate-700"
+                  >
+                    Cancelar
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={importDialogOpen} onOpenChange={setImportDialogOpen}>
             <DialogTrigger asChild>
               <Button className="bg-purple-500 hover:bg-purple-600" data-testid="import-button">

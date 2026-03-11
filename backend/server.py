@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File
+from fastapi import FastAPI, APIRouter, HTTPException, Depends, status, UploadFile, File, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import StreamingResponse
 from dotenv import load_dotenv
@@ -21,6 +21,7 @@ import resend
 from openpyxl import load_workbook, Workbook
 from io import BytesIO
 from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
+from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -124,6 +125,38 @@ def get_result_label(placement: int) -> str:
     }
     return labels.get(placement, f"{placement}º Place")
 
+# ============= SUBSCRIPTION PLANS =============
+
+SUBSCRIPTION_PLANS = {
+    "mensal": {
+        "name": "Plano Mensal",
+        "price": 99.90,  # R$ 99,90/mês
+        "currency": "brl",
+        "duration_days": 30
+    },
+    "anual": {
+        "name": "Plano Anual",
+        "price": 999.00,  # R$ 999,00/ano (economiza ~17%)
+        "currency": "brl",
+        "duration_days": 365
+    }
+}
+
+def check_subscription_active(subscription: Dict) -> bool:
+    """Check if subscription is active and not expired"""
+    if not subscription:
+        return False
+    
+    if subscription['status'] not in ['active']:
+        return False
+    
+    # Check if not expired
+    end_date = subscription['end_date']
+    if isinstance(end_date, str):
+        end_date = datetime.fromisoformat(end_date.replace('Z', '+00:00'))
+    
+    return datetime.now(timezone.utc) < end_date
+
 # ============= MODELS =============
 
 class User(BaseModel):
@@ -132,11 +165,20 @@ class User(BaseModel):
     username: str
     hashed_password: str
     is_admin: bool = True
+    federation_name: Optional[str] = None
+    subscription_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class UserCreate(BaseModel):
     username: str
     password: str
+
+class FederationCreate(BaseModel):
+    federation_name: str
+    email: str
+    password: str
+    plan_type: str  # "mensal" or "anual"
+    start_trial: bool = False
 
 class UserLogin(BaseModel):
     username: str
@@ -145,6 +187,32 @@ class UserLogin(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+class Subscription(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    plan_type: str  # "mensal" or "anual"
+    status: str = "active"  # active, inactive, canceled, expired
+    is_trial: bool = False
+    start_date: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    end_date: datetime
+    next_billing_date: Optional[datetime] = None
+    stripe_subscription_id: Optional[str] = None
+    stripe_customer_id: Optional[str] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class PaymentTransaction(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    session_id: str
+    amount: float
+    currency: str
+    payment_status: str = "pending"  # pending, paid, failed, expired
+    metadata: Optional[Dict[str, str]] = None
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class RegistrationRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -1588,6 +1656,94 @@ async def import_matches_excel(file: UploadFile = File(...), current_user: User 
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing Excel: {str(e)}")
+
+# ============= SUBSCRIPTION ENDPOINTS =============
+
+# Register federation with trial or paid plan
+@api_router.post("/register-federation")
+async def register_federation(federation_data: FederationCreate):
+    # Check if username already exists
+    existing_user = await db.users.find_one({"username": federation_data.email}, {"_id": 0})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Create user
+    hashed_password = pwd_context.hash(federation_data.password)
+    user = User(
+        username=federation_data.email,
+        hashed_password=hashed_password,
+        federation_name=federation_data.federation_name,
+        is_admin=True
+    )
+    
+    # Create subscription
+    if federation_data.start_trial:
+        # 1 day trial
+        subscription = Subscription(
+            user_id=user.id,
+            plan_type=federation_data.plan_type,
+            status="active",
+            is_trial=True,
+            start_date=datetime.now(timezone.utc),
+            end_date=datetime.now(timezone.utc) + timedelta(days=1),
+            next_billing_date=datetime.now(timezone.utc) + timedelta(days=1)
+        )
+    else:
+        # Paid plan - will be activated after payment
+        plan = SUBSCRIPTION_PLANS[federation_data.plan_type]
+        subscription = Subscription(
+            user_id=user.id,
+            plan_type=federation_data.plan_type,
+            status="pending",  # Pending payment
+            is_trial=False,
+            start_date=datetime.now(timezone.utc),
+            end_date=datetime.now(timezone.utc) + timedelta(days=plan['duration_days']),
+            next_billing_date=datetime.now(timezone.utc) + timedelta(days=plan['duration_days'])
+        )
+    
+    # Update user with subscription_id
+    user.subscription_id = subscription.id
+    
+    # Save to database
+    user_doc = user.model_dump()
+    user_doc['created_at'] = user_doc['created_at'].isoformat()
+    await db.users.insert_one(user_doc)
+    
+    subscription_doc = subscription.model_dump()
+    subscription_doc['start_date'] = subscription_doc['start_date'].isoformat()
+    subscription_doc['end_date'] = subscription_doc['end_date'].isoformat()
+    if subscription_doc['next_billing_date']:
+        subscription_doc['next_billing_date'] = subscription_doc['next_billing_date'].isoformat()
+    subscription_doc['created_at'] = subscription_doc['created_at'].isoformat()
+    await db.subscriptions.insert_one(subscription_doc)
+    
+    # Send email notification
+    if federation_data.start_trial:
+        try:
+            params = {
+                "from": "noreply@emergentagent.com",
+                "to": [federation_data.email],
+                "subject": "Trial ativado - SquashRank Pro",
+                "html": f"""
+                    <h2>Bem-vindo ao SquashRank Pro!</h2>
+                    <p>Olá {federation_data.federation_name},</p>
+                    <p>Seu trial de 1 dia foi ativado com sucesso!</p>
+                    <p>Você tem até <strong>{subscription.end_date.strftime('%d/%m/%Y às %H:%M')}</strong> para explorar todas as funcionalidades.</p>
+                    <p>Após o trial, você precisará escolher um plano para continuar usando o sistema.</p>
+                    <p>Obrigado por escolher SquashRank Pro!</p>
+                """
+            }
+            resend.Emails.send(params)
+        except Exception as e:
+            logger.error(f"Error sending trial email: {e}")
+    
+    return {
+        "message": "Federation registered successfully",
+        "user_id": user.id,
+        "subscription_id": subscription.id,
+        "is_trial": subscription.is_trial,
+        "end_date": subscription.end_date.isoformat()
+    }
 
 # Include router
 app.include_router(api_router)

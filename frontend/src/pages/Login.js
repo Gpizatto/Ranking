@@ -16,10 +16,10 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 const Login = () => {
   const navigate = useNavigate();
   const [loginData, setLoginData] = useState({ username: '', password: '' });
-  const [registerData, setRegisterData] = useState({ 
-    federation_name: '', 
-    email: '', 
-    password: '', 
+  const [registerData, setRegisterData] = useState({
+    federation_name: '',
+    email: '',
+    password: '',
     confirmPassword: '',
     plan_type: 'mensal',
     start_trial: true
@@ -31,7 +31,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post(`${API}/token`, 
+      const response = await axios.post(`${API}/token`,
         new URLSearchParams({
           username: loginData.username,
           password: loginData.password
@@ -54,7 +54,7 @@ const Login = () => {
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    
+
     if (registerData.password !== registerData.confirmPassword) {
       toast.error('As senhas não coincidem');
       return;
@@ -75,15 +75,15 @@ const Login = () => {
         plan_type: registerData.plan_type,
         start_trial: registerData.start_trial
       });
-      
+
       if (registerData.start_trial) {
         toast.success('Trial de 1 dia ativado! Faça login para começar.');
       } else {
         toast.success('Cadastro realizado! Faça login e prossiga para o pagamento.');
       }
-      
+
       // Auto login após registro
-      const loginResponse = await axios.post(`${API}/token`, 
+      const loginResponse = await axios.post(`${API}/token`,
         new URLSearchParams({
           username: registerData.email,
           password: registerData.password
@@ -96,7 +96,7 @@ const Login = () => {
       );
       setAuthToken(loginResponse.data.access_token);
       navigate('/admin/dashboard');
-      
+
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao registrar');
     } finally {
@@ -120,7 +120,7 @@ const Login = () => {
               <TabsTrigger value="login">Login</TabsTrigger>
               <TabsTrigger value="register">Registrar</TabsTrigger>
             </TabsList>
-            
+
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
@@ -153,7 +153,7 @@ const Login = () => {
                 </Button>
               </form>
             </TabsContent>
-            
+
             <TabsContent value="register">
               <form onSubmit={handleRegister} className="space-y-4">
                 <div>
@@ -198,7 +198,7 @@ const Login = () => {
                     required
                   />
                 </div>
-                
+
                 <div>
                   <Label className="text-gray-300">Plano</Label>
                   <Select
@@ -210,10 +210,10 @@ const Login = () => {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="mensal">
-                        Mensal - R$ 99,90/mês
+                        Mensal - R$ 59,90/mês
                       </SelectItem>
                       <SelectItem value="anual">
-                        Anual - R$ 999,00/ano (economize 17%)
+                        Anual - R$ 500,00/ano (economize 17%)
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -223,7 +223,9 @@ const Login = () => {
                   <Checkbox
                     id="trial"
                     checked={registerData.start_trial}
-                    onCheckedChange={(checked) => setRegisterData({ ...registerData, start_trial: checked })}
+                    onCheckedChange={(checked) =>
+                      setRegisterData({ ...registerData, start_trial: checked === true })
+                    }
                     className="border-green-500"
                   />
                   <label

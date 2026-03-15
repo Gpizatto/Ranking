@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../lib/api';
-import { API, setAuthToken } from '../lib/api';
+import { setAuthToken } from '../lib/api';
+import { useFederation } from '../context/FederationContext';
 import { Shield, LogIn, Building2, CreditCard, Gift } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -15,6 +16,7 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 
 const Login = () => {
   const navigate = useNavigate();
+  const { API, slug } = useFederation();
   const [loginData, setLoginData] = useState({ username: '', password: '' });
   const [registerData, setRegisterData] = useState({
     federation_name: '',
@@ -31,20 +33,13 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post(`${API}/token`,
-        new URLSearchParams({
-          username: loginData.username,
-          password: loginData.password
-        }),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
-      );
-      setAuthToken(response.data.access_token);
-      toast.success('Login realizado com sucesso!');
-      navigate('/admin');
+      const response = await axios.post(`${API}/auth/login`, {
+  username: loginData.username,
+  password: loginData.password
+});
+setAuthToken(response.data.access_token, slug);
+toast.success('Login realizado com sucesso!');
+navigate(`/${slug}/admin`);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao fazer login');
     } finally {

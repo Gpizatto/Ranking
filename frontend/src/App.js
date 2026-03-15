@@ -1,6 +1,7 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
+import Landing from './pages/Landing';
 import Rankings from './pages/Rankings';
 import Tournaments from './pages/Tournaments';
 import TournamentDetails from './pages/TournamentDetails';
@@ -13,8 +14,32 @@ import AdminResults from './pages/admin/AdminResults';
 import AdminMatches from './pages/admin/AdminMatches';
 import AdminRankingConfig from './pages/admin/AdminRankingConfig';
 import { AdminGuard } from './components/AdminGuard';
+import { FederationProvider } from './context/FederationContext';
 import { Toaster } from 'sonner';
 import './App.css';
+
+const FederationRoutes = () => {
+  return (
+    <FederationProvider>
+      <Routes>
+        <Route element={<Layout />}>
+          <Route index element={<Rankings />} />
+          <Route path="rankings" element={<Rankings />} />
+          <Route path="tournaments" element={<Tournaments />} />
+          <Route path="tournaments/:id" element={<TournamentDetails />} />
+          <Route path="players" element={<Players />} />
+          <Route path="login" element={<Login />} />
+          <Route path="admin" element={<AdminGuard><AdminDashboard /></AdminGuard>} />
+          <Route path="admin/tournaments" element={<AdminGuard><AdminTournaments /></AdminGuard>} />
+          <Route path="admin/players" element={<AdminGuard><AdminPlayers /></AdminGuard>} />
+          <Route path="admin/results" element={<AdminGuard><AdminResults /></AdminGuard>} />
+          <Route path="admin/matches" element={<AdminGuard><AdminMatches /></AdminGuard>} />
+          <Route path="admin/config" element={<AdminGuard><AdminRankingConfig /></AdminGuard>} />
+        </Route>
+      </Routes>
+    </FederationProvider>
+  );
+};
 
 function App() {
   return (
@@ -22,22 +47,8 @@ function App() {
       <Toaster position="top-right" richColors />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Rankings />} />
-            <Route path="rankings" element={<Rankings />} />
-            <Route path="tournaments" element={<Tournaments />} />
-            <Route path="tournaments/:id" element={<TournamentDetails />} />
-            <Route path="players" element={<Players />} />
-            <Route path="login" element={<Login />} />
-            
-            {/* Admin Routes */}
-            <Route path="admin" element={<AdminGuard><AdminDashboard /></AdminGuard>} />
-            <Route path="admin/tournaments" element={<AdminGuard><AdminTournaments /></AdminGuard>} />
-            <Route path="admin/players" element={<AdminGuard><AdminPlayers /></AdminGuard>} />
-            <Route path="admin/results" element={<AdminGuard><AdminResults /></AdminGuard>} />
-            <Route path="admin/matches" element={<AdminGuard><AdminMatches /></AdminGuard>} />
-            <Route path="admin/config" element={<AdminGuard><AdminRankingConfig /></AdminGuard>} />
-          </Route>
+          <Route path="/" element={<Landing />} />
+          <Route path="/:slug/*" element={<FederationRoutes />} />
         </Routes>
       </BrowserRouter>
     </div>

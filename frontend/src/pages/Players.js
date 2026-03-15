@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../lib/api';
-import { API } from '../lib/api';
+import { useFederation } from '../context/FederationContext';
 import { Users, Search, MapPin, GraduationCap, User, Trophy, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
@@ -12,6 +12,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const Players = () => {
+  const { API } = useFederation();
   const [players, setPlayers] = useState([]);
   const [filteredPlayers, setFilteredPlayers] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');

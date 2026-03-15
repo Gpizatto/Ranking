@@ -31,6 +31,12 @@ mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
 db = client[os.environ['DB_NAME']]
 
+# Banco master — armazena todas as federações
+db_master = client['squashrank_master']
+
+def get_federation_db(slug: str):
+    return client[f"squashrank_{slug}"]
+
 # JWT Configuration
 SECRET_KEY = os.environ.get('SECRET_KEY', 'your-secret-key-change-in-production-123456789')
 ALGORITHM = "HS256"
@@ -258,6 +264,9 @@ class Tournament(BaseModel):
     date: datetime
     location: Optional[str] = None
     is_completed: bool = False
+    bracket_link: Optional[str] = None
+    photos_link: Optional[str] = None
+    stream_link: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class TournamentCreate(BaseModel):
@@ -265,7 +274,10 @@ class TournamentCreate(BaseModel):
     date: datetime
     location: Optional[str] = None
     is_completed: bool = False
-
+    bracket_link: Optional[str] = None
+    photos_link: Optional[str] = None
+    stream_link: Optional[str] = None
+    
 class Result(BaseModel):
     model_config = ConfigDict(extra="ignore")
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
@@ -335,6 +347,20 @@ class MatchCreate(BaseModel):
     score: List[str]
     round: str
     date: datetime
+class FederationPublic(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
+    slug: str
+    logo_url: Optional[str] = None
+    state: Optional[str] = None
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+class FederationCreate(BaseModel):
+    name: str
+    slug: str
+    logo_url: Optional[str] = None
+    state: Optional[str] = None
 
 # ============= AUTH FUNCTIONS =============
 
@@ -445,6 +471,32 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 @api_router.get("/")
 async def root():
     return {"message": "SquashRank Pro API"}
+
+@api_router.get("/federations")
+async def list_federations():
+    feds = await db_master.federations.find({"is_active": True}, {"_id": 0}).to_list(1000)
+    for fed in feds:
+        fed['total_players'] = await db.players.count_documents({})
+        fed['total_tournaments'] = await db.tournaments.count_documents({})
+    return feds
+
+@api_router.get("/federations/{slug}")
+async def get_federation(slug: str):
+    fed = await db_master.federations.find_one({"slug": slug}, {"_id": 0})
+    if not fed:
+        raise HTTPException(status_code=404, detail="Federation not found")
+    return fed
+
+@api_router.post("/federations")
+async def create_federation(data: FederationCreate):
+    existing = await db_master.federations.find_one({"slug": data.slug})
+    if existing:
+        raise HTTPException(status_code=400, detail="Slug already in use")
+    fed = FederationPublic(**data.model_dump())
+    doc = fed.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db_master.federations.insert_one(doc)
+    return fed
 
 # Auth Routes
 @api_router.post("/auth/request-registration")

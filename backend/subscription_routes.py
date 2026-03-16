@@ -17,13 +17,13 @@ logger = logging.getLogger(__name__)
 SUBSCRIPTION_PLANS = {
     "mensal": {
         "name": "Plano Mensal",
-        "price": 99.90,
+        "price": 69.90,
         "currency": "brl",
         "duration_days": 30
     },
     "anual": {
         "name": "Plano Anual",
-        "price": 999.00,
+        "price": 600.00,
         "currency": "brl",
         "duration_days": 365
     }

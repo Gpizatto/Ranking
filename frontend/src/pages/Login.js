@@ -205,10 +205,10 @@ navigate(`/${slug}/admin`);
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="mensal">
-                        Mensal - R$ 59,90/mês
+                        Mensal - R$ 69,90/mês
                       </SelectItem>
                       <SelectItem value="anual">
-                        Anual - R$ 500,00/ano (economize 17%)
+                        Anual - R$ 600,00/ano (economize 17%)
                       </SelectItem>
                     </SelectContent>
                   </Select>

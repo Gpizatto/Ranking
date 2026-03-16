@@ -81,7 +81,7 @@ const SubscriptionCard = () => {
               className="w-full bg-blue-500 hover:bg-blue-600"
             >
               <CreditCard className="w-4 h-4 mr-2" />
-              Assinar Plano Mensal - R$ 99,90/mês
+              Assinar Plano Mensal - R$ 69,90/mês
             </Button>
             <Button
               onClick={() => handleCheckout('anual')}
@@ -89,7 +89,7 @@ const SubscriptionCard = () => {
               className="w-full bg-green-500 hover:bg-green-600"
             >
               <CreditCard className="w-4 h-4 mr-2" />
-              Assinar Plano Anual - R$ 999,00/ano
+              Assinar Plano Anual - R$ 600,00/ano
             </Button>
           </div>
         </CardContent>

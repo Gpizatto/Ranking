@@ -2088,3 +2088,14 @@ logger = logging.getLogger(__name__)
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+@api_router.put("/federations/{slug}")
+async def update_federation(slug: str, data: FederationCreate):
+    existing = await db_master.federations.find_one({"slug": slug})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Federation not found")
+    await db_master.federations.update_one(
+        {"slug": slug},
+        {"$set": data.model_dump()}
+    )
+    fed = await db_master.federations.find_one({"slug": slug}, {"_id": 0})
+    return fed

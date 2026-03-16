@@ -92,21 +92,6 @@ sudo supervisorctl restart all
 - `results`: Resultados de cada jogador em cada torneio
 - `ranking_config`: Configuração da fórmula e tabela de pontos
 
-## 🔧 Variáveis de Ambiente
 
-### Backend (.env)
-```
-MONGO_URL=mongodb://localhost:27017
-DB_NAME=test_database
-CORS_ORIGINS=*
-EMERGENT_LLM_KEY=sk-emergent-6F37e5d052bE560918
-```
 
-### Frontend (.env)
-```
-REACT_APP_BACKEND_URL=https://squash-scores.preview.emergentagent.com
-```
 
-## 📞 Suporte
-
-Desenvolvido para a Federação de Squash do Paraná com Emergent AI.

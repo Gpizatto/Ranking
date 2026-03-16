@@ -20,8 +20,8 @@ import string
 import resend
 from openpyxl import load_workbook, Workbook
 from io import BytesIO
-from emergentintegrations.llm.chat import LlmChat, UserMessage, ImageContent
-from emergentintegrations.payments.stripe.checkout import StripeCheckout, CheckoutSessionResponse, CheckoutStatusResponse, CheckoutSessionRequest
+import google.generativeai as genai
+
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -1356,56 +1356,27 @@ async def import_from_image(file: UploadFile = File(...), current_user: User = D
         contents = await file.read()
         base64_image = base64.b64encode(contents).decode('utf-8')
         
-        # Get API key
-        api_key = os.environ.get('EMERGENT_LLM_KEY', '')
-        
-        # Use AI to extract results
-        system_message = """Você é um assistente especializado em análise de imagens de torneios de squash.
-Extraia informações de chaves/brackets de torneios com precisão."""
-        
+        # 
         prompt = """Analise esta imagem de uma chave/bracket de torneio de squash.
         
 Extraia TODOS os jogadores e suas colocações finais. Para cada jogador, identifique:
 - player_name: nome completo
-- placement: colocação numérica (1=campeão, 2=vice, 3/4=semifinalistas que perderam, 5-8=perdedores de quartas, etc.)
+- placement: colocação numérica (1=campeão, 2=vice, 3/4=semifinalistas, 5-8=perdedores de quartas)
 - category: "Masculino" ou "Feminino"
 
-Retorne também o nome do torneio (tournament_name) se visível.
-
-Regras de colocação:
-- Campeão: 1
-- Vice (perdeu final): 2  
-- Perdedores de semifinal: 3 e 4
-- Perdedores de quartas: 5, 6, 7, 8
-- Perdedores de oitavas: 9-16
-- E assim por diante
-
-Retorne os dados no formato JSON: 
+Retorne os dados no formato JSON:
 {
   "tournament_name": "Nome do Torneio",
   "results": [
     {"player_name": "Nome", "placement": 1, "category": "Masculino"}
   ]
 }"""
-        
-        # Initialize chat
-        chat = LlmChat(
-            api_key=api_key,
-            session_id=f"import-{uuid.uuid4()}",
-            system_message=system_message
-        ).with_model("gemini", "gemini-3-flash-preview")
-        
-        # Create image content
-        image_content = ImageContent(image_base64=base64_image)
-        
-        # Create user message
-        user_message = UserMessage(
-            text=prompt,
-            file_contents=[image_content]
-        )
-        
-        # Send message and get response
-        response_text = await chat.send_message(user_message)
+
+        genai.configure(api_key=os.environ.get('GEMINI_API_KEY', ''))
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        image_part = {"mime_type": file.content_type, "data": contents}
+        response = await asyncio.to_thread(model.generate_content, [prompt, image_part])
+        response_text = response.text
         
         # Parse JSON from response
         import json

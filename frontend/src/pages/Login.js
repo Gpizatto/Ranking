@@ -41,10 +41,18 @@ const Login = () => {
     setLoading(true);
 
     try {
-      const response = await axios.post(`${API}/auth/login`, {
-        email: loginData.email, // 🔥 padronizado
-        password: loginData.password
-      });
+      const response = await axios.post(
+  `${API}/token`,
+  new URLSearchParams({
+    username: loginData.email, // 🔥 backend usa username
+    password: loginData.password
+  }),
+  {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+  }
+);
 
       const token = extractToken(response.data);
 
@@ -97,12 +105,24 @@ const Login = () => {
       );
 
       // 🔥 LOGIN AUTOMÁTICO PADRONIZADO
-      const loginResponse = await axios.post(`${API}/auth/login`, {
-        email: registerData.email,
-        password: registerData.password
-      });
+     const loginResponse = await axios.post(
+  `${API}/token`,
+  new URLSearchParams({
+    username: registerData.email,
+    password: registerData.password
+  }),
+  {
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded'
+    }
+  }
+);
 
-      const token = extractToken(loginResponse.data);
+     const token = loginResponse.data.access_token;
+
+if (!token) {
+  throw new Error("Token não retornado após registro");
+}
 
       if (!token) {
         throw new Error("Token não retornado após registro");

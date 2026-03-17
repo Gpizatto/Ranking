@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from '../lib/api';
 import { setAuthToken } from '../lib/api';
 import { useFederation } from '../context/FederationContext';
-import { Shield, LogIn, Building2, CreditCard, Gift } from 'lucide-react';
+import { Shield, LogIn, Building2, Gift } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
@@ -17,7 +17,9 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 const Login = () => {
   const navigate = useNavigate();
   const { API, slug } = useFederation();
-  const [loginData, setLoginData] = useState({ username: '', password: '' });
+
+  const [loginData, setLoginData] = useState({ email: '', password: '' });
+
   const [registerData, setRegisterData] = useState({
     federation_name: '',
     email: '',
@@ -26,7 +28,13 @@ const Login = () => {
     plan_type: 'mensal',
     start_trial: true
   });
+
   const [loading, setLoading] = useState(false);
+
+  // 🔥 FUNÇÃO PARA PEGAR TOKEN DE QUALQUER FORMATO
+  const extractToken = (data) => {
+    return data?.access_token || data?.token || data?.accessToken;
+  };
 
   const handleLogin = async (e) => {
     e.preventDefault();
@@ -34,14 +42,25 @@ const Login = () => {
 
     try {
       const response = await axios.post(`${API}/auth/login`, {
-  username: loginData.username,
-  password: loginData.password
-});
-setAuthToken(response.data.access_token, slug);
-toast.success('Login realizado com sucesso!');
-navigate(`/${slug}/admin`);
+        email: loginData.email, // 🔥 padronizado
+        password: loginData.password
+      });
+
+      const token = extractToken(response.data);
+
+      if (!token) {
+        throw new Error("Token não retornado pela API");
+      }
+
+      // 🔥 salva token + slug
+      setAuthToken(token, slug);
+
+      toast.success('Login realizado com sucesso!');
+      navigate(`/${slug}/admin`);
+
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao fazer login');
+      console.log(error);
+      toast.error(error.response?.data?.detail || error.message || 'Erro ao fazer login');
     } finally {
       setLoading(false);
     }
@@ -63,7 +82,7 @@ navigate(`/${slug}/admin`);
     setLoading(true);
 
     try {
-      const response = await axios.post(`${API}/register-federation`, {
+      await axios.post(`${API}/register-federation`, {
         federation_name: registerData.federation_name,
         email: registerData.email,
         password: registerData.password,
@@ -71,29 +90,31 @@ navigate(`/${slug}/admin`);
         start_trial: registerData.start_trial
       });
 
-      if (registerData.start_trial) {
-        toast.success('Trial de 1 dia ativado! Faça login para começar.');
-      } else {
-        toast.success('Cadastro realizado! Faça login e prossiga para o pagamento.');
+      toast.success(
+        registerData.start_trial
+          ? 'Trial de 1 dia ativado! Faça login para começar.'
+          : 'Cadastro realizado! Faça login.'
+      );
+
+      // 🔥 LOGIN AUTOMÁTICO PADRONIZADO
+      const loginResponse = await axios.post(`${API}/auth/login`, {
+        email: registerData.email,
+        password: registerData.password
+      });
+
+      const token = extractToken(loginResponse.data);
+
+      if (!token) {
+        throw new Error("Token não retornado após registro");
       }
 
-      // Auto login após registro
-      const loginResponse = await axios.post(`${API}/token`,
-        new URLSearchParams({
-          username: registerData.email,
-          password: registerData.password
-        }),
-        {
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded'
-          }
-        }
-      );
-      setAuthToken(loginResponse.data.access_token);
-      navigate('/admin/dashboard');
+      setAuthToken(token, slug);
+
+      navigate(`/${slug}/admin`);
 
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao registrar');
+      console.log(error);
+      toast.error(error.response?.data?.detail || error.message || 'Erro ao registrar');
     } finally {
       setLoading(false);
     }
@@ -107,8 +128,11 @@ navigate(`/${slug}/admin`);
             <Shield className="w-8 h-8 text-white" />
           </div>
           <CardTitle className="text-2xl text-white">SquashRank Pro</CardTitle>
-          <CardDescription className="text-gray-400">Sistema de gerenciamento de rankings</CardDescription>
+          <CardDescription className="text-gray-400">
+            Sistema de gerenciamento de rankings
+          </CardDescription>
         </CardHeader>
+
         <CardContent>
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2 bg-slate-700">
@@ -121,23 +145,29 @@ navigate(`/${slug}/admin`);
                 <div>
                   <Label className="text-gray-300">Email</Label>
                   <Input
-                    type="text"
-                    value={loginData.username}
-                    onChange={(e) => setLoginData({ ...loginData, username: e.target.value })}
+                    type="email"
+                    value={loginData.email}
+                    onChange={(e) =>
+                      setLoginData({ ...loginData, email: e.target.value })
+                    }
                     className="bg-slate-700 border-slate-600 text-white"
                     required
                   />
                 </div>
+
                 <div>
                   <Label className="text-gray-300">Senha</Label>
                   <Input
                     type="password"
                     value={loginData.password}
-                    onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                    onChange={(e) =>
+                      setLoginData({ ...loginData, password: e.target.value })
+                    }
                     className="bg-slate-700 border-slate-600 text-white"
                     required
                   />
                 </div>
+
                 <Button
                   type="submit"
                   className="w-full bg-blue-500 hover:bg-blue-600"
@@ -156,89 +186,64 @@ navigate(`/${slug}/admin`);
                   <Input
                     type="text"
                     value={registerData.federation_name}
-                    onChange={(e) => setRegisterData({ ...registerData, federation_name: e.target.value })}
+                    onChange={(e) =>
+                      setRegisterData({
+                        ...registerData,
+                        federation_name: e.target.value
+                      })
+                    }
                     className="bg-slate-700 border-slate-600 text-white"
-                    placeholder="Ex: Federação de Squash do Paraná"
                     required
                   />
                 </div>
+
                 <div>
                   <Label className="text-gray-300">Email</Label>
                   <Input
                     type="email"
                     value={registerData.email}
-                    onChange={(e) => setRegisterData({ ...registerData, email: e.target.value })}
+                    onChange={(e) =>
+                      setRegisterData({
+                        ...registerData,
+                        email: e.target.value
+                      })
+                    }
                     className="bg-slate-700 border-slate-600 text-white"
-                    placeholder="seu@email.com"
                     required
                   />
                 </div>
+
                 <div>
                   <Label className="text-gray-300">Senha</Label>
                   <Input
                     type="password"
                     value={registerData.password}
-                    onChange={(e) => setRegisterData({ ...registerData, password: e.target.value })}
+                    onChange={(e) =>
+                      setRegisterData({
+                        ...registerData,
+                        password: e.target.value
+                      })
+                    }
                     className="bg-slate-700 border-slate-600 text-white"
                     required
                   />
                 </div>
+
                 <div>
                   <Label className="text-gray-300">Confirmar Senha</Label>
                   <Input
                     type="password"
                     value={registerData.confirmPassword}
-                    onChange={(e) => setRegisterData({ ...registerData, confirmPassword: e.target.value })}
+                    onChange={(e) =>
+                      setRegisterData({
+                        ...registerData,
+                        confirmPassword: e.target.value
+                      })
+                    }
                     className="bg-slate-700 border-slate-600 text-white"
                     required
                   />
                 </div>
-
-                <div>
-                  <Label className="text-gray-300">Plano</Label>
-                  <Select
-                    value={registerData.plan_type}
-                    onValueChange={(value) => setRegisterData({ ...registerData, plan_type: value })}
-                  >
-                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="mensal">
-                        Mensal - R$ 69,90/mês
-                      </SelectItem>
-                      <SelectItem value="anual">
-                        Anual - R$ 600,00/ano (economize 17%)
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center space-x-2 bg-green-500/10 p-3 rounded border border-green-500/20">
-                  <Checkbox
-                    id="trial"
-                    checked={registerData.start_trial}
-                    onCheckedChange={(checked) =>
-                      setRegisterData({ ...registerData, start_trial: checked === true })
-                    }
-                    className="border-green-500"
-                  />
-                  <label
-                    htmlFor="trial"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 text-green-400 cursor-pointer flex items-center"
-                  >
-                    <Gift className="w-4 h-4 mr-2" />
-                    Iniciar trial grátis de 1 dia
-                  </label>
-                </div>
-
-                {!registerData.start_trial && (
-                  <Alert className="bg-blue-500/10 border-blue-500/20">
-                    <AlertDescription className="text-blue-400 text-sm">
-                      Após o cadastro, você será redirecionado para o pagamento.
-                    </AlertDescription>
-                  </Alert>
-                )}
 
                 <Button
                   type="submit"
@@ -246,7 +251,7 @@ navigate(`/${slug}/admin`);
                   disabled={loading}
                 >
                   <Building2 className="w-4 h-4 mr-2" />
-                  {loading ? 'Registrando...' : registerData.start_trial ? 'Iniciar Trial Grátis' : 'Registrar e Pagar'}
+                  {loading ? 'Registrando...' : 'Registrar'}
                 </Button>
               </form>
             </TabsContent>

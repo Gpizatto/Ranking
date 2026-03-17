@@ -23,7 +23,7 @@ const Login = () => {
   const [registerData, setRegisterData] = useState({
   email: '',
   password: '',
-  confirmPassword: ''
+  confirmPassword: '',
 });
 
   const [loading, setLoading] = useState(false);

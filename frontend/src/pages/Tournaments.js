@@ -9,7 +9,7 @@ import { ptBR } from 'date-fns/locale';
 import axios from '../lib/api';
 
 const Tournaments = () => {
-  const { API, slug } = useFederation();
+
   const [tournaments, setTournaments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');

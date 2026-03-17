@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import axios from "../lib/api";
+import axios, { API } from "../lib/api";
 
 import { Users, Search, MapPin } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";

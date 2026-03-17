@@ -54,8 +54,8 @@ const handleLogin = async (e) => {
     toast.success('Login realizado com sucesso!');
 
     // ✅ CORRETO
+    navigate('/admin');
     
-
   } catch (error) {
     console.log(error);
     toast.error(error.response?.data?.detail || error.message || 'Erro ao fazer login');

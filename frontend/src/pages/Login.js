@@ -86,12 +86,9 @@ const Login = () => {
 
     try {
       await axios.post(`${API}/register-federation`, {
-        federation_name: registerData.federation_name,
-        email: registerData.email,
-        password: registerData.password,
-        plan_type: registerData.plan_type,
-        start_trial: registerData.start_trial
-      });
+  email: registerData.email,
+  password: registerData.password
+});
 
       toast.success(
         registerData.start_trial
@@ -194,21 +191,7 @@ if (!token) {
 
             <TabsContent value="register">
               <form onSubmit={handleRegister} className="space-y-4">
-                <div>
-                  <Label className="text-gray-300">Nome da Federação</Label>
-                  <Input
-                    type="text"
-                    value={registerData.federation_name}
-                    onChange={(e) =>
-                      setRegisterData({
-                        ...registerData,
-                        federation_name: e.target.value
-                      })
-                    }
-                    className="bg-slate-700 border-slate-600 text-white"
-                    required
-                  />
-                </div>
+                
 
                 <div>
                   <Label className="text-gray-300">Email</Label>

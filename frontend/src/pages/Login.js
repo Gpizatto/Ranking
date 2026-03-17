@@ -54,7 +54,7 @@ const handleLogin = async (e) => {
     toast.success('Login realizado com sucesso!');
 
     // ✅ CORRETO
-    navigate('/default/admin');
+    
 
   } catch (error) {
     console.log(error);
@@ -103,7 +103,7 @@ const handleRegister = async (e) => {
     toast.success("Conta criada e logada com sucesso!");
 
     // 👉 opcional: já entra no admin
-    navigate('/default/admin');
+    
 
   } catch (error) {
     console.log(error);

@@ -80,7 +80,7 @@ const Login = () => {
     setLoading(true);
 
     try {
-      await axios.post(`${API}/register-federation`, {
+      await axios.post(`${API}/auth/register`, {
   username: registerData.email,
   password: registerData.password
 });

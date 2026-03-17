@@ -39,7 +39,7 @@ const Login = () => {
 
     try {
       const response = await axios.post(`${API}/auth/login`, {
-  email: loginData.email,
+  username: loginData.email,
   password: loginData.password
 });
   
@@ -81,7 +81,7 @@ const Login = () => {
 
     try {
       await axios.post(`${API}/register-federation`, {
-  email: registerData.email,
+  username: registerData.email,
   password: registerData.password
 });
 

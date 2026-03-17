@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios from "../lib/api";
-import { useFederation } from "../context/FederationContext";
+
 import { Users, Search, MapPin } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
@@ -49,7 +49,7 @@ const PlayerCard = React.memo(({ player, onClick }) => {
 });
 
 const Players = () => {
-  const { API } = useFederation();
+
 
   const [players, setPlayers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");

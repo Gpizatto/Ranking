@@ -42,12 +42,7 @@ const Login = () => {
   email: loginData.email,
   password: loginData.password
 });
-  {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    }
-  }
-);
+  
 
       const token = extractToken(response.data);
 
@@ -101,23 +96,15 @@ const Login = () => {
   email: registerData.email,
   password: registerData.password
 });
-  {
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded'
-    }
-  }
-);
+ 
 
-     const token = response.data.token;
+     const token = loginResponse.data.token;
 
 if (!token) {
   throw new Error("Token não retornado após registro");
 }
 
-      if (!token) {
-        throw new Error("Token não retornado após registro");
-      }
-
+   
       setAuthToken(token, slug);
 
       navigate(`/${slug}/admin`);

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from '../lib/api';
-import { setAuthToken } from '../lib/api';
-import { useFederation } from '../context/FederationContext';
+import { setAuthToken, API } from '../lib/api';
+
 import { Shield, LogIn, Building2, Gift } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Input } from '../components/ui/input';
@@ -16,7 +16,7 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 
 const Login = () => {
   const navigate = useNavigate();
-  import { API } from '../lib/api';
+
   const [loginData, setLoginData] = useState({ email: '', password: '' });
 
   const [registerData, setRegisterData] = useState({

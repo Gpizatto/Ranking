@@ -21,13 +21,10 @@ const Login = () => {
   const [loginData, setLoginData] = useState({ email: '', password: '' });
 
   const [registerData, setRegisterData] = useState({
-    federation_name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    plan_type: 'mensal',
-    start_trial: true
-  });
+  email: '',
+  password: '',
+  confirmPassword: ''
+});
 
   const [loading, setLoading] = useState(false);
 

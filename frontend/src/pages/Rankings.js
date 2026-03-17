@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from '../lib/api';
-import { useFederation } from '../context/FederationContext';
+import { API } from '../lib/api';
 import { Trophy, Medal, Download, MapPin, GraduationCap, User, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
@@ -16,7 +16,7 @@ const CLASSES = ['1a', '2a', '3a', '4a', '5a', '6a', 'Duplas'];
 const CATEGORIES = ['Masculino', 'Feminino'];
 
 const Rankings = () => {
-  const { API } = useFederation();
+
   const [rankings, setRankings] = useState([]);
   const [selectedClass, setSelectedClass] = useState('1a');
   const [selectedCategory, setSelectedCategory] = useState('Masculino');

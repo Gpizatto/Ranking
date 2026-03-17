@@ -54,7 +54,7 @@ const Login = () => {
       setAuthToken(token, slug);
 
       toast.success('Login realizado com sucesso!');
-      navigate(`/${slug}/admin`);
+      nnavigate(`/default/admin`););
 
     } catch (error) {
       console.log(error);
@@ -107,7 +107,8 @@ if (!token) {
    
       setAuthToken(token, slug);
 
-      navigate(`/${slug}/admin`);
+      alert("Conta criada com sucesso! Faça login.");
+setIsLogin(true); // volta pro modo login
 
     } catch (error) {
       console.log(error);

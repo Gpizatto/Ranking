@@ -16,8 +16,7 @@ import { Alert, AlertDescription } from '../components/ui/alert';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { API, slug } = useFederation();
-
+  import { API } from '../lib/api';
   const [loginData, setLoginData] = useState({ email: '', password: '' });
 
   const [registerData, setRegisterData] = useState({
@@ -33,90 +32,86 @@ const Login = () => {
     return data?.access_token || data?.token || data?.accessToken;
   };
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
-    setLoading(true);
+const handleLogin = async (e) => {
+  e.preventDefault();
+  setLoading(true);
 
-    try {
-      const response = await axios.post(`${API}/auth/login`, {
-  username: loginData.email,
-  password: loginData.password
-});
-  
+  try {
+    const response = await axios.post(`${API}/auth/login`, {
+      username: loginData.email,
+      password: loginData.password
+    });
 
-      const token = extractToken(response.data);
+    const token = extractToken(response.data);
 
-      if (!token) {
-        throw new Error("Token não retornado pela API");
-      }
-
-      // 🔥 salva token + slug
-      setAuthToken(token, slug);
-
-      toast.success('Login realizado com sucesso!');
-      nnavigate(`/default/admin`););
-
-    } catch (error) {
-      console.log(error);
-      toast.error(error.response?.data?.detail || error.message || 'Erro ao fazer login');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRegister = async (e) => {
-    e.preventDefault();
-
-    if (registerData.password !== registerData.confirmPassword) {
-      toast.error('As senhas não coincidem');
-      return;
+    if (!token) {
+      throw new Error("Token não retornado pela API");
     }
 
-    if (registerData.password.length < 6) {
-      toast.error('A senha deve ter pelo menos 6 caracteres');
-      return;
+    // ✅ SEM SLUG
+    setAuthToken(token);
+
+    toast.success('Login realizado com sucesso!');
+
+    // ✅ CORRETO
+    navigate('/default/admin');
+
+  } catch (error) {
+    console.log(error);
+    toast.error(error.response?.data?.detail || error.message || 'Erro ao fazer login');
+  } finally {
+    setLoading(false);
+  }
+};
+
+const handleRegister = async (e) => {
+  e.preventDefault();
+
+  if (registerData.password !== registerData.confirmPassword) {
+    toast.error('As senhas não coincidem');
+    return;
+  }
+
+  if (registerData.password.length < 6) {
+    toast.error('A senha deve ter pelo menos 6 caracteres');
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    await axios.post(`${API}/auth/register`, {
+      username: registerData.email,
+      password: registerData.password
+    });
+
+    // 🔥 login automático
+    const loginResponse = await axios.post(`${API}/auth/login`, {
+      username: registerData.email,
+      password: registerData.password
+    });
+
+    const token = extractToken(loginResponse.data);
+
+    if (!token) {
+      throw new Error("Token não retornado após registro");
     }
 
-    setLoading(true);
+    // ✅ SEM SLUG
+    setAuthToken(token);
 
-    try {
-      await axios.post(`${API}/auth/register`, {
-  username: registerData.email,
-  password: registerData.password
-});
+    toast.success("Conta criada e logada com sucesso!");
 
-      toast.success(
-        registerData.start_trial
-          ? 'Trial de 1 dia ativado! Faça login para começar.'
-          : 'Cadastro realizado! Faça login.'
-      );
+    // 👉 opcional: já entra no admin
+    navigate('/default/admin');
 
-      // 🔥 LOGIN AUTOMÁTICO PADRONIZADO
-     const loginResponse = await axios.post(`${API}/auth/login`, {
-  email: registerData.email,
-  password: registerData.password
-});
- 
-
-     const token = loginResponse.data.token;
-
-if (!token) {
-  throw new Error("Token não retornado após registro");
-}
-
-   
-      setAuthToken(token, slug);
-
-      alert("Conta criada com sucesso! Faça login.");
-setIsLogin(true); // volta pro modo login
-
-    } catch (error) {
-      console.log(error);
-      toast.error(error.response?.data?.detail || error.message || 'Erro ao registrar');
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (error) {
+    console.log(error);
+    toast.error(error.response?.data?.detail || error.message || 'Erro ao registrar');
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="min-h-[80vh] flex items-center justify-center">

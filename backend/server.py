@@ -602,6 +602,32 @@ async def login(user_data: UserLogin):
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
+@api_router.post("/auth/register", response_model=Token)
+async def register(user_data: UserLogin):
+    # verifica se já existe
+    existing_user = await db.users.find_one({"username": user_data.username})
+    if existing_user:
+        raise HTTPException(status_code=400, detail="User already exists")
+
+    # cria senha hash
+    hashed_password = get_password_hash(user_data.password)
+
+    # cria usuário direto (admin)
+    user = User(
+        username=user_data.username,
+        hashed_password=hashed_password,
+        is_admin=True
+    )
+
+    user_doc = user.model_dump()
+    user_doc['created_at'] = user_doc['created_at'].isoformat()
+
+    await db.users.insert_one(user_doc)
+
+    # gera token automático
+    access_token = create_access_token(data={"sub": user.username})
+
+    return {"access_token": access_token, "token_type": "bearer"}
 @api_router.get("/auth/me")
 async def get_me(current_user: User = Depends(get_current_user)):
     return {"username": current_user.username, "is_admin": current_user.is_admin}

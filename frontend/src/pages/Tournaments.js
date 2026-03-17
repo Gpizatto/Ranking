@@ -6,7 +6,7 @@ import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import axios from '../lib/api';
+
 
 const Tournaments = () => {
 

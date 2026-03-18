@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from '../lib/api';
+import axios, { API } from '../lib/api';
 import { Calendar, MapPin, Trophy, CheckCircle, Clock, Users, ChevronRight } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';

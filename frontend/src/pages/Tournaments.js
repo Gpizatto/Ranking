@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import axios from '../lib/api';
+const response = await axios.get(`${API}/tournaments`);
 import { Calendar, MapPin, Trophy, CheckCircle, Clock, Users, ChevronRight } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
@@ -20,10 +20,7 @@ const Tournaments = () => {
 
   const fetchTournaments = async () => {
   try {
-    const BACKEND_URL = process.env.REACT_APP_BACKEND_URL;
-    console.log('BACKEND_URL:', BACKEND_URL);
-    console.log('Buscando:', `${BACKEND_URL}/api/tournaments`);
-    const response = await axios.get(`${BACKEND_URL}/api/tournaments`);
+   const response = await axios.get(`${API}/tournaments`);
     console.log('Dados recebidos:', response.data);
     setTournaments(response.data);
     } catch (error) {
@@ -96,7 +93,7 @@ const Tournaments = () => {
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5" data-testid="tournaments-grid">
           {filtered.map((tournament) => (
-            <Link key={tournament.id} to={`/${slug}/tournaments/${tournament.id}`}>
+            <Link key={tournament.id} to={`/tournaments/${tournament.id}`}>
               <div
                 className="group relative bg-slate-800/60 border border-slate-700 hover:border-green-500/50 rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 h-full"
                 data-testid={`tournament-card-${tournament.id}`}

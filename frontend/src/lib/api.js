@@ -34,6 +34,7 @@ export const logout = () => {
   setAuthToken(null);
 };
 
+// Inicializa token ao carregar
 getAuthToken();
 
 export default api;

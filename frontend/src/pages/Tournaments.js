@@ -20,7 +20,7 @@ const Tournaments = () => {
 
   const fetchTournaments = async () => {
   try {
-   const response = await axios.get('/tournaments');
+   const response = await axios.get(`${API}/tournaments`);
     console.log('Dados recebidos:', response.data);
     setTournaments(response.data);
     } catch (error) {

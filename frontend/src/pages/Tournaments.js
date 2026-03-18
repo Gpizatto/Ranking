@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-const response = await axios.get(`${API}/tournaments`);
+
 const Tournaments = () => {
 
   const [tournaments, setTournaments] = useState([]);
@@ -20,7 +20,7 @@ const Tournaments = () => {
 
   const fetchTournaments = async () => {
   try {
-   const response = await axios.get(`${API}/tournaments`);
+   const response = await axios.get('/tournaments');
     console.log('Dados recebidos:', response.data);
     setTournaments(response.data);
     } catch (error) {

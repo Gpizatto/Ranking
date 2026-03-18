@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-const response = await axios.get(`${API}/tournaments`);
+import axios from '../lib/api';
 import { Calendar, MapPin, Trophy, CheckCircle, Clock, Users, ChevronRight } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-
+const response = await axios.get(`${API}/tournaments`);
 const Tournaments = () => {
 
   const [tournaments, setTournaments] = useState([]);

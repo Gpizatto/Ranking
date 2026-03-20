@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from '../../lib/api';
 import { API } from '../../lib/api';
-import { FileText, Plus, Trash2, Upload, Image } from 'lucide-react';
+import { FileText, Plus, Trash2, Upload, Image, CheckSquare, Square, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -26,6 +26,44 @@ const AdminResults = () => {
   const [filterTournament, setFilterTournament] = useState('all');
   const [filterClass, setFilterClass] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+
+  const toggleSelectMode = () => {
+    setSelectMode(v => !v);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelectId = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filteredResults.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredResults.map(r => r.id)));
+    }
+  };
+
+  const handleDeleteSelected = async () => {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Excluir ${selectedIds.size} resultado(s)?`)) return;
+    try {
+      await Promise.all([...selectedIds].map(id => axios.delete(`${API}/results/${id}`)));
+      toast.success(`${selectedIds.size} resultado(s) excluído(s)!`);
+      setSelectedIds(new Set());
+      setSelectMode(false);
+      fetchData();
+    } catch (error) {
+      toast.error('Erro ao excluir resultados');
+    }
+  };
+
   const [formData, setFormData] = useState({
     tournament_id: '',
     player_id: '',
@@ -311,6 +349,33 @@ const AdminResults = () => {
           <p className="text-gray-400 text-sm">Registre resultados de torneios</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {selectMode ? (
+            <>
+              <Button
+                onClick={handleDeleteSelected}
+                className="bg-red-500 hover:bg-red-600 gap-2"
+                disabled={selectedIds.size === 0}
+              >
+                <Trash2 className="w-4 h-4" />
+                Excluir {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+              </Button>
+              <Button
+                onClick={toggleSelectMode}
+                variant="outline"
+                className="border-slate-600 text-gray-300 hover:bg-slate-700 gap-2"
+              >
+                <X className="w-4 h-4" /> Cancelar
+              </Button>
+            </>
+          ) : (
+            <Button
+              onClick={toggleSelectMode}
+              variant="outline"
+              className="border-slate-600 text-gray-300 hover:bg-slate-700 gap-2"
+            >
+              <CheckSquare className="w-4 h-4" /> Selecionar
+            </Button>
+          )}
           <Button 
             onClick={handleDownloadTemplate}
             className="bg-blue-500 hover:bg-blue-600"
@@ -673,13 +738,29 @@ const AdminResults = () => {
       ) : (
         <Card className="bg-slate-800/50 border-blue-500/20">
           <CardHeader>
-            <CardTitle className="text-white">Todos os Resultados</CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-white">Todos os Resultados</CardTitle>
+              {selectMode && (
+                <span className="text-sm text-blue-400">
+                  {selectedIds.size > 0 ? `${selectedIds.size} selecionado(s)` : 'Clique nas linhas para selecionar'}
+                </span>
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
               <table className="w-full" data-testid="results-table">
                 <thead>
                   <tr className="border-b border-slate-700">
+                    {selectMode && (
+                      <th className="py-3 px-2 w-8">
+                        <button onClick={toggleSelectAll} className="text-gray-400 hover:text-white">
+                          {selectedIds.size === filteredResults.length && filteredResults.length > 0
+                            ? <CheckSquare className="w-4 h-4 text-blue-400" />
+                            : <Square className="w-4 h-4" />}
+                        </button>
+                      </th>
+                    )}
                     <th className="text-left py-3 px-2 text-gray-400 font-semibold text-sm">Jogador</th>
                     <th className="text-left py-3 px-2 text-gray-400 font-semibold text-sm hidden sm:table-cell">Classe</th>
                     <th className="text-left py-3 px-2 text-gray-400 font-semibold text-sm hidden md:table-cell">Categoria</th>
@@ -690,21 +771,35 @@ const AdminResults = () => {
                 </thead>
                 <tbody>
                   {filteredResults.map((result) => (
-                    <tr key={result.id} className="border-b border-slate-700/50 hover:bg-slate-700/30" data-testid={`result-row-${result.id}`}>
+                    <tr
+                      key={result.id}
+                      className={`border-b border-slate-700/50 transition-colors cursor-pointer ${selectMode && selectedIds.has(result.id) ? 'bg-blue-500/20' : 'hover:bg-slate-700/30'}`}
+                      onClick={selectMode ? () => toggleSelectId(result.id) : undefined}
+                      data-testid={`result-row-${result.id}`}
+                    >
+                      {selectMode && (
+                        <td className="py-3 px-2">
+                          {selectedIds.has(result.id)
+                            ? <CheckSquare className="w-4 h-4 text-blue-400" />
+                            : <Square className="w-4 h-4 text-gray-500" />}
+                        </td>
+                      )}
                       <td className="py-3 px-2 text-white text-sm">{result.player_name}</td>
                       <td className="py-3 px-2 text-gray-300 text-sm hidden sm:table-cell">{result.class_category}</td>
                       <td className="py-3 px-2 text-gray-300 text-sm hidden md:table-cell">{result.gender_category}</td>
                       <td className="py-3 px-2 text-center text-white font-semibold text-sm">{result.placement}º</td>
                       <td className="py-3 px-2 text-center text-green-400 font-semibold text-sm hidden sm:table-cell">{result.points}</td>
                       <td className="py-3 px-4 text-center">
-                        <Button
-                          onClick={() => handleDelete(result.id)}
-                          size="sm"
-                          className="bg-red-500 hover:bg-red-600"
-                          data-testid={`delete-result-${result.id}`}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
+                        {!selectMode && (
+                          <Button
+                            onClick={() => handleDelete(result.id)}
+                            size="sm"
+                            className="bg-red-500 hover:bg-red-600"
+                            data-testid={`delete-result-${result.id}`}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        )}
                       </td>
                     </tr>
                   ))}

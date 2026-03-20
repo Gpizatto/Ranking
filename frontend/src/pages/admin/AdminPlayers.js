@@ -190,10 +190,10 @@ const AdminPlayers = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-4xl font-bold text-white mb-2" data-testid="admin-players-title">Gerenciar Jogadores</h1>
-          <p className="text-gray-400">Cadastre e edite jogadores</p>
+          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2" data-testid="admin-players-title">Gerenciar Jogadores</h1>
+          <p className="text-gray-400 text-sm">Cadastre e edite jogadores</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             onClick={() => setFilterOpen(!filterOpen)}
             variant="outline"
@@ -206,16 +206,16 @@ const AdminPlayers = () => {
             onClick={handleDownloadTemplate}
             className="bg-blue-500 hover:bg-blue-600"
           >
-            <FileText className="w-4 h-4 mr-2" />
-            Baixar Modelo
+            <FileText className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Baixar Modelo</span>
           </Button>
           <Button
             onClick={() => excelInputRef.current?.click()}
             className="bg-purple-500 hover:bg-purple-600"
             data-testid="import-players-button"
           >
-            <Upload className="w-4 h-4 mr-2" />
-            Importar Excel
+            <Upload className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Importar Excel</span>
           </Button>
           <input
             ref={excelInputRef}

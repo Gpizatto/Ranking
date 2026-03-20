@@ -22,7 +22,9 @@ const AdminPlayers = () => {
     city: '',
     academy: '',
     coach: '',
-    main_class: '1a'
+    main_class: '1a',
+    birth_date: '',
+    gender: ''
   });
   const [uploading, setUploading] = useState(false);
   const [importResult, setImportResult] = useState(null);
@@ -107,7 +109,9 @@ const AdminPlayers = () => {
       city: player.city || '',
       academy: player.academy || '',
       coach: player.coach || '',
-      main_class: player.main_class || '1a'
+      main_class: player.main_class || '1a',
+      birth_date: player.birth_date || '',
+      gender: player.gender || ''
     });
     setDialogOpen(true);
   };
@@ -152,7 +156,7 @@ const AdminPlayers = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', photo_url: '', city: '', academy: '', coach: '', main_class: '1a' });
+    setFormData({ name: '', photo_url: '', city: '', academy: '', coach: '', main_class: '1a', birth_date: '', gender: '' });
     setEditingPlayer(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -315,6 +319,32 @@ const AdminPlayers = () => {
                   data-testid="player-coach-input"
                 />
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-gray-300">Data de Nascimento</Label>
+                  <Input
+                    type="date"
+                    value={formData.birth_date}
+                    onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
+                    className="bg-slate-700 border-slate-600 text-white"
+                  />
+                </div>
+                <div>
+                  <Label className="text-gray-300">Gênero</Label>
+                  <Select
+                    value={formData.gender}
+                    onValueChange={(value) => setFormData({ ...formData, gender: value })}
+                  >
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Masculino">Masculino</SelectItem>
+                      <SelectItem value="Feminino">Feminino</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
               <Button type="submit" className="w-full bg-blue-500 hover:bg-blue-600" data-testid="player-submit-button">
                 {editingPlayer ? 'Atualizar' : 'Criar'}
               </Button>
@@ -370,6 +400,16 @@ const AdminPlayers = () => {
                   </Avatar>
                   <div className="flex-1">
                     <h3 className="text-white font-semibold text-lg">{player.name}</h3>
+                    {player.birth_date && (
+                      <p className="text-gray-400 text-xs mt-0.5">
+                        🎂 {new Date(player.birth_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        {' · '}
+                        {new Date().getFullYear() - new Date(player.birth_date).getFullYear()} anos
+                      </p>
+                    )}
+                    {player.gender && (
+                      <p className="text-gray-400 text-xs">{player.gender}</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2">

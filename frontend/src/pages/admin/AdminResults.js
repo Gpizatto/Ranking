@@ -283,11 +283,13 @@ const AdminResults = () => {
         }
       );
 
-      toast.success(response.data.message);
+      toast.success(response.data.message || `${response.data.results_created} resultados importados, ${response.data.results_updated || 0} atualizados`);
       
       if (response.data.errors && response.data.errors.length > 0) {
-        console.warn('Import warnings:', response.data.errors);
-        toast.warning(`${response.data.errors.length} avisos encontrados. Verifique o console.`);
+        response.data.errors.slice(0, 5).forEach(err => toast.warning(err, { duration: 6000 }));
+        if (response.data.errors.length > 5) {
+          toast.warning(`... e mais ${response.data.errors.length - 5} avisos`);
+        }
       }
 
       setImportResultsDialogOpen(false);

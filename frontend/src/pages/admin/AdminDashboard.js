@@ -47,7 +47,7 @@ const AdminDashboard = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-4xl font-bold text-white mb-2" data-testid="admin-dashboard-title">Dashboard Administrativo</h1>
+        <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2" data-testid="admin-dashboard-title">Dashboard Administrativo</h1>
         <p className="text-gray-400">Visão geral do sistema</p>
       </div>
 
@@ -59,7 +59,7 @@ const AdminDashboard = () => {
           <SubscriptionCard />
 
           {/* Stats Cards */}
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {statCards.map((stat) => {
               const Icon = stat.icon;
               return (

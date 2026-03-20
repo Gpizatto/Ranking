@@ -15,6 +15,7 @@ from passlib.context import CryptContext
 from jose import JWTError, jwt
 import base64
 import asyncio
+import re
 import random
 import string
 import resend
@@ -1248,7 +1249,6 @@ async def import_results(
             gender = 'Feminino' if 'feminina' in name.lower() or 'feminino' in name.lower() else 'Masculino'
 
             # Detecta número ordinal: 1ª, 2ª, 3ª, etc.
-            import re
             match = re.search(r'(\d+)[ªº°]', name)
             if match:
                 num = match.group(1)
@@ -1490,7 +1490,6 @@ Retorne os dados no formato JSON:
         
         # Parse JSON from response
         import json
-        import re
         
         # Try to extract JSON from markdown code blocks or raw text
         json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
@@ -1745,7 +1744,6 @@ async def import_matches_excel(
             """
             Limpa sufixos de seed como '[1]', '[3/4]' do nome antes de buscar.
             """
-            import re
             name_clean = re.sub(r'\s*\[.*?\]', '', name_raw).strip()
             return players_dict.get(name_clean.lower()), name_clean
 
@@ -1756,7 +1754,6 @@ async def import_matches_excel(
             'Duplas'              -> ('Duplas', 'Misto')
             'Principiante Masculino' -> ('Principiante', 'Masculino')
             """
-            import re
             if 'dupla' in event_name.lower():
                 return 'Duplas', 'Misto'
             if 'principiante' in event_name.lower():
@@ -1801,7 +1798,6 @@ async def import_matches_excel(
                         match_date = time_val
                     else:
                         time_str = str(time_val).strip()
-                        import re
                         date_match = re.search(r'(\d{2}/\d{2}/\d{4})', time_str)
                         if date_match:
                             match_date = datetime.strptime(date_match.group(1), '%d/%m/%Y')
@@ -1811,7 +1807,6 @@ async def import_matches_excel(
                     if is_doubles:
                         # Duplas: 'Jogador A+Jogador B' vs 'Jogador C+Jogador D'
                         def split_doubles(team_raw):
-                            import re
                             name_clean = re.sub(r'\s*\[.*?\]', '', team_raw).strip()
                             if '+' in name_clean:
                                 parts = [p.strip() for p in name_clean.split('+')]

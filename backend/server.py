@@ -1125,135 +1125,151 @@ async def import_results(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user)
 ):
-    """Import results from Excel file"""
-    if not file.filename.endswith(('.xlsx', '.xls')):
-        raise HTTPException(status_code=400, detail="File must be Excel format (.xlsx or .xls)")
-    
-    # Get tournament
+    """
+    Importa resultados de arquivo Excel do Tournament Planner.
+    Formato: múltiplas abas, cada aba = uma categoria.
+    Nome da aba: ex. '1ª Classe Masculina - 1ª Classe', 'Duplas - Duplas'
+    Colunas: Member ID1 | Member ID2 | Player1 | Player2 | Position | Position2
+    - Para individuais: Player1 = nome do jogador, Position = colocação
+    - Para duplas: Player1 + Player2 = parceiros, ambos recebem a mesma colocação
+    """
+    if not file.filename.lower().endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="Arquivo deve ser Excel (.xlsx ou .xls)")
+
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
     if not tournament:
-        raise HTTPException(status_code=404, detail="Tournament not found")
-    
+        raise HTTPException(status_code=404, detail="Torneio não encontrado")
+
     try:
-        # Read Excel file
         content = await file.read()
         wb = load_workbook(BytesIO(content))
-        sheet = wb.active
-        
-        # Get all players for lookup
+
         players = await db.players.find({}, {"_id": 0}).to_list(1000)
         players_dict = {p['name'].lower().strip(): p for p in players}
-        
-        # Get ranking config for points
+
         config = await get_ranking_config()
-        
+
         results_created = 0
+        results_updated = 0
         errors = []
-        
-        # Map position names to placement numbers
-        position_map = {
-            "champion": 1,
-            "runner-up": 2,
-            "runner up": 2,
-            "semi final": 3,
-            "semi finalist": 3,
-            "quarter final": 5,
-            "quarter finalist": 5,
-            "round of 16": 9,
-            "round of 32": 17
-        }
-        
-        # Skip header row
-        for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
-            if not row[0]:  # Skip empty rows
-                continue
-                
-            try:
-                player_name = str(row[0]).strip()
-                classe = str(row[1]).strip() if row[1] else ""
-                position = str(row[2]).strip() if row[2] else ""
-                
-                # Validate required fields
-                if not player_name or not classe or not position:
-                    errors.append(f"Row {row_idx}: Missing required fields (Player, Classe, or Position)")
-                    continue
-                
-                # Find player
-                player = players_dict.get(player_name.lower())
-                if not player:
-                    errors.append(f"Row {row_idx}: Player '{player_name}' not found")
-                    continue
-                
-                # Parse classe (format: "Masculino A" or "Feminino B")
-                parts = classe.split()
-                if len(parts) >= 2:
-                    gender_category = parts[0]  # Masculino or Feminino
-                    class_category = parts[1]    # A, B, C, etc
-                else:
-                    errors.append(f"Row {row_idx}: Invalid Classe format. Expected 'Masculino A' or 'Feminino B'")
-                    continue
-                
-                # Convert position to placement number
-                position_lower = position.lower().strip()
-                placement = position_map.get(position_lower)
-                
-                if not placement:
-                    # Try to parse as number (e.g., "3rd", "5th")
-                    try:
-                        placement = int(''.join(filter(str.isdigit, position)))
-                    except (ValueError, TypeError):
-                        errors.append(f"Row {row_idx}: Invalid position '{position}'")
-                        continue
-                
-                # Get points for this placement
-                points = config.points_table.get(str(placement), 0.0)
-                
-                # Check if result already exists
-                existing = await db.results.find_one({
-                    "tournament_id": tournament_id,
-                    "player_id": player['id'],
-                    "class_category": class_category,
-                    "gender_category": gender_category
-                }, {"_id": 0})
-                
-                if existing:
-                    # Update if new placement is better (lower number = better)
-                    if placement < existing.get('placement', 999):
-                        await db.results.update_one(
-                            {"id": existing['id']},
-                            {"$set": {
-                                "placement": placement,
-                                "points": points
-                            }}
-                        )
-                        results_created += 1
-                else:
-                    # Create new result
-                    result = Result(
-                        tournament_id=tournament_id,
-                        player_id=player['id'],
-                        player_name=player['name'],
-                        class_category=class_category,
-                        gender_category=gender_category,
-                        placement=placement,
-                        points=points
+
+        def parse_category_from_sheet(sheet_name: str):
+            """
+            Extrai gender_category e class_category do nome da aba.
+            Exemplos:
+              '1ª Classe Masculina - 1ª Classe'  -> ('Masculino', '1a')
+              '3ª Classe Feminina - 3ª Classe '  -> ('Feminino', '3a')
+              'Duplas - Duplas'                   -> ('Misto', 'Duplas')
+              'Principiante Masculino - Princi'   -> ('Masculino', 'Principiante')
+            """
+            name = sheet_name.strip()
+
+            if 'dupla' in name.lower():
+                return 'Misto', 'Duplas'
+
+            if 'principiante' in name.lower():
+                gender = 'Feminino' if 'feminina' in name.lower() or 'feminino' in name.lower() else 'Masculino'
+                return gender, 'Principiante'
+
+            gender = 'Feminino' if 'feminina' in name.lower() or 'feminino' in name.lower() else 'Masculino'
+
+            # Detecta número ordinal: 1ª, 2ª, 3ª, etc.
+            import re
+            match = re.search(r'(\d+)[ªº°]', name)
+            if match:
+                num = match.group(1)
+                class_map = {'1': '1a', '2': '2a', '3': '3a', '4': '4a', '5': '5a', '6': '6a'}
+                class_category = class_map.get(num, f"{num}a")
+            else:
+                class_category = 'Outra'
+
+            return gender, class_category
+
+        async def save_result(tournament_id, player, gender_category, class_category, placement, config):
+            points = config.points_table.get(str(placement), 0.0)
+            existing = await db.results.find_one({
+                "tournament_id": tournament_id,
+                "player_id": player['id'],
+                "class_category": class_category,
+                "gender_category": gender_category
+            }, {"_id": 0})
+            if existing:
+                if placement < existing.get('placement', 999):
+                    await db.results.update_one(
+                        {"id": existing['id']},
+                        {"$set": {"placement": placement, "points": points}}
                     )
-                    result_doc = result.model_dump()
-                    result_doc['created_at'] = result_doc['created_at'].isoformat()
-                    await db.results.insert_one(result_doc)
-                    results_created += 1
-                    
-            except Exception as e:
-                errors.append(f"Row {row_idx}: {str(e)}")
-        
+                    return 'updated'
+                return 'skipped'
+            else:
+                result = Result(
+                    tournament_id=tournament_id,
+                    player_id=player['id'],
+                    player_name=player['name'],
+                    class_category=class_category,
+                    gender_category=gender_category,
+                    placement=placement,
+                    points=points
+                )
+                doc = result.model_dump()
+                doc['created_at'] = doc['created_at'].isoformat()
+                await db.results.insert_one(doc)
+                return 'created'
+
+        for sheet_name in wb.sheetnames:
+            sheet = wb[sheet_name]
+            gender_category, class_category = parse_category_from_sheet(sheet_name)
+            is_doubles = (class_category == 'Duplas')
+
+            for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
+                if not row or not row[2]:  # Player1 é coluna C (índice 2)
+                    continue
+
+                try:
+                    player1_name = str(row[2]).strip()
+                    player2_name = str(row[3]).strip() if row[3] else None
+                    position_val = row[4]  # Position (coluna E)
+
+                    if not position_val:
+                        continue
+
+                    placement = int(float(position_val))
+
+                    if is_doubles and player2_name:
+                        # Duplas: salvar para os dois jogadores
+                        for pname in [player1_name, player2_name]:
+                            player = players_dict.get(pname.lower())
+                            if not player:
+                                errors.append(f"Aba '{sheet_name}' linha {row_idx}: Jogador '{pname}' não encontrado")
+                                continue
+                            status = await save_result(tournament_id, player, gender_category, class_category, placement, config)
+                            if status == 'created':
+                                results_created += 1
+                            elif status == 'updated':
+                                results_updated += 1
+                    else:
+                        player = players_dict.get(player1_name.lower())
+                        if not player:
+                            errors.append(f"Aba '{sheet_name}' linha {row_idx}: Jogador '{player1_name}' não encontrado")
+                            continue
+                        status = await save_result(tournament_id, player, gender_category, class_category, placement, config)
+                        if status == 'created':
+                            results_created += 1
+                        elif status == 'updated':
+                            results_updated += 1
+
+                except Exception as e:
+                    errors.append(f"Aba '{sheet_name}' linha {row_idx}: {str(e)}")
+
         return {
-            "message": f"{results_created} results imported successfully",
+            "message": f"{results_created} resultados importados, {results_updated} atualizados",
             "results_created": results_created,
+            "results_updated": results_updated,
             "errors": errors if errors else None
         }
-        
+
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Erro ao processar arquivo: {str(e)}")
 
 # Ranking Config Routes
 @api_router.get("/ranking-config", response_model=RankingConfig)
@@ -1603,108 +1619,206 @@ async def download_matches_template():
 
 # Import matches from Excel
 @api_router.post("/import-matches-excel")
-async def import_matches_excel(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
-    if not file.filename.endswith(('.xlsx', '.xls')):
-        raise HTTPException(status_code=400, detail="File must be Excel format (.xlsx or .xls)")
-    
+async def import_matches_excel(
+    tournament_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Importa partidas de arquivo Excel do Tournament Planner.
+    Formato: múltiplas abas por dia (ex: 'sexta-feira 27 fev 2026')
+    Cada aba tem 3 linhas de cabeçalho, depois a linha de colunas na linha 4:
+    Time | Event | Nr | Court | Location | Round | Team 1 | Team 2 | Score | Duration | Referee | Marker | Start | Finish
+    - Team 1 e Team 2 podem ser 'Jogador A+Jogador B' para duplas
+    - Score: ex '11-9 11-4 11-5 ' (sets separados por espaço)
+    - O vencedor é determinado contando sets ganhos por cada lado
+    """
+    if not file.filename.lower().endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="Arquivo deve ser Excel (.xlsx ou .xls)")
+
+    tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
+    if not tournament:
+        raise HTTPException(status_code=404, detail="Torneio não encontrado")
+
     try:
         contents = await file.read()
         workbook = load_workbook(BytesIO(contents))
-        
-        if 'Matches' not in workbook.sheetnames:
-            raise HTTPException(status_code=400, detail="Excel must have a sheet named 'Matches'")
-        
-        sheet = workbook['Matches']
-        
-        # Get all players for lookup
+
         players = await db.players.find({}, {"_id": 0}).to_list(1000)
         players_dict = {p['name'].lower().strip(): p for p in players}
-        
-        # Get all tournaments for lookup
-        tournaments = await db.tournaments.find({}, {"_id": 0}).to_list(1000)
-        tournaments_dict = {t['name'].lower().strip(): t for t in tournaments}
-        
+
         matches_created = 0
         errors = []
-        
-        # Skip header row
-        # Expected columns: Tournament | Category | Round | Player1 | Player2 | Score | Winner | Date
-        for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
-            if not row[0]:  # Skip empty rows
-                continue
-                
-            try:
-                tournament_name = str(row[0]).strip()
-                category = str(row[1]).strip() if row[1] else "1a"
-                round_name = str(row[2]).strip()
-                player1_name = str(row[3]).strip()
-                player2_name = str(row[4]).strip()
-                score_str = str(row[5]).strip()
-                winner_name = str(row[6]).strip()
-                date_val = row[7]
-                
-                # Find tournament
-                tournament = tournaments_dict.get(tournament_name.lower())
-                if not tournament:
-                    errors.append(f"Row {row_idx}: Tournament '{tournament_name}' not found")
+
+        def determine_winner(score_str: str, player1_name: str, player2_name: str):
+            """
+            Conta sets do score '11-9 11-4 5-11 ' e retorna nome do vencedor.
+            Cada set: lado esquerdo = Team 1, direito = Team 2.
+            """
+            if not score_str or score_str.strip().lower() in ('w.o.', 'wo', 'walkover', ''):
+                return player1_name  # w.o. = Team 1 vence por W.O.
+            sets = [s.strip() for s in score_str.strip().split() if s.strip()]
+            p1_sets = 0
+            p2_sets = 0
+            for s in sets:
+                parts = s.split('-')
+                if len(parts) == 2:
+                    try:
+                        s1, s2 = int(parts[0]), int(parts[1])
+                        if s1 > s2:
+                            p1_sets += 1
+                        else:
+                            p2_sets += 1
+                    except ValueError:
+                        pass
+            return player1_name if p1_sets >= p2_sets else player2_name
+
+        def resolve_player(name_raw: str):
+            """
+            Limpa sufixos de seed como '[1]', '[3/4]' do nome antes de buscar.
+            """
+            import re
+            name_clean = re.sub(r'\s*\[.*?\]', '', name_raw).strip()
+            return players_dict.get(name_clean.lower()), name_clean
+
+        def parse_event_category(event_name: str):
+            """
+            Converte nome do evento para class_category e gender_category.
+            '4ª Classe Masculina' -> ('4a', 'Masculino')
+            'Duplas'              -> ('Duplas', 'Misto')
+            'Principiante Masculino' -> ('Principiante', 'Masculino')
+            """
+            import re
+            if 'dupla' in event_name.lower():
+                return 'Duplas', 'Misto'
+            if 'principiante' in event_name.lower():
+                gender = 'Feminino' if 'feminina' in event_name.lower() or 'feminino' in event_name.lower() else 'Masculino'
+                return 'Principiante', gender
+            gender = 'Feminino' if 'feminina' in event_name.lower() or 'feminino' in event_name.lower() else 'Masculino'
+            m = re.search(r'(\d+)[ªº°]', event_name)
+            if m:
+                num = m.group(1)
+                class_map = {'1': '1a', '2': '2a', '3': '3a', '4': '4a', '5': '5a', '6': '6a'}
+                class_category = class_map.get(num, f"{num}a")
+            else:
+                class_category = 'Outra'
+            return class_category, gender
+
+        for sheet_name in workbook.sheetnames:
+            sheet = workbook[sheet_name]
+
+            # Cada aba tem 3 linhas de header do Tournament Planner, depois a linha de colunas (row 4)
+            # Dados começam na linha 5
+            for row_idx, row in enumerate(sheet.iter_rows(min_row=5, values_only=True), start=5):
+                if not row or not row[0]:
                     continue
-                
-                # Find players
-                player1 = players_dict.get(player1_name.lower())
-                player2 = players_dict.get(player2_name.lower())
-                winner = players_dict.get(winner_name.lower())
-                
-                if not player1:
-                    errors.append(f"Row {row_idx}: Player1 '{player1_name}' not found")
-                    continue
-                if not player2:
-                    errors.append(f"Row {row_idx}: Player2 '{player2_name}' not found")
-                    continue
-                if not winner:
-                    errors.append(f"Row {row_idx}: Winner '{winner_name}' not found")
-                    continue
-                
-                # Parse score
-                score = [s.strip() for s in score_str.split() if s.strip()]
-                
-                # Parse date
-                if isinstance(date_val, datetime):
-                    match_date = date_val
-                else:
-                    match_date = datetime.strptime(str(date_val), '%Y-%m-%d')
-                
-                # Create match
-                match = Match(
-                    tournament_id=tournament['id'],
-                    tournament_name=tournament['name'],
-                    category=category,
-                    player1_id=player1['id'],
-                    player1_name=player1['name'],
-                    player2_id=player2['id'],
-                    player2_name=player2['name'],
-                    winner_id=winner['id'],
-                    score=score,
-                    round=round_name,
-                    date=match_date
-                )
-                
-                doc = match.model_dump()
-                doc['date'] = doc['date'].isoformat()
-                doc['created_at'] = doc['created_at'].isoformat()
-                await db.matches.insert_one(doc)
-                
-                matches_created += 1
-                
-            except Exception as e:
-                errors.append(f"Row {row_idx}: {str(e)}")
-        
+
+                try:
+                    time_val   = row[0]   # 'sex 27/02/2026 19:00'
+                    event_name = str(row[1]).strip() if row[1] else ""
+                    round_name = str(row[5]).strip() if row[5] else ""
+                    team1_raw  = str(row[6]).strip() if row[6] else ""
+                    team2_raw  = str(row[7]).strip() if row[7] else ""
+                    score_str  = str(row[8]).strip() if row[8] else ""
+
+                    if not event_name or not team1_raw or not team2_raw:
+                        continue
+
+                    class_category, gender_category = parse_event_category(event_name)
+                    is_doubles = class_category == 'Duplas'
+
+                    # Parse date from time_val string like 'sex 27/02/2026 19:00'
+                    match_date = None
+                    if isinstance(time_val, datetime):
+                        match_date = time_val
+                    else:
+                        time_str = str(time_val).strip()
+                        import re
+                        date_match = re.search(r'(\d{2}/\d{2}/\d{4})', time_str)
+                        if date_match:
+                            match_date = datetime.strptime(date_match.group(1), '%d/%m/%Y')
+                        else:
+                            match_date = datetime.now(timezone.utc)
+
+                    if is_doubles:
+                        # Duplas: 'Jogador A+Jogador B' vs 'Jogador C+Jogador D'
+                        def split_doubles(team_raw):
+                            import re
+                            name_clean = re.sub(r'\s*\[.*?\]', '', team_raw).strip()
+                            if '+' in name_clean:
+                                parts = [p.strip() for p in name_clean.split('+')]
+                                return parts[0], parts[1]
+                            return name_clean, None
+
+                        p1a_name, p1b_name = split_doubles(team1_raw)
+                        p2a_name, p2b_name = split_doubles(team2_raw)
+
+                        p1a = players_dict.get(p1a_name.lower()) if p1a_name else None
+                        p1b = players_dict.get(p1b_name.lower()) if p1b_name else None
+                        p2a = players_dict.get(p2a_name.lower()) if p2a_name else None
+                        p2b = players_dict.get(p2b_name.lower()) if p2b_name else None
+
+                        missing = [n for n, p in [(p1a_name, p1a), (p1b_name, p1b), (p2a_name, p2a), (p2b_name, p2b)] if n and not p]
+                        if missing:
+                            errors.append(f"Aba '{sheet_name}' linha {row_idx}: Jogadores não encontrados: {', '.join(missing)}")
+                            continue
+
+                        winner_team = determine_winner(score_str, p1a_name, p2a_name)
+                        winner_id = (p1a or p1b)['id'] if winner_team == p1a_name else (p2a or p2b)['id']
+                        winner_name = winner_team
+
+                        # Registra a partida com player1 = primeiro da dupla 1
+                        p1 = p1a or p1b
+                        p2 = p2a or p2b
+                        player1_name_full = f"{p1a_name}+{p1b_name}" if p1b_name else p1a_name
+                        player2_name_full = f"{p2a_name}+{p2b_name}" if p2b_name else p2a_name
+                    else:
+                        p1, p1_clean = resolve_player(team1_raw)
+                        p2, p2_clean = resolve_player(team2_raw)
+
+                        if not p1:
+                            errors.append(f"Aba '{sheet_name}' linha {row_idx}: Jogador '{p1_clean}' não encontrado")
+                            continue
+                        if not p2:
+                            errors.append(f"Aba '{sheet_name}' linha {row_idx}: Jogador '{p2_clean}' não encontrado")
+                            continue
+
+                        winner_name = determine_winner(score_str, p1['name'], p2['name'])
+                        winner_id = p1['id'] if winner_name == p1['name'] else p2['id']
+                        player1_name_full = p1['name']
+                        player2_name_full = p2['name']
+
+                    score_list = [s for s in score_str.split() if s.strip()] if score_str else []
+
+                    match = Match(
+                        tournament_id=tournament['id'],
+                        tournament_name=tournament['name'],
+                        category=class_category,
+                        player1_id=p1['id'],
+                        player1_name=player1_name_full,
+                        player2_id=p2['id'],
+                        player2_name=player2_name_full,
+                        winner_id=winner_id,
+                        score=score_list,
+                        round=round_name,
+                        date=match_date
+                    )
+                    doc = match.model_dump()
+                    doc['date'] = doc['date'].isoformat() if isinstance(doc['date'], datetime) else doc['date']
+                    doc['created_at'] = doc['created_at'].isoformat()
+                    await db.matches.insert_one(doc)
+                    matches_created += 1
+
+                except Exception as e:
+                    errors.append(f"Aba '{sheet_name}' linha {row_idx}: {str(e)}")
+
         return {
             "matches_created": matches_created,
             "errors": errors
         }
-        
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing Excel: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao processar Excel: {str(e)}")
 
 # ============= SUBSCRIPTION ENDPOINTS =============
 

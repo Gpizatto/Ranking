@@ -33,6 +33,10 @@ const AdminMatches = () => {
     date: new Date().toISOString().split('T')[0]
   });
   const [importResult, setImportResult] = useState(null);
+  const [importDialogMatchesOpen, setImportDialogMatchesOpen] = useState(false);
+  const [importTournamentId, setImportTournamentId] = useState('');
+  const [importMatchFile, setImportMatchFile] = useState(null);
+  const [importMatchLoading, setImportMatchLoading] = useState(false);
   const fileInputRef = useRef(null);
 
   useEffect(() => {
@@ -96,30 +100,45 @@ const AdminMatches = () => {
     }
   };
 
-  const handleImportExcel = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImportExcel = async () => {
+    if (!importTournamentId) {
+      toast.error('Selecione um torneio');
+      return;
+    }
+    if (!importMatchFile) {
+      toast.error('Selecione um arquivo Excel');
+      return;
+    }
 
+    setImportMatchLoading(true);
     const formDataUpload = new FormData();
-    formDataUpload.append('file', file);
+    formDataUpload.append('file', importMatchFile);
 
     try {
-      const response = await axios.post(`${API}/import-matches-excel`, formDataUpload, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
+      const response = await axios.post(
+        `${API}/import-matches-excel?tournament_id=${importTournamentId}`,
+        formDataUpload,
+        { headers: { 'Content-Type': 'multipart/form-data' } }
+      );
 
       setImportResult(response.data);
-      
+
       if (response.data.matches_created > 0) {
         toast.success(`${response.data.matches_created} partidas importadas com sucesso!`);
         fetchData();
       }
-      
-      if (response.data.errors.length > 0) {
+
+      if (response.data.errors && response.data.errors.length > 0) {
         toast.error(`${response.data.errors.length} erros encontrados`);
       }
+
+      setImportDialogMatchesOpen(false);
+      setImportTournamentId('');
+      setImportMatchFile(null);
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Erro ao importar Excel');
+    } finally {
+      setImportMatchLoading(false);
     }
   };
 
@@ -188,7 +207,7 @@ const AdminMatches = () => {
             Baixar Modelo
           </Button>
           <Button
-            onClick={() => fileInputRef.current?.click()}
+            onClick={() => setImportDialogMatchesOpen(true)}
             className="bg-purple-500 hover:bg-purple-600"
             data-testid="import-matches-button"
           >
@@ -198,11 +217,74 @@ const AdminMatches = () => {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".xlsx,.xls"
-            onChange={handleImportExcel}
+            accept=".xlsx,.xls,.XLSX,.XLS"
+            onChange={(e) => setImportMatchFile(e.target.files?.[0] || null)}
             className="hidden"
           />
           
+          {/* Dialog de Importar Partidas */}
+          <Dialog open={importDialogMatchesOpen} onOpenChange={setImportDialogMatchesOpen}>
+            <DialogContent className="bg-slate-800 border-purple-500/20 max-w-md">
+              <DialogHeader>
+                <DialogTitle className="text-white">Importar Partidas (Tournament Planner)</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <p className="text-gray-400 text-sm">
+                  Selecione o torneio e o arquivo Excel exportado do Tournament Planner.
+                  O arquivo pode ter múltiplas abas (uma por dia).
+                </p>
+                <div>
+                  <Label className="text-gray-300">Torneio *</Label>
+                  <Select value={importTournamentId} onValueChange={setImportTournamentId}>
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white mt-1">
+                      <SelectValue placeholder="Selecione o torneio" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-700 border-slate-600">
+                      {tournaments.map(t => (
+                        <SelectItem key={t.id} value={t.id} className="text-white hover:bg-slate-600">
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-gray-300">Arquivo Excel *</Label>
+                  <div className="mt-1 flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="border-slate-600 text-gray-300 hover:bg-slate-700"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      Escolher arquivo
+                    </Button>
+                    {importMatchFile && (
+                      <span className="text-green-400 text-sm truncate max-w-[180px]">{importMatchFile.name}</span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <Button
+                    variant="outline"
+                    className="border-slate-600 text-gray-300"
+                    onClick={() => { setImportDialogMatchesOpen(false); setImportTournamentId(''); setImportMatchFile(null); }}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="bg-purple-500 hover:bg-purple-600"
+                    onClick={handleImportExcel}
+                    disabled={importMatchLoading}
+                  >
+                    {importMatchLoading ? 'Importando...' : 'Importar'}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+
           <Dialog open={dialogOpen} onOpenChange={(open) => {
             setDialogOpen(open);
             if (!open) resetForm();

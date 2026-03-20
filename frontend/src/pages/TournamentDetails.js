@@ -10,13 +10,14 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const PLACEMENT_COLORS = { 1: 'text-yellow-400', 2: 'text-gray-300', 3: 'text-orange-400' };
+const ROUND_ORDER = ['Final', 'Semi Final', 'Quarter Final', 'Round of 16', 'Round of 32', 'Group Stage', 'RR1', 'RR2', 'RR3', 'QF', 'SF'];
 
 const TournamentDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [tournament, setTournament] = useState(null);
   const [results, setResults] = useState([]);
-  const [matches, setMatches] = useState([]);
+  const [matchesFlat, setMatchesFlat] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('results');
   const [selectedCategory, setSelectedCategory] = useState(null);
@@ -30,12 +31,27 @@ const TournamentDetails = () => {
         axios.get(`${API}/tournaments/${id}/results`),
         axios.get(`${API}/tournaments/${id}/matches`),
       ]);
+
       setTournament(resultsRes.data.tournament);
-      setResults(resultsRes.data.results || []);
-      setMatches(matchesRes.data.matches || matchesRes.data || []);
-      if (resultsRes.data.results && resultsRes.data.results.length > 0) {
-        setSelectedCategory(resultsRes.data.results[0].class + '_' + resultsRes.data.results[0].category);
+
+      const r = resultsRes.data.results;
+      setResults(Array.isArray(r) ? r : []);
+
+      if (Array.isArray(r) && r.length > 0) {
+        setSelectedCategory(r[0].class + '_' + r[0].category);
       }
+
+      // matches vem como objeto { "1a": [...], "2a": [...] } — achatar em array
+      const matchesData = matchesRes.data.matches;
+      if (matchesData && typeof matchesData === 'object' && !Array.isArray(matchesData)) {
+        const flat = Object.values(matchesData).flat();
+        setMatchesFlat(flat);
+      } else if (Array.isArray(matchesData)) {
+        setMatchesFlat(matchesData);
+      } else {
+        setMatchesFlat([]);
+      }
+
     } catch (error) {
       toast.error('Erro ao carregar detalhes do torneio');
     } finally {
@@ -61,17 +77,21 @@ const TournamentDetails = () => {
     return (r.class + '_' + r.category) === selectedCategory;
   });
 
-  const matchesByRound = matches.reduce(function(acc, m) {
+  const totalParticipants = results.reduce(function(acc, r) {
+    return acc + (Array.isArray(r.results) ? r.results.length : 0);
+  }, 0);
+
+  // Agrupa partidas por rodada
+  const matchesByRound = matchesFlat.reduce(function(acc, m) {
     const round = m.round || 'Outra';
     if (!acc[round]) acc[round] = [];
     acc[round].push(m);
     return acc;
   }, {});
 
-  const roundOrder = ['Final', 'Semi Final', 'Quarter Final', 'Round of 16', 'Round of 32', 'Group Stage'];
   const sortedRounds = Object.keys(matchesByRound).sort(function(a, b) {
-    const ia = roundOrder.indexOf(a);
-    const ib = roundOrder.indexOf(b);
+    const ia = ROUND_ORDER.indexOf(a);
+    const ib = ROUND_ORDER.indexOf(b);
     return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
   });
 
@@ -86,43 +106,44 @@ const TournamentDetails = () => {
         Voltar para Torneios
       </button>
 
+      {/* Header */}
       <Card className="bg-slate-800/60 border-slate-700">
         <div className={`h-1.5 w-full ${tournament.is_completed ? 'bg-green-500' : 'bg-yellow-500'}`} />
         <CardContent className="pt-6">
           <div className="flex items-start justify-between flex-wrap gap-4">
-            <div>
+            <div className="flex-1 min-w-0">
               <Badge className={`mb-3 text-xs ${tournament.is_completed ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'}`}>
                 {tournament.is_completed ? 'Concluido' : 'Em andamento'}
               </Badge>
-              <h1 className="text-3xl font-bold text-white mb-3">{tournament.name}</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white mb-3 break-words">{tournament.name}</h1>
               <div className="space-y-1.5">
                 <div className="flex items-center text-gray-400 text-sm gap-2">
-                  <Calendar className="w-4 h-4 text-green-500/60" />
+                  <Calendar className="w-4 h-4 text-green-500/60 shrink-0" />
                   {format(new Date(tournament.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                 </div>
                 {tournament.location && (
                   <div className="flex items-center text-gray-400 text-sm gap-2">
-                    <MapPin className="w-4 h-4 text-green-500/60" />
+                    <MapPin className="w-4 h-4 text-green-500/60 shrink-0" />
                     {tournament.location}
                   </div>
                 )}
                 <div className="flex items-center text-gray-400 text-sm gap-2">
-                  <Users className="w-4 h-4 text-green-500/60" />
-                  {results.reduce(function(acc, r) { return acc + r.results.length; }, 0)} participantes
+                  <Users className="w-4 h-4 text-green-500/60 shrink-0" />
+                  {totalParticipants} participantes
                 </div>
               </div>
             </div>
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-row sm:flex-col gap-2 shrink-0">
               {tournament.bracket_link && (
                 <a href={tournament.bracket_link} target="_blank" rel="noopener noreferrer">
-                  <Button variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700 gap-2 w-full">
+                  <Button variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700 gap-2">
                     <ExternalLink className="w-4 h-4" /> Chave
                   </Button>
                 </a>
               )}
               {tournament.photos_link && (
                 <a href={tournament.photos_link} target="_blank" rel="noopener noreferrer">
-                  <Button variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700 gap-2 w-full">
+                  <Button variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700 gap-2">
                     <ExternalLink className="w-4 h-4" /> Fotos
                   </Button>
                 </a>
@@ -132,6 +153,7 @@ const TournamentDetails = () => {
         </CardContent>
       </Card>
 
+      {/* Tabs */}
       <div className="flex gap-2 border-b border-slate-700">
         <button
           onClick={() => setActiveTab('results')}
@@ -147,17 +169,18 @@ const TournamentDetails = () => {
         </button>
       </div>
 
+      {/* Tab: Resultados */}
       {activeTab === 'results' && (
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-4">
           {results.length > 0 && (
-            <div className="w-48 min-w-[12rem] space-y-1">
+            <div className="flex sm:flex-col gap-2 sm:w-48 sm:min-w-[12rem] overflow-x-auto sm:overflow-visible pb-1 sm:pb-0">
               {results.map(function(r) {
                 const key = r.class + '_' + r.category;
                 return (
                   <button
                     key={key}
                     onClick={() => setSelectedCategory(key)}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${selectedCategory === key ? 'bg-green-500 text-white font-semibold' : 'text-gray-300 hover:bg-slate-700'}`}
+                    className={`shrink-0 sm:w-full text-left px-3 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${selectedCategory === key ? 'bg-green-500 text-white font-semibold' : 'text-gray-300 bg-slate-800/50 hover:bg-slate-700'}`}
                   >
                     {r.class} {r.category}
                   </button>
@@ -165,7 +188,7 @@ const TournamentDetails = () => {
               })}
             </div>
           )}
-          <div className="flex-1">
+          <div className="flex-1 min-w-0">
             {results.length === 0 ? (
               <Card className="bg-slate-800/50 border-slate-700">
                 <CardContent className="py-12 text-center text-gray-400">
@@ -182,20 +205,20 @@ const TournamentDetails = () => {
                   <table className="w-full">
                     <thead>
                       <tr className="text-gray-400 text-xs uppercase border-b border-slate-700">
-                        <th className="text-left py-2 px-3">Pos.</th>
-                        <th className="text-left py-2 px-3">Jogador</th>
-                        <th className="text-right py-2 px-3">Pontos</th>
+                        <th className="text-left py-2 px-2 sm:px-3">Pos.</th>
+                        <th className="text-left py-2 px-2 sm:px-3">Jogador</th>
+                        <th className="text-right py-2 px-2 sm:px-3">Pontos</th>
                       </tr>
                     </thead>
                     <tbody>
                       {activeResults.results.map(function(r) {
                         return (
                           <tr key={r.player_id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
-                            <td className={`py-3 px-3 font-bold ${PLACEMENT_COLORS[r.placement] || 'text-gray-300'}`}>
+                            <td className={`py-3 px-2 sm:px-3 font-bold ${PLACEMENT_COLORS[r.placement] || 'text-gray-300'}`}>
                               {r.placement === 1 ? '🥇' : r.placement === 2 ? '🥈' : r.placement === 3 ? '🥉' : r.placement + 'º'}
                             </td>
-                            <td className="py-3 px-3 text-white">{r.player_name}</td>
-                            <td className="py-3 px-3 text-green-400 text-right font-semibold">{r.points} pts</td>
+                            <td className="py-3 px-2 sm:px-3 text-white text-sm">{r.player_name}</td>
+                            <td className="py-3 px-2 sm:px-3 text-green-400 text-right font-semibold">{r.points} pts</td>
                           </tr>
                         );
                       })}
@@ -208,9 +231,10 @@ const TournamentDetails = () => {
         </div>
       )}
 
+      {/* Tab: Partidas */}
       {activeTab === 'matches' && (
         <div className="space-y-4">
-          {matches.length === 0 ? (
+          {matchesFlat.length === 0 ? (
             <Card className="bg-slate-800/50 border-slate-700">
               <CardContent className="py-12 text-center text-gray-400">
                 <Swords className="w-12 h-12 mx-auto mb-3 opacity-30" />
@@ -226,17 +250,17 @@ const TournamentDetails = () => {
                 <CardContent className="space-y-2">
                   {matchesByRound[round].map(function(match) {
                     return (
-                      <div key={match.id} className="flex items-center justify-between bg-slate-700/40 rounded-lg px-4 py-3 gap-4">
-                        <span className={`flex-1 text-sm font-semibold ${match.winner_id === match.player1_id ? 'text-white' : 'text-gray-400'}`}>
+                      <div key={match.id} className="flex items-center bg-slate-700/40 rounded-lg px-3 py-3 gap-2">
+                        <span className={`flex-1 text-xs sm:text-sm font-semibold truncate ${match.winner_id === match.player1_id ? 'text-white' : 'text-gray-400'}`}>
                           {match.player1_name}
                         </span>
-                        <div className="text-center">
+                        <div className="text-center shrink-0 px-1">
                           <div className="text-green-400 text-xs font-mono whitespace-nowrap">
-                            {match.score && match.score.length > 0 ? match.score.join('  ') : 'vs'}
+                            {match.score && match.score.length > 0 ? match.score.join(' ') : 'vs'}
                           </div>
                           <div className="text-gray-500 text-xs">{match.category}</div>
                         </div>
-                        <span className={`flex-1 text-sm font-semibold text-right ${match.winner_id === match.player2_id ? 'text-white' : 'text-gray-400'}`}>
+                        <span className={`flex-1 text-xs sm:text-sm font-semibold text-right truncate ${match.winner_id === match.player2_id ? 'text-white' : 'text-gray-400'}`}>
                           {match.player2_name}
                         </span>
                       </div>

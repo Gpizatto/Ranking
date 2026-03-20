@@ -247,6 +247,10 @@ class Player(BaseModel):
     academy: Optional[str] = None
     coach: Optional[str] = None
     main_class: Optional[str] = None  # Classe principal que joga
+    birth_date: Optional[str] = None  # ISO date string 'YYYY-MM-DD'
+    gender: Optional[str] = None      # 'Masculino' ou 'Feminino'
+    email: Optional[str] = None
+    phone: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 class PlayerCreate(BaseModel):
@@ -256,6 +260,10 @@ class PlayerCreate(BaseModel):
     academy: Optional[str] = None
     coach: Optional[str] = None
     main_class: Optional[str] = None
+    birth_date: Optional[str] = None
+    gender: Optional[str] = None
+    email: Optional[str] = None
+    phone: Optional[str] = None
 
 class Tournament(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -714,72 +722,111 @@ async def download_players_template():
 
 @api_router.post("/import-players-excel")
 async def import_players_excel(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
-    if not file.filename.endswith(('.xlsx', '.xls')):
-        raise HTTPException(status_code=400, detail="File must be Excel format (.xlsx or .xls)")
-    
+    """
+    Importa jogadores do arquivo Excel de Filiação (Google Forms / Tournament Planner).
+    Formato esperado (aba 'Respostas ao formulário 1' ou a primeira aba):
+    Col A: Carimbo de data/hora
+    Col B: E-mail
+    Col C: Nome Completo
+    Col D: Gênero
+    Col E: Data de nascimento
+    Col F: CPF
+    Col G: Celular
+    Col H: Cidade
+    Col I: Estado
+    Col J: Clube/Academia
+    Col K: Treinador
+    (colunas L+ ignoradas)
+    """
+    if not file.filename.lower().endswith(('.xlsx', '.xls')):
+        raise HTTPException(status_code=400, detail="Arquivo deve ser Excel (.xlsx ou .xls)")
+
     try:
         contents = await file.read()
         workbook = load_workbook(BytesIO(contents))
-        
-        if 'Players' not in workbook.sheetnames:
-            raise HTTPException(status_code=400, detail="Excel must have a sheet named 'Players'")
-        
-        sheet = workbook['Players']
-        
+
+        # Tenta usar a primeira aba que contém dados de filiação
+        sheet = workbook.active
+
         players_created = 0
         players_updated = 0
         errors = []
-        
-        # Skip header row
+
         for row_idx, row in enumerate(sheet.iter_rows(min_row=2, values_only=True), start=2):
-            if not row[0]:  # Skip empty rows
+            if not row or not row[2]:  # Nome Completo é coluna C (índice 2)
                 continue
-                
+
             try:
-                name = str(row[0]).strip()
-                city = str(row[1]).strip() if row[1] else None
-                academy = str(row[2]).strip() if row[2] else None
-                coach = str(row[3]).strip() if row[3] else None
-                main_class = str(row[4]).strip() if row[4] else None
-                
-                # Check if player exists
-                existing = await db.players.find_one({"name": name}, {"_id": 0})
-                
+                name = str(row[2]).strip()
+                if not name:
+                    continue
+
+                gender   = str(row[3]).strip() if row[3] else None
+                email    = str(row[1]).strip() if row[1] else None
+                city_raw = str(row[7]).strip() if row[7] else None
+                state    = str(row[8]).strip() if row[8] else None
+                academy  = str(row[9]).strip() if row[9] else None
+                coach    = str(row[10]).strip() if row[10] else None
+                phone_raw= row[6]
+                phone    = str(int(float(phone_raw))) if phone_raw else None
+
+                # Cidade + Estado
+                city = None
+                if city_raw and state:
+                    city = f"{city_raw}, {state}"
+                elif city_raw:
+                    city = city_raw
+
+                # Data de nascimento
+                birth_date = None
+                if row[4]:
+                    from datetime import date as date_type
+                    if isinstance(row[4], (datetime, date_type)):
+                        birth_date = row[4].strftime('%Y-%m-%d')
+                    else:
+                        try:
+                            from dateutil import parser as date_parser
+                            birth_date = date_parser.parse(str(row[4])).strftime('%Y-%m-%d')
+                        except Exception:
+                            birth_date = str(row[4])
+
+                # Checa se jogador já existe pelo nome (case-insensitive)
+                existing = await db.players.find_one(
+                    {"name": {"$regex": f"^{name}$", "$options": "i"}},
+                    {"_id": 0}
+                )
+
+                update_data = {
+                    "gender": gender,
+                    "birth_date": birth_date,
+                    "email": email,
+                    "phone": phone,
+                    "city": city,
+                    "academy": academy,
+                    "coach": coach,
+                }
+
                 if existing:
-                    # Update player
-                    update_data = {
-                        "city": city,
-                        "academy": academy,
-                        "coach": coach,
-                        "main_class": main_class
-                    }
                     await db.players.update_one({"id": existing['id']}, {"$set": update_data})
                     players_updated += 1
                 else:
-                    # Create new player
-                    player = Player(
-                        name=name,
-                        city=city,
-                        academy=academy,
-                        coach=coach,
-                        main_class=main_class
-                    )
+                    player = Player(name=name, **update_data)
                     doc = player.model_dump()
                     doc['created_at'] = doc['created_at'].isoformat()
                     await db.players.insert_one(doc)
                     players_created += 1
-                
+
             except Exception as e:
-                errors.append(f"Row {row_idx}: {str(e)}")
-        
+                errors.append(f"Linha {row_idx}: {str(e)}")
+
         return {
             "players_created": players_created,
             "players_updated": players_updated,
             "errors": errors
         }
-        
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error processing Excel: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao processar Excel: {str(e)}")
 
 @api_router.get("/players/{player_id}/details")
 async def get_player_details(player_id: str):
@@ -1119,6 +1166,33 @@ async def download_results_template():
         headers={"Content-Disposition": "attachment; filename=modelo_resultados.xlsx"}
     )
 
+async def get_or_create_player(name: str, players_dict: dict, gender: str = None) -> dict:
+    """
+    Busca jogador pelo nome (case-insensitive).
+    Se não existir, cria automaticamente e atualiza players_dict.
+    """
+    key = name.lower().strip()
+    if key in players_dict:
+        return players_dict[key]
+
+    # Tenta busca direta no banco (caso players_dict esteja desatualizado)
+    existing = await db.players.find_one(
+        {"name": {"$regex": f"^{re.escape(name.strip())}$", "$options": "i"}},
+        {"_id": 0}
+    )
+    if existing:
+        players_dict[key] = existing
+        return existing
+
+    # Cria novo jogador
+    new_player = Player(name=name.strip(), gender=gender)
+    doc = new_player.model_dump()
+    doc['created_at'] = doc['created_at'].isoformat()
+    await db.players.insert_one(doc)
+    players_dict[key] = doc
+    return doc
+
+
 @api_router.post("/results/import")
 async def import_results(
     tournament_id: str,
@@ -1238,20 +1312,14 @@ async def import_results(
                     if is_doubles and player2_name:
                         # Duplas: salvar para os dois jogadores
                         for pname in [player1_name, player2_name]:
-                            player = players_dict.get(pname.lower())
-                            if not player:
-                                errors.append(f"Aba '{sheet_name}' linha {row_idx}: Jogador '{pname}' não encontrado")
-                                continue
+                            player = await get_or_create_player(pname, players_dict)
                             status = await save_result(tournament_id, player, gender_category, class_category, placement, config)
                             if status == 'created':
                                 results_created += 1
                             elif status == 'updated':
                                 results_updated += 1
                     else:
-                        player = players_dict.get(player1_name.lower())
-                        if not player:
-                            errors.append(f"Aba '{sheet_name}' linha {row_idx}: Jogador '{player1_name}' não encontrado")
-                            continue
+                        player = await get_or_create_player(player1_name, players_dict, gender_category if gender_category != 'Misto' else None)
                         status = await save_result(tournament_id, player, gender_category, class_category, placement, config)
                         if status == 'created':
                             results_created += 1
@@ -1753,15 +1821,10 @@ async def import_matches_excel(
                         p1a_name, p1b_name = split_doubles(team1_raw)
                         p2a_name, p2b_name = split_doubles(team2_raw)
 
-                        p1a = players_dict.get(p1a_name.lower()) if p1a_name else None
-                        p1b = players_dict.get(p1b_name.lower()) if p1b_name else None
-                        p2a = players_dict.get(p2a_name.lower()) if p2a_name else None
-                        p2b = players_dict.get(p2b_name.lower()) if p2b_name else None
-
-                        missing = [n for n, p in [(p1a_name, p1a), (p1b_name, p1b), (p2a_name, p2a), (p2b_name, p2b)] if n and not p]
-                        if missing:
-                            errors.append(f"Aba '{sheet_name}' linha {row_idx}: Jogadores não encontrados: {', '.join(missing)}")
-                            continue
+                        p1a = await get_or_create_player(p1a_name, players_dict) if p1a_name else None
+                        p1b = await get_or_create_player(p1b_name, players_dict) if p1b_name else None
+                        p2a = await get_or_create_player(p2a_name, players_dict) if p2a_name else None
+                        p2b = await get_or_create_player(p2b_name, players_dict) if p2b_name else None
 
                         winner_team = determine_winner(score_str, p1a_name, p2a_name)
                         winner_id = (p1a or p1b)['id'] if winner_team == p1a_name else (p2a or p2b)['id']
@@ -1777,11 +1840,9 @@ async def import_matches_excel(
                         p2, p2_clean = resolve_player(team2_raw)
 
                         if not p1:
-                            errors.append(f"Aba '{sheet_name}' linha {row_idx}: Jogador '{p1_clean}' não encontrado")
-                            continue
+                            p1 = await get_or_create_player(p1_clean, players_dict)
                         if not p2:
-                            errors.append(f"Aba '{sheet_name}' linha {row_idx}: Jogador '{p2_clean}' não encontrado")
-                            continue
+                            p2 = await get_or_create_player(p2_clean, players_dict)
 
                         winner_name = determine_winner(score_str, p1['name'], p2['name'])
                         winner_id = p1['id'] if winner_name == p1['name'] else p2['id']

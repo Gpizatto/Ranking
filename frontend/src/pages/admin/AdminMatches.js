@@ -123,8 +123,10 @@ const AdminMatches = () => {
 
       setImportResult(response.data);
 
-      if (response.data.matches_created > 0) {
-        toast.success(`${response.data.matches_created} partidas importadas com sucesso!`);
+      if (response.data.matches_created > 0 || response.data.matches_skipped >= 0) {
+        const msg = `${response.data.matches_created} partidas importadas` +
+          (response.data.matches_skipped > 0 ? `, ${response.data.matches_skipped} ignoradas (duplicadas)` : '');
+        toast.success(msg);
         fetchData();
       }
 
@@ -491,6 +493,9 @@ const AdminMatches = () => {
           <CardContent className="pt-6">
             <h3 className="text-white font-semibold mb-2">Resultado da Importação:</h3>
             <p className="text-green-400">✅ {importResult.matches_created} partidas criadas</p>
+            {importResult.matches_skipped > 0 && (
+              <p className="text-yellow-400">⏭️ {importResult.matches_skipped} ignoradas (já existiam)</p>
+            )}
             {importResult.errors.length > 0 && (
               <div className="mt-2">
                 <p className="text-red-400">❌ {importResult.errors.length} erros:</p>

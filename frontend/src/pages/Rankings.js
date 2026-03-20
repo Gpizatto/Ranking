@@ -100,14 +100,14 @@ const Rankings = () => {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-4xl font-bold text-white mb-2" data-testid="rankings-title">Rankings Oficiais</h1>
-          <p className="text-gray-400">Classificação atualizada dos jogadores</p>
+          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-1" data-testid="rankings-title">Rankings Oficiais</h1>
+          <p className="text-gray-400 text-sm">Classificação atualizada dos jogadores</p>
         </div>
-        <Button onClick={generateTop10Image} className="bg-purple-500 hover:bg-purple-600" data-testid="generate-image-button">
-          <Download className="w-4 h-4 mr-2" />
-          Gerar Imagem Top 10
+        <Button onClick={generateTop10Image} className="bg-purple-500 hover:bg-purple-600 shrink-0" data-testid="generate-image-button">
+          <Download className="w-4 h-4 sm:mr-2" />
+          <span className="hidden sm:inline">Gerar Imagem Top 10</span>
         </Button>
       </div>
 
@@ -147,14 +147,14 @@ const Rankings = () => {
             <h2 className="text-3xl font-bold text-white">Top Players</h2>
             <Badge className="bg-green-500 text-white px-3 py-1">{selectedClass} - {selectedCategory}</Badge>
           </div>
-          <div className="grid grid-cols-5 gap-3 items-end">
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 items-end">
             {top5.map((player, index) => {
               const borderColors = ['border-yellow-400', 'border-gray-300', 'border-orange-400', 'border-blue-400', 'border-green-400'];
               const badgeBg = ['bg-yellow-400 text-yellow-900', 'bg-gray-300 text-gray-900', 'bg-orange-400 text-orange-900', 'bg-blue-400 text-blue-900', 'bg-green-400 text-green-900'];
-              const heights = ['h-[420px]', 'h-[380px]', 'h-[380px]', 'h-[340px]', 'h-[340px]'];
+              const heights = ['h-[280px] sm:h-[420px]', 'h-[240px] sm:h-[380px]', 'h-[240px] sm:h-[380px]', 'h-[340px]', 'h-[340px]'];
               return (
                 <div key={player.player_id} onClick={() => handlePlayerClick(player.player_id)}
-                  className={`relative overflow-hidden rounded-xl cursor-pointer group border-2 ${borderColors[index]} ${heights[index]}`}
+                  className={`relative overflow-hidden rounded-xl cursor-pointer group border-2 ${borderColors[index]} ${heights[index]} ${index >= 3 ? "hidden sm:block" : ""}`}
                   data-testid={`top-player-card-${index + 1}`}>
                   {player.photo_url
                     ? <img src={player.photo_url} alt={player.player_name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -203,8 +203,8 @@ const Rankings = () => {
                     <tr className="border-b-2 border-slate-700">
                       <th className="text-left py-4 px-4 text-gray-400 font-semibold uppercase text-xs">Rank</th>
                       <th className="text-left py-4 px-4 text-gray-400 font-semibold uppercase text-xs">Jogador</th>
-                      <th className="text-left py-4 px-4 text-gray-400 font-semibold uppercase text-xs hidden md:table-cell">Classe</th>
-                      <th className="text-left py-4 px-4 text-gray-400 font-semibold uppercase text-xs hidden lg:table-cell">Categoria</th>
+                      <th className="text-left py-4 px-2 text-gray-400 font-semibold uppercase text-xs hidden md:table-cell">Classe</th>
+                      <th className="text-left py-4 px-2 text-gray-400 font-semibold uppercase text-xs hidden lg:table-cell">Categoria</th>
                       <th className="text-right py-4 px-4 text-gray-400 font-semibold uppercase text-xs">Pontos</th>
                       <th className="text-center py-4 px-4 text-gray-400 font-semibold uppercase text-xs hidden sm:table-cell">Torneios</th>
                     </tr>
@@ -215,7 +215,7 @@ const Rankings = () => {
                       const medalColors = ['text-yellow-400', 'text-gray-300', 'text-orange-400'];
                       return (
                         <tr key={player.player_id} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-all cursor-pointer group" data-testid={`ranking-row-${index}`}>
-                          <td className="py-4 px-4">
+                          <td className="py-3 px-2 sm:px-4">
                             <div className="flex items-center">
                               {isTop3 ? (<>{index === 0 && <Trophy className="w-5 h-5 text-yellow-400 mr-2" />}{index === 1 && <Medal className="w-5 h-5 text-gray-300 mr-2" />}{index === 2 && <Medal className="w-5 h-5 text-orange-400 mr-2" />}<span className={`font-black text-xl ${medalColors[index]}`}>{player.rank}</span></>) : (<span className="text-white font-bold text-lg">{player.rank}</span>)}
                             </div>
@@ -333,7 +333,7 @@ const Rankings = () => {
 
       {/* Player Details Modal */}
       <Dialog open={!!selectedPlayer} onOpenChange={() => { setSelectedPlayer(null); setPlayerDetails(null); }}>
-        <DialogContent className="bg-slate-800 border-green-500/20 max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogContent className="bg-slate-800 border-green-500/20 w-full max-w-4xl max-h-[90vh] overflow-y-auto mx-2 sm:mx-auto">
           {selectedPlayer && (
             <>
               <DialogHeader>

@@ -1715,6 +1715,7 @@ async def import_matches_excel(
         players_dict = {p['name'].lower().strip(): p for p in players}
 
         matches_created = 0
+        matches_skipped = 0
         errors = []
 
         def determine_winner(score_str: str, player1_name: str, player2_name: str):
@@ -1862,14 +1863,35 @@ async def import_matches_excel(
                     doc = match.model_dump()
                     doc['date'] = doc['date'].isoformat() if isinstance(doc['date'], datetime) else doc['date']
                     doc['created_at'] = doc['created_at'].isoformat()
-                    await db.matches.insert_one(doc)
-                    matches_created += 1
+
+                    # Verifica duplicidade: mesma partida = mesmo torneio + mesmos jogadores + mesma rodada
+                    existing_match = await db.matches.find_one({
+                        "tournament_id": tournament['id'],
+                        "player1_id": p1['id'],
+                        "player2_id": p2['id'],
+                        "round": round_name
+                    })
+                    # Tenta também na ordem inversa (p1 e p2 podem estar trocados)
+                    if not existing_match:
+                        existing_match = await db.matches.find_one({
+                            "tournament_id": tournament['id'],
+                            "player1_id": p2['id'],
+                            "player2_id": p1['id'],
+                            "round": round_name
+                        })
+
+                    if existing_match:
+                        matches_skipped += 1
+                    else:
+                        await db.matches.insert_one(doc)
+                        matches_created += 1
 
                 except Exception as e:
                     errors.append(f"Aba '{sheet_name}' linha {row_idx}: {str(e)}")
 
         return {
             "matches_created": matches_created,
+            "matches_skipped": matches_skipped,
             "errors": errors
         }
 

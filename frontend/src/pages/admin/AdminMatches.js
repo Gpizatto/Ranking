@@ -195,12 +195,12 @@ const AdminMatches = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-4xl font-bold text-white mb-2" data-testid="admin-matches-title">Gerenciar Partidas</h1>
-          <p className="text-gray-400">Registre partidas e histórico de jogos</p>
+          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2" data-testid="admin-matches-title">Gerenciar Partidas</h1>
+          <p className="text-gray-400 text-sm">Registre partidas e histórico de jogos</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             onClick={handleDownloadTemplate}
             className="bg-blue-500 hover:bg-blue-600"
@@ -532,13 +532,13 @@ const AdminMatches = () => {
               <table className="w-full" data-testid="matches-table">
                 <thead>
                   <tr className="border-b border-slate-700">
-                    <th className="text-left py-3 px-4 text-gray-400 font-semibold">Data</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-semibold">Torneio</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-semibold">Categoria</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-semibold">Partida</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-semibold">Placar</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-semibold">Rodada</th>
-                    <th className="text-center py-3 px-4 text-gray-400 font-semibold">Ações</th>
+                    <th className="text-left py-3 px-2 text-gray-400 font-semibold text-sm hidden sm:table-cell">Data</th>
+                    <th className="text-left py-3 px-2 text-gray-400 font-semibold text-sm hidden md:table-cell">Torneio</th>
+                    <th className="text-left py-3 px-2 text-gray-400 font-semibold text-sm hidden sm:table-cell">Cat.</th>
+                    <th className="text-left py-3 px-2 text-gray-400 font-semibold text-sm">Partida</th>
+                    <th className="text-left py-3 px-2 text-gray-400 font-semibold text-sm hidden md:table-cell">Placar</th>
+                    <th className="text-left py-3 px-2 text-gray-400 font-semibold text-sm hidden lg:table-cell">Rodada</th>
+                    <th className="text-center py-3 px-2 text-gray-400 font-semibold text-sm">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -562,7 +562,7 @@ const AdminMatches = () => {
                           </span>
                         </div>
                       </td>
-                      <td className="py-3 px-4 text-gray-300 font-mono text-sm">
+                      <td className="py-3 px-2 text-gray-300 font-mono text-xs hidden md:table-cell">
                         {match.score.join(' ')}
                       </td>
                       <td className="py-3 px-4">

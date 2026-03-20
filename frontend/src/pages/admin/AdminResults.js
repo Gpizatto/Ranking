@@ -305,12 +305,12 @@ const AdminResults = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-4xl font-bold text-white mb-2" data-testid="admin-results-title">Gerenciar Resultados</h1>
-          <p className="text-gray-400">Registre resultados de torneios</p>
+          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2" data-testid="admin-results-title">Gerenciar Resultados</h1>
+          <p className="text-gray-400 text-sm">Registre resultados de torneios</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button 
             onClick={handleDownloadTemplate}
             className="bg-blue-500 hover:bg-blue-600"
@@ -610,7 +610,7 @@ const AdminResults = () => {
       {/* Filters */}
       <Card className="bg-slate-800/50 border-blue-500/20">
         <CardContent className="pt-6">
-          <div className="grid md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <Label className="text-gray-300 mb-2 block">Filtrar por Torneio</Label>
               <Select value={filterTournament} onValueChange={setFilterTournament}>
@@ -680,22 +680,22 @@ const AdminResults = () => {
               <table className="w-full" data-testid="results-table">
                 <thead>
                   <tr className="border-b border-slate-700">
-                    <th className="text-left py-3 px-4 text-gray-400 font-semibold">Jogador</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-semibold">Classe</th>
-                    <th className="text-left py-3 px-4 text-gray-400 font-semibold">Categoria</th>
-                    <th className="text-center py-3 px-4 text-gray-400 font-semibold">Colocação</th>
-                    <th className="text-center py-3 px-4 text-gray-400 font-semibold">Pontos</th>
-                    <th className="text-center py-3 px-4 text-gray-400 font-semibold">Ações</th>
+                    <th className="text-left py-3 px-2 text-gray-400 font-semibold text-sm">Jogador</th>
+                    <th className="text-left py-3 px-2 text-gray-400 font-semibold text-sm hidden sm:table-cell">Classe</th>
+                    <th className="text-left py-3 px-2 text-gray-400 font-semibold text-sm hidden md:table-cell">Categoria</th>
+                    <th className="text-center py-3 px-2 text-gray-400 font-semibold text-sm">Pos.</th>
+                    <th className="text-center py-3 px-2 text-gray-400 font-semibold text-sm hidden sm:table-cell">Pts</th>
+                    <th className="text-center py-3 px-2 text-gray-400 font-semibold text-sm">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredResults.map((result) => (
                     <tr key={result.id} className="border-b border-slate-700/50 hover:bg-slate-700/30" data-testid={`result-row-${result.id}`}>
-                      <td className="py-3 px-4 text-white">{result.player_name}</td>
-                      <td className="py-3 px-4 text-gray-300">{result.class_category}</td>
-                      <td className="py-3 px-4 text-gray-300">{result.gender_category}</td>
-                      <td className="py-3 px-4 text-center text-white font-semibold">{result.placement}º</td>
-                      <td className="py-3 px-4 text-center text-green-400 font-semibold">{result.points}</td>
+                      <td className="py-3 px-2 text-white text-sm">{result.player_name}</td>
+                      <td className="py-3 px-2 text-gray-300 text-sm hidden sm:table-cell">{result.class_category}</td>
+                      <td className="py-3 px-2 text-gray-300 text-sm hidden md:table-cell">{result.gender_category}</td>
+                      <td className="py-3 px-2 text-center text-white font-semibold text-sm">{result.placement}º</td>
+                      <td className="py-3 px-2 text-center text-green-400 font-semibold text-sm hidden sm:table-cell">{result.points}</td>
                       <td className="py-3 px-4 text-center">
                         <Button
                           onClick={() => handleDelete(result.id)}

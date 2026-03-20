@@ -67,9 +67,11 @@ const Layout = () => {
 
             {/* Logo */}
             <Link to="/" className="flex items-center space-x-2 sm:space-x-3">
-              <div className="w-9 h-9 sm:w-12 sm:h-12 bg-gradient-to-br from-green-400 to-blue-500 rounded-lg flex items-center justify-center shrink-0">
-                <Trophy className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
-              </div>
+              <img
+                src="/fsp.jpeg"
+                alt="FSP"
+                className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg object-cover shrink-0"
+              />
               <div>
                 <h1 className="text-sm sm:text-xl font-bold text-white leading-tight">Federação de Squash do Paraná</h1>
                 <p className="text-xs text-green-400">Rankings Oficiais</p>

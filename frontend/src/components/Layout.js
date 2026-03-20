@@ -120,7 +120,7 @@ const Layout = () => {
       {/* Admin subnav */}
       {isAuth && isAdminPage && (
         <div className="bg-slate-800/50 border-b border-blue-500/20">
-          <div className="container mx-auto px-3 py-2 text-sm sm:text-base flex space-x-1">
+          <div className="container mx-auto px-3 py-2 text-sm flex space-x-1 overflow-x-auto whitespace-nowrap scrollbar-none">
 
             <Link to="/admin" className="px-3 py-1.5 text-sm rounded text-gray-400 hover:bg-slate-700">
               Dashboard

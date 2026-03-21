@@ -13,7 +13,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const CLASSES = ['1a', '2a', '3a', '4a', '5a', '6a', 'Duplas'];
-const CATEGORIES = ['Masculino', 'Feminino'];
+const CATEGORIES = ['Masculino', 'Feminino', 'Misto'];
 
 const AdminResults = () => {
   const [results, setResults] = useState([]);
@@ -616,7 +616,7 @@ const AdminResults = () => {
                     <Label className="text-gray-300">Classe</Label>
                     <Select
                       value={formData.class_category}
-                      onValueChange={(value) => setFormData({ ...formData, class_category: value })}
+                      onValueChange={(value) => setFormData({ ...formData, class_category: value, gender_category: value === 'Duplas' ? 'Misto' : (formData.gender_category === 'Misto' ? 'Masculino' : formData.gender_category) })}
                     >
                       <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="class-select">
                         <SelectValue />
@@ -638,7 +638,10 @@ const AdminResults = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {CATEGORIES.map(cat => (
+                        {(formData.class_category === 'Duplas'
+                          ? ['Misto']
+                          : ['Masculino', 'Feminino']
+                        ).map(cat => (
                           <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                         ))}
                       </SelectContent>

@@ -113,3 +113,175 @@ code {
         border-bottom-color: inherit;
     }
 }
+
+/* ============================================================
+   THEME SYSTEM — sobrescreve classes Tailwind via data-theme
+   ============================================================ */
+
+/* Transição suave ao trocar tema */
+*, *::before, *::after {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease !important;
+}
+
+/* ---------- VERDE (padrão) ---------- */
+[data-theme="green"] {
+  --t-500: #22c55e; --t-600: #16a34a; --t-400: #4ade80;
+  --t-500-20: rgba(34,197,94,0.2); --t-500-30: rgba(34,197,94,0.3);
+  --t-bg-from: #0f172a; --t-bg-via: #1e293b; --t-bg-to: #0f172a;
+}
+/* ---------- AZUL ---------- */
+[data-theme="blue"] {
+  --t-500: #3b82f6; --t-600: #2563eb; --t-400: #60a5fa;
+  --t-500-20: rgba(59,130,246,0.2); --t-500-30: rgba(59,130,246,0.3);
+  --t-bg-from: #0c1a2e; --t-bg-via: #0f2847; --t-bg-to: #0c1a2e;
+}
+/* ---------- ROXO ---------- */
+[data-theme="purple"] {
+  --t-500: #a855f7; --t-600: #9333ea; --t-400: #c084fc;
+  --t-500-20: rgba(168,85,247,0.2); --t-500-30: rgba(168,85,247,0.3);
+  --t-bg-from: #130d1f; --t-bg-via: #1e1035; --t-bg-to: #130d1f;
+}
+/* ---------- VERMELHO ---------- */
+[data-theme="red"] {
+  --t-500: #ef4444; --t-600: #dc2626; --t-400: #f87171;
+  --t-500-20: rgba(239,68,68,0.2); --t-500-30: rgba(239,68,68,0.3);
+  --t-bg-from: #1a0a0a; --t-bg-via: #2d1010; --t-bg-to: #1a0a0a;
+}
+/* ---------- LARANJA ---------- */
+[data-theme="orange"] {
+  --t-500: #f97316; --t-600: #ea6e0a; --t-400: #fb923c;
+  --t-500-20: rgba(249,115,22,0.2); --t-500-30: rgba(249,115,22,0.3);
+  --t-bg-from: #1a0f00; --t-bg-via: #2d1a00; --t-bg-to: #1a0f00;
+}
+/* ---------- PRATA ---------- */
+[data-theme="silver"] {
+  --t-500: #94a3b8; --t-600: #7c8fa3; --t-400: #cbd5e1;
+  --t-500-20: rgba(148,163,184,0.2); --t-500-30: rgba(148,163,184,0.3);
+  --t-bg-from: #0d0f12; --t-bg-via: #1a1f27; --t-bg-to: #0d0f12;
+}
+
+/* ============================================================
+   SOBRESCRITA GLOBAL DE CORES — funciona com qualquer tema
+   ============================================================ */
+
+/* Fundo principal */
+[data-theme] .min-h-screen,
+[data-theme] .App {
+  background: linear-gradient(135deg, var(--t-bg-from) 0%, var(--t-bg-via) 50%, var(--t-bg-to) 100%) !important;
+}
+
+/* bg-green-500 / bg-blue-500 → accent */
+[data-theme] .bg-green-500,
+[data-theme] .bg-blue-500 {
+  background-color: var(--t-500) !important;
+}
+[data-theme] .hover\:bg-green-600:hover,
+[data-theme] .hover\:bg-green-500:hover,
+[data-theme] .hover\:bg-blue-600:hover,
+[data-theme] .hover\:bg-blue-500:hover {
+  background-color: var(--t-600) !important;
+}
+
+/* text-green-400 / text-green-500 / text-blue-400 → accent text */
+[data-theme] .text-green-400,
+[data-theme] .text-green-500,
+[data-theme] .text-blue-400,
+[data-theme] .text-blue-500 {
+  color: var(--t-400) !important;
+}
+
+/* border-green-500 / border-blue-500 */
+[data-theme] .border-green-500,
+[data-theme] .border-blue-500 {
+  border-color: var(--t-500) !important;
+}
+
+/* Opacidades de border */
+[data-theme] .border-green-500\/20,
+[data-theme] .border-blue-500\/20 {
+  border-color: var(--t-500-20) !important;
+}
+[data-theme] .border-green-500\/30,
+[data-theme] .border-blue-500\/30 {
+  border-color: var(--t-500-30) !important;
+}
+[data-theme] .border-green-500\/50,
+[data-theme] .border-blue-500\/50 {
+  border-color: var(--t-500-30) !important;
+}
+
+/* bg com opacidade */
+[data-theme] .bg-green-500\/10,
+[data-theme] .bg-blue-500\/10,
+[data-theme] .bg-green-500\/20,
+[data-theme] .bg-blue-500\/20 {
+  background-color: var(--t-500-20) !important;
+}
+
+/* ring */
+[data-theme] .ring-green-500,
+[data-theme] .ring-blue-500 {
+  --tw-ring-color: var(--t-500) !important;
+}
+
+/* focus outline */
+[data-theme] button:focus-visible,
+[data-theme] input:focus-visible,
+[data-theme] select:focus-visible {
+  outline-color: var(--t-500) !important;
+}
+
+/* Badge bg-green / bg-blue */
+[data-theme] .bg-green-500.text-white,
+[data-theme] .bg-blue-500.text-white {
+  background-color: var(--t-500) !important;
+}
+
+/* Avatar fallback */
+[data-theme] .bg-green-500.text-white.text-xl,
+[data-theme] .bg-green-500.text-white.text-2xl {
+  background-color: var(--t-500) !important;
+}
+
+/* Active nav links */
+[data-theme] a.bg-green-500,
+[data-theme] button.bg-green-500,
+[data-theme] a.bg-blue-500,
+[data-theme] button.bg-blue-500 {
+  background-color: var(--t-500) !important;
+}
+
+/* gradient from-green */
+[data-theme] .from-green-400 {
+  --tw-gradient-from: var(--t-400) !important;
+}
+[data-theme] .to-green-600 {
+  --tw-gradient-to: var(--t-600) !important;
+}
+
+/* hover border accent */
+[data-theme] .hover\:border-green-400\/40:hover,
+[data-theme] .hover\:border-green-500\/50:hover {
+  border-color: var(--t-500-30) !important;
+}
+
+/* group-hover text */
+[data-theme] .group:hover .group-hover\:text-green-400 {
+  color: var(--t-400) !important;
+}
+[data-theme] .group:hover .group-hover\:ring-green-500 {
+  --tw-ring-color: var(--t-500) !important;
+}
+
+/* border-b-2 active tabs */
+[data-theme] .border-green-500.border-b-2 {
+  border-color: var(--t-500) !important;
+}
+
+/* scrollbar */
+[data-theme] ::-webkit-scrollbar-thumb {
+  background: var(--t-500-20) !important;
+}
+[data-theme] ::-webkit-scrollbar-thumb:hover {
+  background: var(--t-500-30) !important;
+}

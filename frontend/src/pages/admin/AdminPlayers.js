@@ -380,8 +380,8 @@ const AdminPlayers = () => {
                       <SelectValue placeholder="Selecione" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Masculino">Masculino</SelectItem>
-                      <SelectItem value="Feminino">Feminino</SelectItem>
+                      <SelectItem value="Masculina">Masculina</SelectItem>
+                      <SelectItem value="Feminina">Feminina</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -451,7 +451,7 @@ const AdminPlayers = () => {
                   <div>
                     <Label className="text-gray-300 text-xs mb-1 block">Gênero</Label>
                     <div className="flex flex-col gap-1">
-                      {['', 'Masculino', 'Feminino'].map(g => (
+                      {['', 'Masculina', 'Feminina'].map(g => (
                         <button
                           key={g}
                           onClick={() => setFilters({ ...filters, gender: g })}

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from '../../lib/api';
 import { API } from '../../lib/api';
-import { Users, Plus, Edit, Trash2, Upload, Camera, FileText, Filter, X, Search } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Upload, Camera, FileText, Filter, X, Search, GitMerge, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -28,6 +28,10 @@ const AdminPlayers = () => {
   });
   const [uploading, setUploading] = useState(false);
   const [importResult, setImportResult] = useState(null);
+  const [mergeOpen, setMergeOpen] = useState(false);
+  const [mergeKeep, setMergeKeep] = useState('');
+  const [mergeRemove, setMergeRemove] = useState('');
+  const [mergeLoading, setMergeLoading] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState({ name: '', gender: '', city: '', academy: '' });
   const fileInputRef = useRef(null);
@@ -186,6 +190,25 @@ const AdminPlayers = () => {
     }
   };
 
+  const handleMerge = async () => {
+    if (!mergeKeep || !mergeRemove) { toast.error('Selecione os dois jogadores'); return; }
+    if (mergeKeep === mergeRemove) { toast.error('Selecione jogadores diferentes'); return; }
+    if (!window.confirm('Tem certeza? O jogador duplicado será removido e todos os dados transferidos.')) return;
+    setMergeLoading(true);
+    try {
+      const response = await axios.post(`${API}/players/merge?keep_id=${mergeKeep}&remove_id=${mergeRemove}`);
+      toast.success(`${response.data.message} — ${response.data.results_transferred} resultados e ${response.data.matches_transferred} partidas transferidos`);
+      setMergeOpen(false);
+      setMergeKeep('');
+      setMergeRemove('');
+      fetchPlayers();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao mesclar jogadores');
+    } finally {
+      setMergeLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -201,6 +224,14 @@ const AdminPlayers = () => {
           >
             <Filter className="w-4 h-4" />
             Filtros
+          </Button>
+          <Button
+            onClick={() => setMergeOpen(true)}
+            variant="outline"
+            className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10 gap-2"
+          >
+            <GitMerge className="w-4 h-4" />
+            <span className="hidden sm:inline">Mesclar Duplicatas</span>
           </Button>
           <Button
             onClick={handleDownloadTemplate}
@@ -581,6 +612,80 @@ const AdminPlayers = () => {
           </div>
         </div>
       )}
+
+      {/* Merge Players Dialog */}
+      <Dialog open={mergeOpen} onOpenChange={setMergeOpen}>
+        <DialogContent className="bg-slate-800 border-orange-500/20 max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <GitMerge className="w-5 h-5 text-orange-400" />
+              Mesclar Jogadores Duplicados
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 flex gap-2">
+              <AlertTriangle className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
+              <p className="text-orange-300 text-xs">
+                Todos os resultados e partidas do jogador duplicado serão transferidos para o jogador correto. O duplicado será removido permanentemente.
+              </p>
+            </div>
+            <div>
+              <Label className="text-gray-300 mb-1 block">Jogador correto (manter)</Label>
+              <Select value={mergeKeep} onValueChange={setMergeKeep}>
+                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                  <SelectValue placeholder="Selecione o jogador principal..." />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-700 border-slate-600 max-h-60">
+                  {players.filter(p => p.id !== mergeRemove).map(p => (
+                    <SelectItem key={p.id} value={p.id} className="text-white hover:bg-slate-600">
+                      {p.name} {p.city ? `— ${p.city}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-gray-300 mb-1 block">Jogador duplicado (remover)</Label>
+              <Select value={mergeRemove} onValueChange={setMergeRemove}>
+                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                  <SelectValue placeholder="Selecione o duplicado..." />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-700 border-slate-600 max-h-60">
+                  {players.filter(p => p.id !== mergeKeep).map(p => (
+                    <SelectItem key={p.id} value={p.id} className="text-white hover:bg-slate-600">
+                      {p.name} {p.city ? `— ${p.city}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {mergeKeep && mergeRemove && (
+              <div className="bg-slate-700/50 rounded-lg p-3 text-sm">
+                <p className="text-gray-400">Resultado da mesclagem:</p>
+                <p className="text-white mt-1">
+                  <span className="text-red-400 line-through">{players.find(p => p.id === mergeRemove)?.name}</span>
+                  {' → '}
+                  <span className="text-green-400">{players.find(p => p.id === mergeKeep)?.name}</span>
+                </p>
+              </div>
+            )}
+            <div className="flex gap-2 justify-end pt-2">
+              <Button variant="outline" className="border-slate-600 text-gray-300"
+                onClick={() => { setMergeOpen(false); setMergeKeep(''); setMergeRemove(''); }}>
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleMerge}
+                disabled={!mergeKeep || !mergeRemove || mergeLoading}
+                className="bg-orange-500 hover:bg-orange-600"
+              >
+                <GitMerge className="w-4 h-4 mr-2" />
+                {mergeLoading ? 'Mesclando...' : 'Mesclar'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Excel Format Guide */}
       <Card className="bg-slate-800/50 border-purple-500/20">

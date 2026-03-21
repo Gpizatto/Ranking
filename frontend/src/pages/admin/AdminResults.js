@@ -68,7 +68,7 @@ const AdminResults = () => {
     tournament_id: '',
     player_id: '',
     class_category: '1ª',
-    gender_category: 'Masculino',
+    gender_category: 'Masculina',
     placement: 1
   });
   const [importData, setImportData] = useState(null);
@@ -260,7 +260,7 @@ const AdminResults = () => {
       tournament_id: '',
       player_id: '',
       class_category: '1ª',
-      gender_category: 'Masculino',
+      gender_category: 'Masculina',
       placement: 1
     });
   };
@@ -616,7 +616,7 @@ const AdminResults = () => {
                     <Label className="text-gray-300">Classe</Label>
                     <Select
                       value={formData.class_category}
-                      onValueChange={(value) => setFormData({ ...formData, class_category: value, gender_category: value === 'Duplas' ? 'Misto' : (formData.gender_category === 'Misto' ? 'Masculino' : formData.gender_category) })}
+                      onValueChange={(value) => setFormData({ ...formData, class_category: value, gender_category: value === 'Duplas' ? 'Mista' : (formData.gender_category === 'Mista' ? 'Masculina' : formData.gender_category) })}
                     >
                       <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="class-select">
                         <SelectValue />
@@ -639,8 +639,8 @@ const AdminResults = () => {
                       </SelectTrigger>
                       <SelectContent>
                         {(formData.class_category === 'Duplas'
-                          ? ['Misto']
-                          : ['Feminino', 'Masculino']
+                          ? ['Mista']
+                          : ['Feminina', 'Masculina']
                         ).map(cat => (
                           <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                         ))}

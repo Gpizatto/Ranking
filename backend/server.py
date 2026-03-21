@@ -249,7 +249,7 @@ class Player(BaseModel):
     coach: Optional[str] = None
     main_class: Optional[str] = None  # Classe principal que joga
     birth_date: Optional[str] = None  # ISO date string 'YYYY-MM-DD'
-    gender: Optional[str] = None      # 'Masculino' ou 'Feminino'
+    gender: Optional[str] = None      # 'Masculina' ou 'Feminina'
     email: Optional[str] = None
     phone: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -294,7 +294,7 @@ class Result(BaseModel):
     player_id: str
     player_name: str  # Denormalized for performance
     class_category: str  # "1ª", "2ª", "3ª", "4ª", "5ª", "6ª", "Duplas"
-    gender_category: str  # "Masculino", "Feminino"
+    gender_category: str  # "Masculina", "Feminina"
     placement: int
     points: float = 0.0
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -842,7 +842,7 @@ async def import_players_excel(file: UploadFile = File(...), current_user: User 
                 if not name:
                     continue
 
-                gender   = str(row[3]).strip() if row[3] else None
+                gender   = normalize_gender(str(row[3]).strip()) if row[3] else None
                 email    = str(row[1]).strip() if row[1] else None
                 city_raw = str(row[7]).strip() if row[7] else None
                 state    = str(row[8]).strip() if row[8] else None
@@ -1224,7 +1224,7 @@ async def download_results_template():
     ws.append(headers)
     
     # Example row
-    example = ["João Silva", "Masculino A", "Champion"]
+    example = ["João Silva", "Masculina A", "Champion"]
     ws.append(example)
     
     # Style headers (bold)
@@ -1246,6 +1246,26 @@ async def download_results_template():
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": "attachment; filename=modelo_resultados.xlsx"}
     )
+
+
+def normalize_gender(value: str) -> str:
+    """
+    Normaliza qualquer variação de gênero para o padrão do sistema.
+    Masculino/masculino -> Masculina
+    Feminino/feminino  -> Feminina
+    Misto/misto        -> Mista
+    """
+    if not value:
+        return value
+    v = value.strip().lower()
+    if v in ('masculino', 'masculina', 'm', 'masc'):
+        return 'Masculina'
+    if v in ('feminino', 'feminina', 'f', 'fem'):
+        return 'Feminina'
+    if v in ('misto', 'mista', 'duplas'):
+        return 'Mista'
+    return value.strip()
+
 
 async def get_or_create_player(name: str, players_dict: dict, gender: str = None) -> dict:
     """
@@ -1312,21 +1332,22 @@ async def import_results(
             """
             Extrai gender_category e class_category do nome da aba.
             Exemplos:
-              '1ª Classe Masculina - 1ª Classe'  -> ('Masculino', '1ª')
-              '3ª Classe Feminina - 3ª Classe '  -> ('Feminino', '3ª')
-              'Duplas - Duplas'                   -> ('Misto', 'Duplas')
-              'Principiante Masculino - Princi'   -> ('Masculino', 'Principiante')
+              '1ª Classe Masculina - 1ª Classe'  -> ('Masculina', '1ª')
+              '3ª Classe Feminina - 3ª Classe '  -> ('Feminina', '3ª')
+              'Duplas - Duplas'                   -> ('Mista', 'Duplas')
+              'Principiante Masculina - Princi'   -> ('Masculina', 'Principiante')
             """
             name = sheet_name.strip()
 
             if 'dupla' in name.lower():
-                return 'Misto', 'Duplas'
+                return 'Mista', 'Duplas'
 
             if 'principiante' in name.lower():
-                gender = 'Feminino' if 'feminina' in name.lower() or 'feminino' in name.lower() else 'Masculino'
-                return gender, 'Principiante'
+                gender = 'Feminina' if 'feminina' in name.lower() or 'feminino' in name.lower() else 'Masculina'
+                return normalize_gender(gender), 'Principiante'
 
-            gender = 'Feminino' if 'feminina' in name.lower() or 'feminino' in name.lower() else 'Masculino'
+            gender = 'Feminina' if 'feminina' in name.lower() or 'feminino' in name.lower() else 'Masculina'
+            gender = normalize_gender(gender)
 
             # Detecta número ordinal: 1ª, 2ª, 3ª, etc.
             match = re.search(r'(\d+)[ªº°]', name)
@@ -1399,7 +1420,7 @@ async def import_results(
                             elif status == 'updated':
                                 results_updated += 1
                     else:
-                        player = await get_or_create_player(player1_name, players_dict, gender_category if gender_category != 'Misto' else None)
+                        player = await get_or_create_player(player1_name, players_dict, gender_category if gender_category != 'Mista' else None)
                         status = await save_result(tournament_id, player, gender_category, class_category, placement, config)
                         if status == 'created':
                             results_created += 1
@@ -1424,7 +1445,7 @@ async def import_results(
 async def migrate_class_names(current_user: User = Depends(get_current_user)):
     """
     Migração única: converte class_category de '1a','2a'... para '1ª','2ª'...
-    e gender_category 'Misto' para registros de Duplas.
+    e gender_category 'Mista' para registros de Duplas.
     Também atualiza main_class nos jogadores.
     """
     class_map = {'1a': '1ª', '2a': '2ª', '3a': '3ª', '4a': '4ª', '5a': '5ª', '6a': '6ª'}
@@ -1457,10 +1478,16 @@ async def migrate_class_names(current_user: User = Depends(get_current_user)):
         )
         players_updated += res.modified_count
 
-    # Garante que resultados de Duplas tenham gender_category='Misto'
+    # Normaliza qualquer valor antigo de gender_category
+    for old_val, new_val in [('Masculino', 'Masculina'), ('Feminino', 'Feminina'), ('Misto', 'Mista')]:
+        await db.results.update_many({"gender_category": old_val}, {"$set": {"gender_category": new_val}})
+        await db.matches.update_many({"gender_category": old_val}, {"$set": {"gender_category": new_val}})
+        await db.players.update_many({"gender": old_val}, {"$set": {"gender": new_val}})
+
+    # Garante que resultados de Duplas tenham gender_category='Mista'
     duplas_fix = await db.results.update_many(
-        {"class_category": "Duplas", "gender_category": {"$ne": "Misto"}},
-        {"$set": {"gender_category": "Misto"}}
+        {"class_category": "Duplas", "gender_category": {"$ne": "Mista"}},
+        {"$set": {"gender_category": "Mista"}}
     )
 
     return {
@@ -1626,13 +1653,13 @@ async def import_from_image(file: UploadFile = File(...), current_user: User = D
 Extraia TODOS os jogadores e suas colocações finais. Para cada jogador, identifique:
 - player_name: nome completo
 - placement: colocação numérica (1=campeão, 2=vice, 3/4=semifinalistas, 5-8=perdedores de quartas)
-- category: "Masculino" ou "Feminino"
+- category: "Masculina" ou "Feminina"
 
 Retorne os dados no formato JSON:
 {
   "tournament_name": "Nome do Torneio",
   "results": [
-    {"player_name": "Nome", "placement": 1, "category": "Masculino"}
+    {"player_name": "Nome", "placement": 1, "category": "Masculina"}
   ]
 }"""
 
@@ -1728,7 +1755,7 @@ async def create_match(match_data: MatchCreate, current_user: User = Depends(get
         "tournament_id": match.tournament_id,
         "player_id": winner_id,
         "class_category": match.category,
-        "gender_category": "Masculino"  # Default, could be enhanced
+        "gender_category": "Masculina"  # Default, could be enhanced
     }, {"_id": 0})
     
     if existing_winner_result:
@@ -1748,7 +1775,7 @@ async def create_match(match_data: MatchCreate, current_user: User = Depends(get
             player_id=winner_id,
             player_name=winner_name,
             class_category=match.category,
-            gender_category="Masculino",  # Default
+            gender_category="Masculina",  # Default
             placement=winner_placement,
             points=winner_points
         )
@@ -1761,7 +1788,7 @@ async def create_match(match_data: MatchCreate, current_user: User = Depends(get
         "tournament_id": match.tournament_id,
         "player_id": loser_id,
         "class_category": match.category,
-        "gender_category": "Masculino"
+        "gender_category": "Masculina"
     }, {"_id": 0})
     
     if existing_loser_result:
@@ -1781,7 +1808,7 @@ async def create_match(match_data: MatchCreate, current_user: User = Depends(get
             player_id=loser_id,
             player_name=loser_name,
             class_category=match.category,
-            gender_category="Masculino",
+            gender_category="Masculina",
             placement=loser_placement,
             points=loser_points
         )
@@ -1905,16 +1932,16 @@ async def import_matches_excel(
         def parse_event_category(event_name: str):
             """
             Converte nome do evento para class_category e gender_category.
-            '4ª Classe Masculina' -> ('4ª', 'Masculino')
-            'Duplas'              -> ('Duplas', 'Misto')
-            'Principiante Masculino' -> ('Principiante', 'Masculino')
+            '4ª Classe Masculina' -> ('4ª', 'Masculina')
+            'Duplas'              -> ('Duplas', 'Mista')
+            'Principiante Masculina' -> ('Principiante', 'Masculina')
             """
             if 'dupla' in event_name.lower():
-                return 'Duplas', 'Misto'
+                return 'Duplas', 'Mista'
             if 'principiante' in event_name.lower():
-                gender = 'Feminino' if 'feminina' in event_name.lower() or 'feminino' in event_name.lower() else 'Masculino'
+                gender = 'Feminina' if 'feminina' in event_name.lower() or 'feminino' in event_name.lower() else 'Masculina'
                 return 'Principiante', gender
-            gender = 'Feminino' if 'feminina' in event_name.lower() or 'feminino' in event_name.lower() else 'Masculino'
+            gender = 'Feminina' if 'feminina' in event_name.lower() or 'feminino' in event_name.lower() else 'Masculina'
             m = re.search(r'(\d+)[ªº°]', event_name)
             if m:
                 num = m.group(1)

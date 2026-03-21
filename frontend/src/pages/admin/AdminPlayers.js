@@ -537,7 +537,7 @@ const AdminPlayers = () => {
                                 <p className="text-gray-400 text-xs mt-0.5">
                                   🎂 {new Date(player.birth_date + 'T00:00:00').toLocaleDateString('pt-BR')}
                                   {' · '}
-                                  {new Date().getFullYear() - new Date(player.birth_date).getFullYear()} anos
+                                  {(() => { const t = new Date(); const b = new Date(player.birth_date + 'T00:00:00'); return t.getFullYear() - b.getFullYear() - (t < new Date(t.getFullYear(), b.getMonth(), b.getDate()) ? 1 : 0); })()} anos
                                 </p>
                               )}
                               {player.gender && (

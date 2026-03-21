@@ -28,13 +28,20 @@ const PlayerModal = ({ playerId, player, onClose }) => {
 
     const fetchDetails = async () => {
       try {
-        const [playersRes, detailsRes] = await Promise.all([
-          axios.get(`${API}/players`),
-          axios.get(`${API}/players/${resolvedId}/details`),
-        ]);
-        const found = playersRes.data.find(p => p.id === resolvedId);
-        setSelectedPlayer(found || player || null);
+        // Se já temos o objeto player completo, usa direto sem buscar /players
+        if (player && (player.id || player.player_id)) {
+          setSelectedPlayer(player);
+        }
+
+        const detailsRes = await axios.get(`${API}/players/${resolvedId}/details`);
         setPlayerDetails(detailsRes.data);
+
+        // Se não tinha player, busca agora
+        if (!player || (!player.id && !player.player_id)) {
+          const playersRes = await axios.get(`${API}/players`);
+          const found = playersRes.data.find(p => p.id === resolvedId);
+          setSelectedPlayer(found || null);
+        }
       } catch {
         toast.error('Erro ao carregar detalhes do jogador');
       } finally {

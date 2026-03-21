@@ -293,7 +293,7 @@ class Result(BaseModel):
     tournament_id: str
     player_id: str
     player_name: str  # Denormalized for performance
-    class_category: str  # "1a", "2a", "3a", "4a", "5a", "6a", "Duplas"
+    class_category: str  # "1ª", "2ª", "3ª", "4ª", "5ª", "6ª", "Duplas"
     gender_category: str  # "Masculino", "Feminino"
     placement: int
     points: float = 0.0
@@ -336,7 +336,7 @@ class Match(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     tournament_id: str  # Obrigatório - ID do torneio
     tournament_name: str
-    category: str  # "1a", "2a", etc.
+    category: str  # "1ª", "2ª", etc.
     player1_id: str
     player1_name: str
     player2_id: str
@@ -776,7 +776,7 @@ async def download_players_template():
     ws.append(headers)
     
     # Example row
-    example = ["João Silva", "Curitiba", "Academia XYZ", "Pedro Treinador", "1a"]
+    example = ["João Silva", "Curitiba", "Academia XYZ", "Pedro Treinador", "1ª"]
     ws.append(example)
     
     # Style headers (bold)
@@ -1312,8 +1312,8 @@ async def import_results(
             """
             Extrai gender_category e class_category do nome da aba.
             Exemplos:
-              '1ª Classe Masculina - 1ª Classe'  -> ('Masculino', '1a')
-              '3ª Classe Feminina - 3ª Classe '  -> ('Feminino', '3a')
+              '1ª Classe Masculina - 1ª Classe'  -> ('Masculino', '1ª')
+              '3ª Classe Feminina - 3ª Classe '  -> ('Feminino', '3ª')
               'Duplas - Duplas'                   -> ('Misto', 'Duplas')
               'Principiante Masculino - Princi'   -> ('Masculino', 'Principiante')
             """
@@ -1332,8 +1332,8 @@ async def import_results(
             match = re.search(r'(\d+)[ªº°]', name)
             if match:
                 num = match.group(1)
-                class_map = {'1': '1a', '2': '2a', '3': '3a', '4': '4a', '5': '5a', '6': '6a'}
-                class_category = class_map.get(num, f"{num}a")
+                class_map = {'1': '1ª', '2': '2ª', '3': '3ª', '4': '4ª', '5': '5ª', '6': '6ª'}
+                class_category = class_map.get(num, f"{num}ª")
             else:
                 class_category = 'Outra'
 
@@ -1420,6 +1420,58 @@ async def import_results(
         raise HTTPException(status_code=400, detail=f"Erro ao processar arquivo: {str(e)}")
 
 # Ranking Config Routes
+@api_router.post("/admin/migrate-class-names")
+async def migrate_class_names(current_user: User = Depends(get_current_user)):
+    """
+    Migração única: converte class_category de '1a','2a'... para '1ª','2ª'...
+    e gender_category 'Misto' para registros de Duplas.
+    Também atualiza main_class nos jogadores.
+    """
+    class_map = {'1a': '1ª', '2a': '2ª', '3a': '3ª', '4a': '4ª', '5a': '5ª', '6a': '6ª'}
+
+    results_updated = 0
+    matches_updated = 0
+    players_updated = 0
+
+    # Migra results
+    for old, new in class_map.items():
+        res = await db.results.update_many(
+            {"class_category": old},
+            {"$set": {"class_category": new}}
+        )
+        results_updated += res.modified_count
+
+    # Migra matches (category field)
+    for old, new in class_map.items():
+        res = await db.matches.update_many(
+            {"category": old},
+            {"$set": {"category": new}}
+        )
+        matches_updated += res.modified_count
+
+    # Migra players (main_class field)
+    for old, new in class_map.items():
+        res = await db.players.update_many(
+            {"main_class": old},
+            {"$set": {"main_class": new}}
+        )
+        players_updated += res.modified_count
+
+    # Garante que resultados de Duplas tenham gender_category='Misto'
+    duplas_fix = await db.results.update_many(
+        {"class_category": "Duplas", "gender_category": {"$ne": "Misto"}},
+        {"$set": {"gender_category": "Misto"}}
+    )
+
+    return {
+        "message": "Migração concluída com sucesso",
+        "results_updated": results_updated,
+        "matches_updated": matches_updated,
+        "players_updated": players_updated,
+        "duplas_gender_fixed": duplas_fix.modified_count
+    }
+
+
 @api_router.get("/ranking-config", response_model=RankingConfig)
 async def get_ranking_config():
     config = await db.ranking_config.find_one({}, {"_id": 0})
@@ -1736,7 +1788,7 @@ async def download_matches_template():
     ws.append(headers)
     
     # Example row
-    example = ["Copa PR", "1a", "Final", "João Silva", "Pedro Lima", "11-7 8-11 11-6", "João Silva", "2025-01-15"]
+    example = ["Copa PR", "1ª", "Final", "João Silva", "Pedro Lima", "11-7 8-11 11-6", "João Silva", "2025-01-15"]
     ws.append(example)
     
     # Style headers (bold)
@@ -1831,7 +1883,7 @@ async def import_matches_excel(
         def parse_event_category(event_name: str):
             """
             Converte nome do evento para class_category e gender_category.
-            '4ª Classe Masculina' -> ('4a', 'Masculino')
+            '4ª Classe Masculina' -> ('4ª', 'Masculino')
             'Duplas'              -> ('Duplas', 'Misto')
             'Principiante Masculino' -> ('Principiante', 'Masculino')
             """
@@ -1844,8 +1896,8 @@ async def import_matches_excel(
             m = re.search(r'(\d+)[ªº°]', event_name)
             if m:
                 num = m.group(1)
-                class_map = {'1': '1a', '2': '2a', '3': '3a', '4': '4a', '5': '5a', '6': '6a'}
-                class_category = class_map.get(num, f"{num}a")
+                class_map = {'1': '1ª', '2': '2ª', '3': '3ª', '4': '4ª', '5': '5ª', '6': '6ª'}
+                class_category = class_map.get(num, f"{num}ª")
             else:
                 class_category = 'Outra'
             return class_category, gender

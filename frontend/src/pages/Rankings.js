@@ -20,7 +20,7 @@ const Rankings = () => {
 
   const [rankings, setRankings] = useState([]);
   const [selectedClass, setSelectedClass] = useState('1ª');
-  const [selectedCategory, setSelectedCategory] = useState('Masculina');
+  const [selectedCategory, setSelectedCategory] = useState('Feminina');
   const [loading, setLoading] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   // Logo em base64 para funcionar no html2canvas
@@ -260,7 +260,7 @@ const Rankings = () => {
               <div style={{ fontSize: '11px', color: '#7ab3f0', letterSpacing: '1px', marginTop: '3px' }}>FEDERAÇÃO DE SQUASH DO PARANÁ</div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '11px', color: '#7ab3f0', letterSpacing: '1px' }}>{selectedCategory.toUpperCase()} · {selectedClass.toUpperCase()} CLASSE</div>
+              <div style={{ fontSize: '11px', color: '#7ab3f0', letterSpacing: '1px' }}>{selectedClass.toUpperCase()} CLASSE · {selectedCategory.toUpperCase()}</div>
               <div style={{ fontSize: '15px', fontWeight: '700', color: 'white', marginTop: '3px' }}>
                 {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}
               </div>

@@ -12,8 +12,8 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-const CLASSES = ['1a', '2a', '3a', '4a', '5a', '6a', 'Duplas'];
-const CATEGORIES = ['Masculino', 'Feminino', 'Misto'];
+const CLASSES = ['1ª', '2ª', '3ª', '4ª', '5ª', '6ª', 'Duplas'];
+const CATEGORIES = ['Feminina', 'Masculina', 'Mista'];
 
 const AdminResults = () => {
   const [results, setResults] = useState([]);
@@ -67,7 +67,7 @@ const AdminResults = () => {
   const [formData, setFormData] = useState({
     tournament_id: '',
     player_id: '',
-    class_category: '1a',
+    class_category: '1ª',
     gender_category: 'Masculino',
     placement: 1
   });
@@ -232,7 +232,7 @@ const AdminResults = () => {
         await axios.post(`${API}/results`, {
           tournament_id: tournamentId,
           player_id: playerId,
-          class_category: importData.class_category || '1a',
+          class_category: importData.class_category || '1ª',
           gender_category: result.category,
           placement: result.placement
         });
@@ -259,7 +259,7 @@ const AdminResults = () => {
     setFormData({
       tournament_id: '',
       player_id: '',
-      class_category: '1a',
+      class_category: '1ª',
       gender_category: 'Masculino',
       placement: 1
     });
@@ -510,7 +510,7 @@ const AdminResults = () => {
                     <div>
                       <Label className="text-gray-300">Classe</Label>
                       <Select
-                        value={importData.class_category || '1a'}
+                        value={importData.class_category || '1ª'}
                         onValueChange={(value) => setImportData({ ...importData, class_category: value })}
                       >
                         <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
@@ -640,7 +640,7 @@ const AdminResults = () => {
                       <SelectContent>
                         {(formData.class_category === 'Duplas'
                           ? ['Misto']
-                          : ['Masculino', 'Feminino']
+                          : ['Feminino', 'Masculino']
                         ).map(cat => (
                           <SelectItem key={cat} value={cat}>{cat}</SelectItem>
                         ))}

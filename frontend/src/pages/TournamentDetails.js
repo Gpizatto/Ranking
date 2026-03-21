@@ -79,9 +79,11 @@ const TournamentDetails = () => {
     return (r.class + '_' + r.category) === selectedCategory;
   });
 
-  const totalParticipants = results.reduce(function(acc, r) {
-    return acc + (Array.isArray(r.results) ? r.results.length : 0);
-  }, 0);
+  const totalParticipants = new Set(
+    results.flatMap(function(r) {
+      return Array.isArray(r.results) ? r.results.map(function(p) { return p.player_id; }) : [];
+    })
+  ).size;
 
   // Agrupa partidas por rodada
   const matchesByRound = matchesFlat.reduce(function(acc, m) {

@@ -275,7 +275,6 @@ const TournamentDetails = () => {
         </div>
       )}
 
-    </div>
       <PlayerModal playerId={selectedPlayerId} onClose={() => setSelectedPlayerId(null)} />
     </div>
   );

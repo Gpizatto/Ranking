@@ -12,6 +12,7 @@ import AdminPlayers from './pages/admin/AdminPlayers';
 import AdminResults from './pages/admin/AdminResults';
 import AdminMatches from './pages/admin/AdminMatches';
 import AdminRankingConfig from './pages/admin/AdminRankingConfig';
+import AdminLayout from './pages/admin/AdminLayout';
 import { AdminGuard } from './components/AdminGuard';
 import { Toaster } from 'sonner';
 import './App.css';
@@ -38,6 +39,7 @@ function App() {
             <Route path="admin/results" element={<AdminGuard><AdminResults /></AdminGuard>} />
             <Route path="admin/matches" element={<AdminGuard><AdminMatches /></AdminGuard>} />
             <Route path="admin/config" element={<AdminGuard><AdminRankingConfig /></AdminGuard>} />
+            <Route path="admin/layout" element={<AdminGuard><AdminLayout /></AdminGuard>} />
           </Route>
         </Routes>
       </BrowserRouter>

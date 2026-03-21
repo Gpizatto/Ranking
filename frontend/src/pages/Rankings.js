@@ -47,7 +47,8 @@ const Rankings = () => {
   const fetchRankings = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API}/rankings?class_category=${selectedClass}&gender_category=${selectedCategory}`);
+      const effectiveCategory = selectedClass === 'Duplas' ? 'Misto' : selectedCategory;
+      const response = await axios.get(`${API}/rankings?class_category=${selectedClass}&gender_category=${effectiveCategory}`);
       setRankings(response.data);
     } catch (error) {
       toast.error('Erro ao carregar rankings');
@@ -113,13 +114,19 @@ const Rankings = () => {
         <Card className="bg-slate-800/50 border-blue-500/20">
           <CardHeader><CardTitle className="text-white">Categoria</CardTitle></CardHeader>
           <CardContent>
-            <div className="flex gap-2">
-              {CATEGORIES.map((cat) => (
-                <button key={cat} onClick={() => setSelectedCategory(cat)}
-                  className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-all ${selectedCategory === cat ? 'bg-blue-500 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
-                  data-testid={`category-filter-${cat}`}>{cat}</button>
-              ))}
-            </div>
+            {selectedClass === 'Duplas' ? (
+              <div className="flex gap-2">
+                <div className="flex-1 px-4 py-2 rounded-lg font-semibold bg-purple-500 text-white text-center">Misto</div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                {CATEGORIES.map((cat) => (
+                  <button key={cat} onClick={() => setSelectedCategory(cat)}
+                    className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-all ${selectedCategory === cat ? 'bg-blue-500 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+                    data-testid={`category-filter-${cat}`}>{cat}</button>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

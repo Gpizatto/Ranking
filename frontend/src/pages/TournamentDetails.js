@@ -43,7 +43,7 @@ const TournamentDetails = () => {
         setSelectedCategory(r[0].class + '_' + r[0].category);
       }
 
-      // matches vem como objeto { "1a": [...], "2a": [...] } — achatar em array
+      // matches vem como objeto { "1ª": [...], "2ª": [...] } — achatar em array
       const matchesData = matchesRes.data.matches;
       if (matchesData && typeof matchesData === 'object' && !Array.isArray(matchesData)) {
         const flat = Object.values(matchesData).flat();

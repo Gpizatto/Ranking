@@ -20,7 +20,7 @@ const Rankings = () => {
 
   const [rankings, setRankings] = useState([]);
   const [selectedClass, setSelectedClass] = useState('1ª');
-  const [selectedCategory, setSelectedCategory] = useState('Masculino');
+  const [selectedCategory, setSelectedCategory] = useState('Masculina');
   const [loading, setLoading] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   // Logo em base64 para funcionar no html2canvas
@@ -47,7 +47,7 @@ const Rankings = () => {
   const fetchRankings = async () => {
     setLoading(true);
     try {
-      const effectiveCategory = selectedClass === 'Duplas' ? 'Misto' : selectedCategory;
+      const effectiveCategory = selectedClass === 'Duplas' ? 'Mista' : selectedCategory;
       const response = await axios.get(`${API}/rankings?class_category=${selectedClass}&gender_category=${effectiveCategory}`);
       setRankings(response.data);
     } catch (error) {
@@ -116,7 +116,7 @@ const Rankings = () => {
           <CardContent>
             {selectedClass === 'Duplas' ? (
               <div className="flex gap-2">
-                <div className="flex-1 px-4 py-2 rounded-lg font-semibold bg-purple-500 text-white text-center">Misto</div>
+                <div className="flex-1 px-4 py-2 rounded-lg font-semibold bg-purple-500 text-white text-center">Mista</div>
               </div>
             ) : (
               <div className="flex gap-2">

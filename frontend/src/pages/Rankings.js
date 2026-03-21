@@ -128,14 +128,14 @@ const Rankings = () => {
       {!loading && rankings.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-3xl font-bold text-white">Top Players</h2>
+            <h2 className="text-3xl font-bold text-white">Top 5</h2>
             <Badge className="bg-green-500 text-white px-3 py-1">{selectedClass} - {selectedCategory}</Badge>
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 items-end">
             {top5.map((player, index) => {
               const borderColors = ['border-yellow-400', 'border-gray-300', 'border-orange-400', 'border-blue-400', 'border-green-400'];
               const badgeBg = ['bg-yellow-400 text-yellow-900', 'bg-gray-300 text-gray-900', 'bg-orange-400 text-orange-900', 'bg-blue-400 text-blue-900', 'bg-green-400 text-green-900'];
-              const heights = ['h-[280px] sm:h-[420px]', 'h-[240px] sm:h-[380px]', 'h-[240px] sm:h-[380px]', 'h-[340px]', 'h-[340px]'];
+              const heights = ['h-[280px] sm:h-[360px]', 'h-[280px] sm:h-[360px]', 'h-[280px] sm:h-[360px]', 'h-[280px] sm:h-[360px]', 'h-[280px] sm:h-[360px]'];
               return (
                 <div key={player.player_id} onClick={() => handlePlayerClick(player.player_id)}
                   className={`relative overflow-hidden rounded-xl cursor-pointer group border-2 ${borderColors[index]} ${heights[index]} ${index >= 3 ? "hidden sm:block" : ""}`}

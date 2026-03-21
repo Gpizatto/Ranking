@@ -22,7 +22,7 @@ const AdminPlayers = () => {
     city: '',
     academy: '',
     coach: '',
-    main_class: '1a',
+    main_class: '1ª',
     birth_date: '',
     gender: ''
   });
@@ -115,7 +115,7 @@ const AdminPlayers = () => {
       city: player.city || '',
       academy: player.academy || '',
       coach: player.coach || '',
-      main_class: player.main_class || '1a',
+      main_class: player.main_class || '1ª',
       birth_date: player.birth_date || '',
       gender: player.gender || ''
     });
@@ -162,7 +162,7 @@ const AdminPlayers = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', photo_url: '', city: '', academy: '', coach: '', main_class: '1a', birth_date: '', gender: '' });
+    setFormData({ name: '', photo_url: '', city: '', academy: '', coach: '', main_class: '1ª', birth_date: '', gender: '' });
     setEditingPlayer(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -333,7 +333,7 @@ const AdminPlayers = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {['1a', '2a', '3a', '4a', '5a', '6a', 'Duplas'].map(cls => (
+                      {['1ª', '2ª', '3ª', '4ª', '5ª', '6ª', 'Duplas'].map(cls => (
                         <SelectItem key={cls} value={cls}>{cls}</SelectItem>
                       ))}
                     </SelectContent>

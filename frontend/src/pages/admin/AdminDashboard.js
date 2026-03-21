@@ -44,6 +44,23 @@ const AdminDashboard = () => {
     { title: 'Resultados', value: stats.results, icon: FileText, color: 'from-purple-400 to-purple-600' },
   ];
 
+  const [migrating, setMigrating] = useState(false);
+  const [migrationDone, setMigrationDone] = useState(false);
+
+  const runMigration = async () => {
+    if (!window.confirm('Isso vai atualizar todos os registros no banco (1a→1ª, etc). Fazer apenas uma vez. Continuar?')) return;
+    setMigrating(true);
+    try {
+      const res = await axios.post(`${API}/admin/migrate-class-names`);
+      toast.success(`Migração OK — ${res.data.results_updated} resultados, ${res.data.matches_updated} partidas, ${res.data.players_updated} jogadores atualizados`);
+      setMigrationDone(true);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro na migração');
+    } finally {
+      setMigrating(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -90,6 +107,27 @@ const AdminDashboard = () => {
           </p>
         </CardContent>
       </Card>
+      {/* Migração */}
+      {!migrationDone && (
+        <Card className="bg-orange-500/10 border-orange-500/30">
+          <CardHeader>
+            <CardTitle className="text-orange-400 text-sm">🔧 Migração de Dados</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-gray-400 text-sm mb-3">
+              Atualiza os registros do banco de dados para o novo formato de classes (1a → 1ª, 2a → 2ª...).
+              Execute apenas uma vez após o deploy.
+            </p>
+            <Button
+              onClick={runMigration}
+              disabled={migrating}
+              className="bg-orange-500 hover:bg-orange-600"
+            >
+              {migrating ? 'Migrando...' : 'Executar Migração'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 };

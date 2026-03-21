@@ -62,7 +62,7 @@
     "start": "craco start",
     "build": "craco build",
     "test": "craco test",
-    "start:prod": "serve -s build -l 3000"
+    "start:prod": "npx serve -s build -l ${PORT:-3000}"
   },
   "browserslist": {
     "production": [

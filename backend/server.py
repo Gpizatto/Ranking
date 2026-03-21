@@ -677,7 +677,87 @@ async def delete_player(player_id: str, current_user: User = Depends(get_current
         raise HTTPException(status_code=404, detail="Player not found")
     return {"message": "Player deleted"}
 
-@api_router.post("/players/upload-photo")
+@api_router.post("/players/merge")
+async def merge_players(
+    keep_id: str,
+    remove_id: str,
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Mescla dois jogadores duplicados.
+    - keep_id: jogador que será mantido (nome correto/completo)
+    - remove_id: jogador duplicado que será removido
+    Todos os resultados e partidas do duplicado são transferidos para o jogador mantido.
+    """
+    keep = await db.players.find_one({"id": keep_id}, {"_id": 0})
+    remove = await db.players.find_one({"id": remove_id}, {"_id": 0})
+
+    if not keep:
+        raise HTTPException(status_code=404, detail="Jogador principal não encontrado")
+    if not remove:
+        raise HTTPException(status_code=404, detail="Jogador duplicado não encontrado")
+    if keep_id == remove_id:
+        raise HTTPException(status_code=400, detail="Os jogadores devem ser diferentes")
+
+    results_updated = 0
+    matches_updated = 0
+
+    # Transfere resultados — mas evita duplicar resultado no mesmo torneio/classe
+    remove_results = await db.results.find({"player_id": remove_id}, {"_id": 0}).to_list(1000)
+    for result in remove_results:
+        # Checa se já existe resultado igual para o jogador mantido
+        existing = await db.results.find_one({
+            "player_id": keep_id,
+            "tournament_id": result["tournament_id"],
+            "class_category": result["class_category"],
+            "gender_category": result["gender_category"]
+        })
+        if existing:
+            # Mantém o melhor placement
+            if result["placement"] < existing["placement"]:
+                await db.results.update_one(
+                    {"id": existing["id"]},
+                    {"$set": {"placement": result["placement"], "points": result["points"]}}
+                )
+            await db.results.delete_one({"id": result["id"]})
+        else:
+            await db.results.update_one(
+                {"id": result["id"]},
+                {"$set": {"player_id": keep_id, "player_name": keep["name"]}}
+            )
+            results_updated += 1
+
+    # Transfere partidas
+    matches_p1 = await db.matches.find({"player1_id": remove_id}, {"_id": 0}).to_list(1000)
+    for match in matches_p1:
+        await db.matches.update_one(
+            {"id": match["id"]},
+            {"$set": {"player1_id": keep_id, "player1_name": keep["name"],
+                      "winner_id": keep_id if match["winner_id"] == remove_id else match["winner_id"]}}
+        )
+        matches_updated += 1
+
+    matches_p2 = await db.matches.find({"player2_id": remove_id}, {"_id": 0}).to_list(1000)
+    for match in matches_p2:
+        await db.matches.update_one(
+            {"id": match["id"]},
+            {"$set": {"player2_id": keep_id, "player2_name": keep["name"],
+                      "winner_id": keep_id if match["winner_id"] == remove_id else match["winner_id"]}}
+        )
+        matches_updated += 1
+
+    # Remove o jogador duplicado
+    await db.players.delete_one({"id": remove_id})
+
+    return {
+        "message": f"Jogadores mesclados com sucesso",
+        "kept_player": keep["name"],
+        "removed_player": remove["name"],
+        "results_transferred": results_updated,
+        "matches_transferred": matches_updated
+    }
+
+
 async def upload_photo(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
     contents = await file.read()
     base64_encoded = base64.b64encode(contents).decode('utf-8')

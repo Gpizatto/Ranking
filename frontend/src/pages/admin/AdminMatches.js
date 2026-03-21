@@ -24,7 +24,7 @@ const AdminMatches = () => {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     tournament_id: '',
-    category: '1a',
+    category: '1ª',
     player1_id: '',
     player2_id: '',
     winner_id: '',
@@ -147,7 +147,7 @@ const AdminMatches = () => {
   const resetForm = () => {
     setFormData({
       tournament_id: '',
-      category: '1a',
+      category: '1ª',
       player1_id: '',
       player2_id: '',
       winner_id: '',
@@ -334,12 +334,12 @@ const AdminMatches = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1a">1ª Classe</SelectItem>
-                        <SelectItem value="2a">2ª Classe</SelectItem>
-                        <SelectItem value="3a">3ª Classe</SelectItem>
-                        <SelectItem value="4a">4ª Classe</SelectItem>
-                        <SelectItem value="5a">5ª Classe</SelectItem>
-                        <SelectItem value="6a">6ª Classe</SelectItem>
+                        <SelectItem value="1ª">1ª Classe</SelectItem>
+                        <SelectItem value="2ª">2ª Classe</SelectItem>
+                        <SelectItem value="3ª">3ª Classe</SelectItem>
+                        <SelectItem value="4ª">4ª Classe</SelectItem>
+                        <SelectItem value="5ª">5ª Classe</SelectItem>
+                        <SelectItem value="6ª">6ª Classe</SelectItem>
                         <SelectItem value="Duplas">Duplas</SelectItem>
                       </SelectContent>
                     </Select>

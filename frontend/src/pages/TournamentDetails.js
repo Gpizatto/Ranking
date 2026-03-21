@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
+import PlayerModal from '../components/PlayerModal';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -20,6 +21,7 @@ const TournamentDetails = () => {
   const [matchesFlat, setMatchesFlat] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('results');
+  const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
 
   useEffect(() => { fetchData(); }, [id]);
@@ -213,7 +215,7 @@ const TournamentDetails = () => {
                     <tbody>
                       {activeResults.results.map(function(r) {
                         return (
-                          <tr key={r.player_id} className="border-b border-slate-700/50 hover:bg-slate-700/30">
+                          <tr key={r.player_id} className="border-b border-slate-700/50 hover:bg-slate-700/30 cursor-pointer" onClick={() => setSelectedPlayerId(r.player_id)}>
                             <td className={`py-3 px-2 sm:px-3 font-bold ${PLACEMENT_COLORS[r.placement] || 'text-gray-300'}`}>
                               {r.placement === 1 ? '🥇' : r.placement === 2 ? '🥈' : r.placement === 3 ? '🥉' : r.placement + 'º'}
                             </td>
@@ -251,7 +253,7 @@ const TournamentDetails = () => {
                   {matchesByRound[round].map(function(match) {
                     return (
                       <div key={match.id} className="flex items-center bg-slate-700/40 rounded-lg px-3 py-3 gap-2">
-                        <span className={`flex-1 text-xs sm:text-sm font-semibold truncate ${match.winner_id === match.player1_id ? 'text-white' : 'text-gray-400'}`}>
+                        <span className={`flex-1 text-xs sm:text-sm font-semibold truncate cursor-pointer hover:text-green-400 transition-colors ${match.winner_id === match.player1_id ? 'text-white' : 'text-gray-400'}`} onClick={() => setSelectedPlayerId(match.player1_id)}>
                           {match.player1_name}
                         </span>
                         <div className="text-center shrink-0 px-1">
@@ -260,7 +262,7 @@ const TournamentDetails = () => {
                           </div>
                           <div className="text-gray-500 text-xs">{match.category}</div>
                         </div>
-                        <span className={`flex-1 text-xs sm:text-sm font-semibold text-right truncate ${match.winner_id === match.player2_id ? 'text-white' : 'text-gray-400'}`}>
+                        <span className={`flex-1 text-xs sm:text-sm font-semibold text-right truncate cursor-pointer hover:text-green-400 transition-colors ${match.winner_id === match.player2_id ? 'text-white' : 'text-gray-400'}`} onClick={() => setSelectedPlayerId(match.player2_id)}>
                           {match.player2_name}
                         </span>
                       </div>
@@ -273,6 +275,8 @@ const TournamentDetails = () => {
         </div>
       )}
 
+    </div>
+      <PlayerModal playerId={selectedPlayerId} onClose={() => setSelectedPlayerId(null)} />
     </div>
   );
 };

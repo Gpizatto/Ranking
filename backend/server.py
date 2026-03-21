@@ -1472,6 +1472,28 @@ async def migrate_class_names(current_user: User = Depends(get_current_user)):
     }
 
 
+
+@api_router.get("/theme")
+async def get_theme():
+    """Retorna o tema atual salvo no banco"""
+    config = await db.app_config.find_one({"key": "theme"}, {"_id": 0})
+    if not config:
+        return {"theme": "green"}
+    return {"theme": config.get("value", "green")}
+
+@api_router.put("/theme")
+async def set_theme(theme: str, current_user: User = Depends(get_current_user)):
+    """Salva o tema escolhido pelo admin"""
+    valid_themes = ["green", "blue", "purple", "red", "orange", "silver"]
+    if theme not in valid_themes:
+        raise HTTPException(status_code=400, detail=f"Tema inválido. Opções: {valid_themes}")
+    await db.app_config.update_one(
+        {"key": "theme"},
+        {"$set": {"key": "theme", "value": theme}},
+        upsert=True
+    )
+    return {"theme": theme}
+
 @api_router.get("/ranking-config", response_model=RankingConfig)
 async def get_ranking_config():
     config = await db.ranking_config.find_one({}, {"_id": 0})

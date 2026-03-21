@@ -13,13 +13,13 @@ import html2canvas from 'html2canvas';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-const CLASSES = ['1a', '2a', '3a', '4a', '5a', '6a', 'Duplas'];
-const CATEGORIES = ['Masculino', 'Feminino'];
+const CLASSES = ['1ª', '2ª', '3ª', '4ª', '5ª', '6ª', 'Duplas'];
+const CATEGORIES = ['Feminino', 'Masculino'];
 
 const Rankings = () => {
 
   const [rankings, setRankings] = useState([]);
-  const [selectedClass, setSelectedClass] = useState('1a');
+  const [selectedClass, setSelectedClass] = useState('1ª');
   const [selectedCategory, setSelectedCategory] = useState('Masculino');
   const [loading, setLoading] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);

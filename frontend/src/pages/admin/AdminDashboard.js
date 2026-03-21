@@ -3,6 +3,7 @@ import axios from '../../lib/api';
 import { API } from '../../lib/api';
 import { Trophy, Users, Calendar, FileText } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import SubscriptionCard from '../../components/SubscriptionCard';
 

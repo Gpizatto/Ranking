@@ -54,7 +54,7 @@ const Players = () => {
   const [players, setPlayers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
-  const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
 
   useEffect(() => {
     fetchPlayers();
@@ -82,7 +82,7 @@ const Players = () => {
       .slice(0, 50);
   }, [searchTerm, players]);
 
-  const handlePlayerClick = (player) => { setSelectedPlayerId(player.id); };
+  const handlePlayerClick = (player) => { setSelectedPlayer(player); };
 
   return (
     <div className="space-y-6">
@@ -143,7 +143,7 @@ const Players = () => {
         </div>
       )}
 
-      <PlayerModal playerId={selectedPlayerId} onClose={() => setSelectedPlayerId(null)} />
+      <PlayerModal playerId={selectedPlayer?.id} player={selectedPlayer} onClose={() => setSelectedPlayer(null)} />
     </div>
   );
 };

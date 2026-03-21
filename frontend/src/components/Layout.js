@@ -1,12 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios, { API } from '../lib/api';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Trophy, Users, Calendar, Settings, LogOut, Shield, Menu, X, LayoutDashboard, FileText, Swords } from 'lucide-react';
+import { Trophy, Users, Calendar, Settings, LogOut, Shield, Menu, X, LayoutDashboard, FileText, Swords, Palette } from 'lucide-react';
 import { isAuthenticated, logout } from '../lib/api';
 
 const Layout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  useEffect(() => {
+    axios.get(`${API}/theme`).then(res => {
+      document.documentElement.setAttribute('data-theme', res.data.theme || 'green');
+    }).catch(() => {});
+  }, []);
+
 
   const isAuth = isAuthenticated();
   const isAdminPage = location.pathname.includes('/admin');
@@ -36,11 +44,12 @@ const Layout = () => {
     { to: '/admin/players', label: 'Jogadores', icon: Users },
     { to: '/admin/results', label: 'Resultados', icon: FileText },
     { to: '/admin/matches', label: 'Partidas', icon: Swords },
+    { to: '/admin/layout', label: 'Layout', icon: Palette },
     { to: '/admin/config', label: 'Config', icon: Settings },
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen theme-bg">
 
       {/* Hero */}
       {(location.pathname === '/' || location.pathname === '/rankings') && (
@@ -54,14 +63,14 @@ const Layout = () => {
           <div className="absolute inset-0 z-20 flex items-center justify-center">
             <div className="text-center">
               <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-white mb-2">SquashRank Pro</h1>
-              <p className="text-lg sm:text-xl text-green-400">Federação de Squash do Paraná</p>
+              <p className="text-lg sm:text-xl theme-accent">Federação de Squash do Paraná</p>
             </div>
           </div>
         </div>
       )}
 
       {/* Header */}
-      <header className="bg-slate-900/50 backdrop-blur-lg border-b border-green-500/20 sticky top-0 z-50">
+      <header className="bg-slate-900/50 backdrop-blur-lg border-b theme-border sticky top-0 z-50">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
 
@@ -74,7 +83,7 @@ const Layout = () => {
               />
               <div>
                 <h1 className="text-sm sm:text-xl font-bold text-white leading-tight">Federação de Squash do Paraná</h1>
-                <p className="text-xs text-green-400">Rankings Oficiais</p>
+                <p className="text-xs theme-accent">Rankings Oficiais</p>
               </div>
             </Link>
 
@@ -82,7 +91,7 @@ const Layout = () => {
             <nav className="hidden sm:flex items-center gap-1">
               {navLinks.map(({ to, label, icon: Icon }) => (
                 <Link key={to} to={to}
-                  className={`px-3 py-2 text-sm rounded-lg flex items-center gap-1.5 ${isActive(to.slice(1)) ? 'bg-green-500 text-white' : 'text-gray-300 hover:bg-slate-800'}`}>
+                  className={`px-3 py-2 text-sm rounded-lg flex items-center gap-1.5 ${isActive(to.slice(1)) ? 'theme-accent-bg text-white' : 'text-gray-300 hover:bg-slate-800'}`}>
                   <Icon className="w-4 h-4" />{label}
                 </Link>
               ))}
@@ -117,7 +126,7 @@ const Layout = () => {
               {navLinks.map(({ to, label, icon: Icon }) => (
                 <Link key={to} to={to}
                   onClick={() => setMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm ${isActive(to.slice(1)) ? 'bg-green-500 text-white' : 'text-gray-300 hover:bg-slate-800'}`}>
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm ${isActive(to.slice(1)) ? 'theme-accent-bg text-white' : 'text-gray-300 hover:bg-slate-800'}`}>
                   <Icon className="w-4 h-4" />{label}
                 </Link>
               ))}
@@ -182,7 +191,7 @@ const Layout = () => {
       </main>
 
       {/* Footer */}
-      <footer className="bg-slate-900/50 border-t border-green-500/20 py-6 mt-12 text-center text-gray-400 text-sm">
+      <footer className="bg-slate-900/50 border-t theme-border py-6 mt-12 text-center text-gray-400 text-sm">
         © {new Date().getFullYear()} Federação de Squash do Paraná — Powered by SquashRank Pro
       </footer>
     </div>

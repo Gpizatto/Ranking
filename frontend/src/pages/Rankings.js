@@ -14,7 +14,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const CLASSES = ['1ª', '2ª', '3ª', '4ª', '5ª', '6ª', 'Duplas'];
-const CATEGORIES = ['Feminino', 'Masculino'];
+const CATEGORIES = ['Feminina', 'Masculina'];
 
 const Rankings = () => {
 

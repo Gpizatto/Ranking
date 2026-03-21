@@ -5,7 +5,7 @@ import { Users, Search, MapPin } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Input } from "../components/ui/input";
-import { Dialog, DialogContent } from "../components/ui/dialog";
+import PlayerModal from "../components/PlayerModal";
 import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
 
@@ -54,8 +54,7 @@ const Players = () => {
   const [players, setPlayers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(true);
-  const [selectedPlayer, setSelectedPlayer] = useState(null);
-  const [playerDetails, setPlayerDetails] = useState(null);
+  const [selectedPlayerId, setSelectedPlayerId] = useState(null);
 
   useEffect(() => {
     fetchPlayers();
@@ -83,19 +82,7 @@ const Players = () => {
       .slice(0, 50);
   }, [searchTerm, players]);
 
-  const handlePlayerClick = async (player) => {
-    setSelectedPlayer(player);
-
-    try {
-      const response = await axios.get(
-        `${API}/players/${player.id}/details`
-      );
-
-      setPlayerDetails(response.data);
-    } catch {
-      toast.error("Erro ao carregar detalhes");
-    }
-  };
+  const handlePlayerClick = (player) => { setSelectedPlayerId(player.id); };
 
   return (
     <div className="space-y-6">
@@ -156,56 +143,7 @@ const Players = () => {
         </div>
       )}
 
-      <Dialog
-        open={!!selectedPlayer}
-        onOpenChange={() => {
-          setSelectedPlayer(null);
-          setPlayerDetails(null);
-        }}
-      >
-        <DialogContent className="bg-slate-800 border-green-500/20 max-w-3xl">
-
-          {selectedPlayer && (
-            <div className="space-y-4">
-
-              <div className="flex items-center space-x-4">
-
-                <Avatar className="w-20 h-20">
-                  <AvatarImage src={selectedPlayer.photo_url} />
-                  <AvatarFallback className="bg-green-500 text-white text-2xl">
-                    {selectedPlayer.name.charAt(0)}
-                  </AvatarFallback>
-                </Avatar>
-
-                <div>
-                  <h2 className="text-white text-2xl font-bold">
-                    {selectedPlayer.name}
-                  </h2>
-
-                  {selectedPlayer.main_class && (
-                    <Badge className="bg-blue-500 mt-1">
-                      {selectedPlayer.main_class}
-                    </Badge>
-                  )}
-                </div>
-
-              </div>
-
-              {playerDetails ? (
-                <div className="text-gray-300">
-                  Detalhes carregados
-                </div>
-              ) : (
-                <div className="text-gray-400">
-                  Carregando detalhes...
-                </div>
-              )}
-
-            </div>
-          )}
-
-        </DialogContent>
-      </Dialog>
+      <PlayerModal playerId={selectedPlayerId} onClose={() => setSelectedPlayerId(null)} />
     </div>
   );
 };

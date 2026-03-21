@@ -87,7 +87,7 @@ const PlayerModal = ({ playerId, player, onClose }) => {
                     {selectedPlayer.gender && <Badge className="bg-purple-500">{selectedPlayer.gender}</Badge>}
                     {selectedPlayer.birth_date && (
                       <Badge className="bg-slate-600">
-                        {new Date().getFullYear() - new Date(selectedPlayer.birth_date).getFullYear()} anos
+                        {(() => { const t = new Date(); const b = new Date(selectedPlayer.birth_date + 'T00:00:00'); return t.getFullYear() - b.getFullYear() - (t < new Date(t.getFullYear(), b.getMonth(), b.getDate()) ? 1 : 0); })()} anos
                       </Badge>
                     )}
                   </div>

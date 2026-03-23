@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Routes, Route } from 'react-router-dom';
 import Layout from './components/Layout';
 import Rankings from './pages/Rankings';
 import Tournaments from './pages/Tournaments';
@@ -22,7 +22,7 @@ function App() {
     <div className="App">
       <Toaster position="top-right" richColors />
 
-      <BrowserRouter>
+      <HashRouter>
         <Routes>
           <Route element={<Layout />}>
             <Route index element={<Rankings />} />
@@ -42,7 +42,7 @@ function App() {
             <Route path="admin/layout" element={<AdminGuard><AdminLayout /></AdminGuard>} />
           </Route>
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
     </div>
   );
 }

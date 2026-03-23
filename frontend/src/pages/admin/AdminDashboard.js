@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../../lib/api';
 import { API } from '../../lib/api';
-import { Trophy, Users, Calendar, FileText } from 'lucide-react';
+import { Trophy, Users, Calendar, FileText, Crown, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
 import SubscriptionCard from '../../components/SubscriptionCard';
+import { Link } from 'react-router-dom';
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState({
@@ -14,9 +15,18 @@ const AdminDashboard = () => {
     results: 0
   });
   const [loading, setLoading] = useState(true);
+  const [isOwner, setIsOwner] = useState(false);
+  const [pendingCount, setPendingCount] = useState(0);
 
   useEffect(() => {
     fetchStats();
+    // Check owner status and pending registrations
+    axios.get(`${API}/auth/me`).then(res => {
+      if (res.data.is_owner) {
+        setIsOwner(true);
+        axios.get(`${API}/owner/pending-registrations`).then(r => setPendingCount(r.data.length)).catch(() => {});
+      }
+    }).catch(() => {});
   }, []);
 
   const fetchStats = async () => {
@@ -73,6 +83,25 @@ const AdminDashboard = () => {
         <div className="text-center py-12 text-gray-400">Carregando...</div>
       ) : (
         <>
+          {/* Owner banner */}
+          {isOwner && pendingCount > 0 && (
+            <div className="flex items-center justify-between bg-yellow-500/10 border border-yellow-500/40 rounded-xl px-5 py-4">
+              <div className="flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-yellow-400 shrink-0" />
+                <div>
+                  <p className="text-yellow-300 font-semibold">{pendingCount} cadastro{pendingCount !== 1 ? 's' : ''} aguardando aprovação</p>
+                  <p className="text-yellow-400/70 text-sm">Acesse o painel Owner para aprovar ou rejeitar.</p>
+                </div>
+              </div>
+              <Link to="/admin/owner">
+                <button className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-semibold text-sm px-4 py-2 rounded-lg transition-colors">
+                  <Crown className="w-4 h-4" />
+                  Ver painel
+                </button>
+              </Link>
+            </div>
+          )}
+
           {/* Subscription Card */}
           <SubscriptionCard />
 

@@ -2201,29 +2201,29 @@ async def create_checkout_session(
     origin_url: str,
     current_user: User = Depends(get_current_user)
 ):
-    """Create Stripe checkout session for subscription payment"""
     if plan_type not in SUBSCRIPTION_PLANS:
         raise HTTPException(status_code=400, detail="Invalid plan type")
-    
+
     plan = SUBSCRIPTION_PLANS[plan_type]
-    
+
     # Initialize Stripe
     stripe_api_key = os.getenv('STRIPE_API_KEY')
     webhook_url = f"{origin_url}/api/webhook/stripe"
     stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
-    
-    # Create checkout session
-checkout_request = {
-    "success_url": success_url,
-    "cancel_url": cancel_url,
-    "metadata": {
-        "user_id": current_user.id,
-        "plan_type": plan_type,
-        "federation_name": current_user.federation_name or ""
-    }
-}
 
-session: CheckoutSessionResponse = await stripe_checkout.create_checkout_session(checkout_request)
+    # Create checkout session
+    checkout_request = {
+        "success_url": success_url,
+        "cancel_url": cancel_url,
+        "metadata": {
+            "user_id": current_user.id,
+            "plan_type": plan_type,
+            "federation_name": current_user.federation_name or ""
+        }
+    }
+
+    session: CheckoutSessionResponse = await stripe_checkout.create_checkout_session(checkout_request)
+
     # Create payment transaction record
     transaction_doc = {
         "id": str(uuid.uuid4()),
@@ -2232,13 +2232,13 @@ session: CheckoutSessionResponse = await stripe_checkout.create_checkout_session
         "amount": plan['price'],
         "currency": plan['currency'],
         "payment_status": "pending",
-        "metadata": checkout_request.metadata,
+        "metadata": checkout_request["metadata"],
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
-    
+
     await db.payment_transactions.insert_one(transaction_doc)
-    
+
     return {"url": session.url, "session_id": session.session_id}
 
 # Get checkout status

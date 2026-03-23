@@ -2213,18 +2213,17 @@ async def create_checkout_session(
     stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
     
     # Create checkout session
-    
-        success_url=success_url,
-        cancel_url=cancel_url,
-        metadata={
-            "user_id": current_user.id,
-            "plan_type": plan_type,
-            "federation_name": current_user.federation_name or ""
-        }
-    )
-    
-    session: CheckoutSessionResponse = await stripe_checkout.create_checkout_session(checkout_request)
-    
+checkout_request = {
+    "success_url": success_url,
+    "cancel_url": cancel_url,
+    "metadata": {
+        "user_id": current_user.id,
+        "plan_type": plan_type,
+        "federation_name": current_user.federation_name or ""
+    }
+}
+
+session: CheckoutSessionResponse = await stripe_checkout.create_checkout_session(checkout_request)
     # Create payment transaction record
     transaction_doc = {
         "id": str(uuid.uuid4()),

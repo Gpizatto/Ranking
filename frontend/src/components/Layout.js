@@ -1,18 +1,25 @@
 import React, { useState, useEffect } from 'react';
 import axios, { API } from '../lib/api';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Trophy, Users, Calendar, Settings, LogOut, Shield, Menu, X, LayoutDashboard, FileText, Swords, Palette } from 'lucide-react';
+import { Trophy, Users, Calendar, Settings, LogOut, Shield, Menu, X, LayoutDashboard, FileText, Swords, Palette, Crown } from 'lucide-react';
 import { isAuthenticated, logout } from '../lib/api';
 
 const Layout = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isOwner, setIsOwner] = useState(false);
 
   useEffect(() => {
     axios.get(`${API}/theme`).then(res => {
       document.documentElement.setAttribute('data-theme', res.data.theme || 'green');
     }).catch(() => {});
+    // Check if current user is owner
+    if (isAuthenticated()) {
+      axios.get(`${API}/auth/me`).then(res => {
+        setIsOwner(!!res.data.is_owner);
+      }).catch(() => {});
+    }
   }, []);
 
 
@@ -46,6 +53,7 @@ const Layout = () => {
     { to: '/admin/matches', label: 'Partidas', icon: Swords },
     { to: '/admin/layout', label: 'Layout', icon: Palette },
     { to: '/admin/config', label: 'Config', icon: Settings },
+    ...(isOwner ? [{ to: '/admin/owner', label: 'Owner', icon: Crown }] : []),
   ];
 
   return (

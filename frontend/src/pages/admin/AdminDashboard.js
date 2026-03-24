@@ -135,29 +135,7 @@ const AdminDashboard = () => {
           <p className="text-gray-400">
             Use o menu acima para gerenciar torneios, jogadores, resultados e configurações do ranking.
           </p>
-        </CardContent>
-      </Card>
-      {/* Migração */}
-      {!migrationDone && (
-        <Card className="bg-orange-500/10 border-orange-500/30">
-          <CardHeader>
-            <CardTitle className="text-orange-400 text-sm">🔧 Migração de Dados</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-400 text-sm mb-3">
-              Atualiza os registros do banco de dados para o novo formato de classes (1a → 1ª, 2a → 2ª...).
-              Execute apenas uma vez após o deploy.
-            </p>
-            <Button
-              onClick={runMigration}
-              disabled={migrating}
-              className="bg-orange-500 hover:bg-orange-600"
-            >
-              {migrating ? 'Migrando...' : 'Executar Migração'}
-            </Button>
-          </CardContent>
-        </Card>
-      )}
+         
     </div>
   );
 };

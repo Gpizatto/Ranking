@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios, { API } from '../lib/api';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Trophy, Users, Calendar, Settings, LogOut, Shield, Menu, X, LayoutDashboard, FileText, Swords, Palette, Crown } from 'lucide-react';
+import { Trophy, Users, Calendar, Settings, LogOut, Shield, Menu, X, LayoutDashboard, FileText, Swords, Palette, UserCheck } from 'lucide-react';
 import { isAuthenticated, logout } from '../lib/api';
 
 const Layout = () => {
@@ -14,12 +14,9 @@ const Layout = () => {
     axios.get(`${API}/theme`).then(res => {
       document.documentElement.setAttribute('data-theme', res.data.theme || 'green');
     }).catch(() => {});
-    // Check if current user is owner
-    if (isAuthenticated()) {
-      axios.get(`${API}/auth/me`).then(res => {
-        setIsOwner(!!res.data.is_owner);
-      }).catch(() => {});
-    }
+    axios.get(`${API}/auth/approval-status`).then(res => {
+      setIsOwner(res.data.is_owner || false);
+    }).catch(() => {});
   }, []);
 
 
@@ -52,8 +49,8 @@ const Layout = () => {
     { to: '/admin/results', label: 'Resultados', icon: FileText },
     { to: '/admin/matches', label: 'Partidas', icon: Swords },
     { to: '/admin/layout', label: 'Layout', icon: Palette },
+    { to: '/admin/users', label: 'Usuários', icon: UserCheck, ownerOnly: true },
     { to: '/admin/config', label: 'Config', icon: Settings },
-    ...(isOwner ? [{ to: '/admin/owner', label: 'Owner', icon: Crown }] : []),
   ];
 
   return (
@@ -168,7 +165,7 @@ const Layout = () => {
           <div className="container mx-auto px-2">
             {/* Mobile: grid 3x2 */}
             <div className="grid grid-cols-3 sm:hidden gap-1 py-2">
-              {adminLinks.map(({ to, label, icon: Icon }) => (
+              {adminLinks.filter(l => !l.ownerOnly || isOwner).map(({ to, label, icon: Icon }) => (
                 <Link key={to} to={to}
                   className={`flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg text-xs transition-colors ${
                     isAdminActive(to) ? 'bg-blue-500 text-white' : 'text-gray-400 hover:bg-slate-700 hover:text-white'
@@ -180,7 +177,7 @@ const Layout = () => {
             </div>
             {/* Desktop: row */}
             <div className="hidden sm:flex space-x-1 py-2">
-              {adminLinks.map(({ to, label, icon: Icon }) => (
+              {adminLinks.filter(l => !l.ownerOnly || isOwner).map(({ to, label, icon: Icon }) => (
                 <Link key={to} to={to}
                   className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors ${
                     isAdminActive(to) ? 'bg-blue-500 text-white' : 'text-gray-400 hover:bg-slate-700 hover:text-white'

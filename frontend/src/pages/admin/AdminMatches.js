@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from '../../lib/api';
 import { API } from '../../lib/api';
-import { Swords, Plus, Trash2, Upload, FileSpreadsheet, FileText } from 'lucide-react';
+import { Swords, Plus, Trash2, Upload, FileSpreadsheet, FileText, Search } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -33,6 +33,11 @@ const AdminMatches = () => {
     date: new Date().toISOString().split('T')[0]
   });
   const [importResult, setImportResult] = useState(null);
+  const [isWO, setIsWO] = useState(false);
+  const [filterTournament, setFilterTournament] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
+  const [filterRound, setFilterRound] = useState('all');
+  const [filterSearch, setFilterSearch] = useState('');
   const [importDialogMatchesOpen, setImportDialogMatchesOpen] = useState(false);
   const [importTournamentId, setImportTournamentId] = useState('');
   const [importMatchFile, setImportMatchFile] = useState(null);
@@ -65,10 +70,10 @@ const AdminMatches = () => {
     e.preventDefault();
     
     // Filter out empty score entries
-    const scoreFiltered = formData.score.filter(s => s.trim() !== '');
+    const scoreFiltered = isWO ? ['W.O.'] : formData.score.filter(s => s.trim() !== '');
     
-    if (scoreFiltered.length === 0) {
-      toast.error('Adicione pelo menos um placar');
+    if (!isWO && scoreFiltered.length === 0) {
+      toast.error('Adicione pelo menos um placar ou marque como W.O.');
       return;
     }
 
@@ -145,6 +150,7 @@ const AdminMatches = () => {
   };
 
   const resetForm = () => {
+    setIsWO(false);
     setFormData({
       tournament_id: '',
       category: '1ª',
@@ -192,6 +198,20 @@ const AdminMatches = () => {
       toast.error('Erro ao baixar modelo');
     }
   };
+
+  const filteredMatches = matches.filter(m => {
+    if (filterTournament !== 'all' && m.tournament_id !== filterTournament) return false;
+    if (filterCategory !== 'all' && m.category !== filterCategory) return false;
+    if (filterRound !== 'all' && m.round !== filterRound) return false;
+    if (filterSearch) {
+      const s = filterSearch.toLowerCase();
+      if (!m.player1_name.toLowerCase().includes(s) && !m.player2_name.toLowerCase().includes(s) && !m.tournament_name.toLowerCase().includes(s)) return false;
+    }
+    return true;
+  });
+
+  const uniqueCategories = [...new Set(matches.map(m => m.category))].sort();
+  const uniqueRounds = [...new Set(matches.map(m => m.round))].filter(Boolean);
 
   return (
     <div className="space-y-6">
@@ -388,7 +408,24 @@ const AdminMatches = () => {
                   </div>
                 </div>
 
-                <div>
+                <div className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="wo-checkbox"
+                    checked={isWO}
+                    onChange={(e) => {
+                      setIsWO(e.target.checked);
+                      if (e.target.checked) setFormData({ ...formData, score: [] });
+                      else setFormData({ ...formData, score: ['', '', ''] });
+                    }}
+                    className="w-4 h-4 accent-green-500"
+                  />
+                  <label htmlFor="wo-checkbox" className="text-gray-300 font-medium cursor-pointer select-none">
+                    W.O. (Walkover — adversário não compareceu)
+                  </label>
+                </div>
+
+                <div className={isWO ? 'opacity-40 pointer-events-none' : ''}>
                   <div className="flex items-center justify-between mb-2">
                     <Label className="text-gray-300">Placar (formato: 11-7)</Label>
                     <Button type="button" onClick={addScoreSet} size="sm" variant="ghost" className="text-green-400">
@@ -420,6 +457,7 @@ const AdminMatches = () => {
                     ))}
                   </div>
                   <p className="text-xs text-gray-400 mt-1">Exemplo: 11-7, 8-11, 11-6, 11-9</p>
+                </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -511,6 +549,54 @@ const AdminMatches = () => {
       )}
 
       {/* Matches List */}
+      {/* Filtros */}
+      {!loading && matches.length > 0 && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Buscar jogador ou torneio..."
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+              className="bg-slate-800/50 border-slate-600 text-white pl-9 text-sm"
+            />
+          </div>
+          <Select value={filterTournament} onValueChange={setFilterTournament}>
+            <SelectTrigger className="bg-slate-800/50 border-slate-600 text-white text-sm">
+              <SelectValue placeholder="Todos os torneios" />
+            </SelectTrigger>
+            <SelectContent className="bg-slate-700 border-slate-600">
+              <SelectItem value="all">Todos os torneios</SelectItem>
+              {tournaments.map(t => (
+                <SelectItem key={t.id} value={t.id} className="text-white">{t.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterCategory} onValueChange={setFilterCategory}>
+            <SelectTrigger className="bg-slate-800/50 border-slate-600 text-white text-sm">
+              <SelectValue placeholder="Todas as categorias" />
+            </SelectTrigger>
+            <SelectContent className="bg-slate-700 border-slate-600">
+              <SelectItem value="all">Todas as categorias</SelectItem>
+              {uniqueCategories.map(cat => (
+                <SelectItem key={cat} value={cat} className="text-white">{cat}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={filterRound} onValueChange={setFilterRound}>
+            <SelectTrigger className="bg-slate-800/50 border-slate-600 text-white text-sm">
+              <SelectValue placeholder="Todas as rodadas" />
+            </SelectTrigger>
+            <SelectContent className="bg-slate-700 border-slate-600">
+              <SelectItem value="all">Todas as rodadas</SelectItem>
+              {uniqueRounds.map(r => (
+                <SelectItem key={r} value={r} className="text-white">{r}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
       {loading ? (
         <div className="text-center py-12 text-gray-400">Carregando...</div>
       ) : matches.length === 0 ? (
@@ -542,7 +628,7 @@ const AdminMatches = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {matches.map((match) => (
+                  {filteredMatches.map((match) => (
                     <tr key={match.id} className="border-b border-slate-700/50 hover:bg-slate-700/30" data-testid={`match-row-${match.id}`}>
                       <td className="py-3 px-4 text-gray-300">
                         {format(new Date(match.date), 'dd/MM/yyyy', { locale: ptBR })}
@@ -563,7 +649,7 @@ const AdminMatches = () => {
                         </div>
                       </td>
                       <td className="py-3 px-2 text-gray-300 font-mono text-xs hidden md:table-cell">
-                        {match.score.join(' ')}
+                        {match.score && match.score.includes('W.O.') ? <span className="text-yellow-400 font-semibold">W.O.</span> : match.score.join(' ')}
                       </td>
                       <td className="py-3 px-4">
                         <Badge className="bg-purple-500">{match.round}</Badge>

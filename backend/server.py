@@ -50,10 +50,7 @@ security = HTTPBearer()
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 SENDER_EMAIL = os.environ.get('SENDER_EMAIL', 'onboarding@resend.dev')
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', 'gustavopizatto@hotmail.com')
-
-# Owner account — bypasses payment restriction (pays full price, unlimited access)
-OWNER_EMAIL = os.environ.get('OWNER_EMAIL', 'gustavopizatto@hotmail.com')
-
+OWNER_EMAIL = ADMIN_EMAIL  # dono do sistema
 
 if RESEND_API_KEY:
     resend.api_key = RESEND_API_KEY
@@ -176,8 +173,8 @@ class User(BaseModel):
     username: str
     hashed_password: str
     is_admin: bool = True
-    is_owner: bool = False          # True apenas para a conta master (OWNER_EMAIL)
-    is_approved: bool = False       # Owner aprova novos cadastros antes de liberar acesso
+    is_owner: bool = False       # dono do sistema — nunca bloqueado
+    is_approved: bool = False    # aprovado manualmente pelo dono após pagamento
     federation_name: Optional[str] = None
     subscription_id: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -614,52 +611,93 @@ async def login(user_data: UserLogin):
     if not verify_password(user_data.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     
-    # Owner account: always approved, ensure flags are set
-    if user.username == OWNER_EMAIL:
-        await db.users.update_one(
-            {"username": OWNER_EMAIL},
-            {"$set": {"is_owner": True, "is_approved": True}}
-        )
-    else:
-        # Block unapproved accounts
-        if not user.is_approved:
-            raise HTTPException(
-                status_code=403,
-                detail="Cadastro ainda nao aprovado pelo administrador. Aguarde a aprovacao."
-            )
-    
     access_token = create_access_token(data={"sub": user.username})
     return {"access_token": access_token, "token_type": "bearer"}
 
 @api_router.post("/auth/register", response_model=Token)
 async def register(user_data: UserLogin):
-    # verifica se já existe
     existing_user = await db.users.find_one({"username": user_data.username})
     if existing_user:
         raise HTTPException(status_code=400, detail="User already exists")
 
-    # cria senha hash
     hashed_password = get_password_hash(user_data.password)
 
-    # cria usuário direto (admin)
+    # O dono do sistema (ADMIN_EMAIL) é aprovado automaticamente
+    is_owner = (user_data.username.lower() == ADMIN_EMAIL.lower())
+
     user = User(
         username=user_data.username,
         hashed_password=hashed_password,
-        is_admin=True
+        is_admin=True,
+        is_owner=is_owner,
+        is_approved=is_owner  # dono já aprovado, outros aguardam
     )
 
     user_doc = user.model_dump()
     user_doc['created_at'] = user_doc['created_at'].isoformat()
-
     await db.users.insert_one(user_doc)
 
-    # gera token automático
     access_token = create_access_token(data={"sub": user.username})
-
     return {"access_token": access_token, "token_type": "bearer"}
 @api_router.get("/auth/me")
 async def get_me(current_user: User = Depends(get_current_user)):
-    return {"username": current_user.username, "is_admin": current_user.is_admin, "is_owner": current_user.is_owner, "is_approved": current_user.is_approved, "federation_name": current_user.federation_name}
+    return {
+        "username": current_user.username,
+        "is_admin": current_user.is_admin,
+        "is_owner": current_user.is_owner,
+        "is_approved": current_user.is_approved or current_user.is_owner
+    }
+
+@api_router.get("/auth/approval-status")
+async def get_approval_status(current_user: User = Depends(get_current_user)):
+    """Verifica se o usuário está aprovado para usar o sistema"""
+    approved = current_user.is_approved or current_user.is_owner
+    return {"is_approved": approved, "is_owner": current_user.is_owner}
+
+@api_router.get("/admin/pending-users")
+async def get_pending_users(current_user: User = Depends(get_current_user)):
+    """Lista usuários aguardando aprovação — apenas para o dono"""
+    if not current_user.is_owner:
+        raise HTTPException(status_code=403, detail="Apenas o dono pode ver usuários pendentes")
+    pending = await db.users.find(
+        {"is_approved": False, "is_owner": {"$ne": True}},
+        {"_id": 0, "hashed_password": 0}
+    ).to_list(100)
+    return pending
+
+@api_router.post("/admin/approve-user/{username}")
+async def approve_user(username: str, current_user: User = Depends(get_current_user)):
+    """Aprova um usuário manualmente — apenas para o dono"""
+    if not current_user.is_owner:
+        raise HTTPException(status_code=403, detail="Apenas o dono pode aprovar usuários")
+    result = await db.users.update_one(
+        {"username": username},
+        {"$set": {"is_approved": True}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    return {"message": f"Usuário {username} aprovado com sucesso"}
+
+@api_router.get("/admin/all-users")
+async def get_all_users(current_user: User = Depends(get_current_user)):
+    """Lista todos os usuários — apenas para o dono"""
+    if not current_user.is_owner:
+        raise HTTPException(status_code=403, detail="Apenas o dono pode ver todos os usuários")
+    users = await db.users.find({}, {"_id": 0, "hashed_password": 0}).to_list(200)
+    return users
+
+@api_router.post("/admin/revoke-user/{username}")
+async def revoke_user(username: str, current_user: User = Depends(get_current_user)):
+    """Revoga acesso de um usuário — apenas para o dono"""
+    if not current_user.is_owner:
+        raise HTTPException(status_code=403, detail="Apenas o dono pode revogar usuários")
+    result = await db.users.update_one(
+        {"username": username},
+        {"$set": {"is_approved": False}}
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+    return {"message": f"Acesso de {username} revogado"}
 
 # Player Routes
 @api_router.get("/players", response_model=List[Player])
@@ -718,6 +756,21 @@ async def merge_players(
         raise HTTPException(status_code=404, detail="Jogador duplicado não encontrado")
     if keep_id == remove_id:
         raise HTTPException(status_code=400, detail="Os jogadores devem ser diferentes")
+
+    # Copia campos não vazios do duplicado para o jogador mantido
+    fields_to_copy = ['photo_url', 'city', 'academy', 'coach', 'main_class',
+                      'birth_date', 'gender', 'email', 'phone']
+    update_fields = {}
+    for field in fields_to_copy:
+        keep_val = keep.get(field)
+        remove_val = remove.get(field)
+        # Copia do duplicado se o campo principal estiver vazio/None
+        if not keep_val and remove_val:
+            update_fields[field] = remove_val
+
+    if update_fields:
+        await db.players.update_one({"id": keep_id}, {"$set": update_fields})
+        keep.update(update_fields)  # atualiza local para usar o nome correto abaixo
 
     results_updated = 0
     matches_updated = 0
@@ -1498,6 +1551,19 @@ async def migrate_class_names(current_user: User = Depends(get_current_user)):
         )
         players_updated += res.modified_count
 
+    # Migra usuários existentes — define is_owner e is_approved
+    owner_email = OWNER_EMAIL.lower()
+    all_users = await db.users.find({}, {"_id": 0}).to_list(1000)
+    for u in all_users:
+        update = {}
+        if "is_owner" not in u:
+            update["is_owner"] = (u.get("username", "").lower() == owner_email)
+        if "is_approved" not in u:
+            # Owner e usuários já existentes antes da migração são aprovados automaticamente
+            update["is_approved"] = True
+        if update:
+            await db.users.update_one({"id": u["id"]}, {"$set": update})
+
     # Normaliza qualquer valor antigo de gender_category
     for old_val, new_val in [('Masculino', 'Masculina'), ('Feminino', 'Feminina'), ('Misto', 'Mista')]:
         await db.results.update_many({"gender_category": old_val}, {"$set": {"gender_category": new_val}})
@@ -2109,16 +2175,13 @@ async def register_federation(federation_data: FederationCreate):
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
     
-    # Create user — not approved until owner authorizes
+    # Create user
     hashed_password = pwd_context.hash(federation_data.password)
-    is_owner_account = federation_data.email == OWNER_EMAIL
     user = User(
         username=federation_data.email,
         hashed_password=hashed_password,
         federation_name=federation_data.federation_name,
-        is_admin=True,
-        is_owner=is_owner_account,
-        is_approved=is_owner_account  # owner is auto-approved; others wait
+        is_admin=True
     )
     
     # Create subscription
@@ -2162,35 +2225,31 @@ async def register_federation(federation_data: FederationCreate):
     subscription_doc['created_at'] = subscription_doc['created_at'].isoformat()
     await db.subscriptions.insert_one(subscription_doc)
     
-    # Notify owner about new registration request (unless it is the owner registering)
-    if not is_owner_account:
+    # Send email notification
+    if federation_data.start_trial:
         try:
-            plan_label = SUBSCRIPTION_PLANS.get(federation_data.plan_type, {}).get("name", federation_data.plan_type)
             params = {
                 "from": "noreply@emergentagent.com",
-                "to": [OWNER_EMAIL],
-                "subject": f"Nova solicitacao de cadastro - {federation_data.federation_name}",
+                "to": [federation_data.email],
+                "subject": "Trial ativado - SquashRank Pro",
                 "html": f"""
-                    <h2>Nova Solicitacao de Cadastro</h2>
-                    <p>Uma nova federacao solicitou acesso ao SquashRank Pro:</p>
-                    <ul>
-                        <li><strong>Federacao:</strong> {federation_data.federation_name}</li>
-                        <li><strong>Email:</strong> {federation_data.email}</li>
-                        <li><strong>Plano:</strong> {plan_label}</li>
-                    </ul>
-                    <p>Acesse o painel administrativo para aprovar ou rejeitar este cadastro.</p>
+                    <h2>Bem-vindo ao SquashRank Pro!</h2>
+                    <p>Olá {federation_data.federation_name},</p>
+                    <p>Seu trial de 1 dia foi ativado com sucesso!</p>
+                    <p>Você tem até <strong>{subscription.end_date.strftime('%d/%m/%Y às %H:%M')}</strong> para explorar todas as funcionalidades.</p>
+                    <p>Após o trial, você precisará escolher um plano para continuar usando o sistema.</p>
+                    <p>Obrigado por escolher SquashRank Pro!</p>
                 """
             }
             resend.Emails.send(params)
         except Exception as e:
-            logger.error(f"Error sending new registration notification email: {e}")
+            logger.error(f"Error sending trial email: {e}")
     
     return {
-        "message": "Federation registered successfully. Waiting for owner approval." if not is_owner_account else "Owner account registered.",
+        "message": "Federation registered successfully",
         "user_id": user.id,
         "subscription_id": subscription.id,
         "is_trial": subscription.is_trial,
-        "is_approved": user.is_approved,
         "end_date": subscription.end_date.isoformat()
     }
 
@@ -2201,29 +2260,35 @@ async def create_checkout_session(
     origin_url: str,
     current_user: User = Depends(get_current_user)
 ):
+    """Create Stripe checkout session for subscription payment"""
     if plan_type not in SUBSCRIPTION_PLANS:
         raise HTTPException(status_code=400, detail="Invalid plan type")
-
+    
     plan = SUBSCRIPTION_PLANS[plan_type]
-
+    
     # Initialize Stripe
     stripe_api_key = os.getenv('STRIPE_API_KEY')
     webhook_url = f"{origin_url}/api/webhook/stripe"
     stripe_checkout = StripeCheckout(api_key=stripe_api_key, webhook_url=webhook_url)
-
+    
     # Create checkout session
-    checkout_request = {
-        "success_url": success_url,
-        "cancel_url": cancel_url,
-        "metadata": {
+    success_url = f"{origin_url}/admin/dashboard?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = f"{origin_url}/admin/dashboard"
+    
+    checkout_request = CheckoutSessionRequest(
+        amount=plan['price'],
+        currency=plan['currency'],
+        success_url=success_url,
+        cancel_url=cancel_url,
+        metadata={
             "user_id": current_user.id,
             "plan_type": plan_type,
             "federation_name": current_user.federation_name or ""
         }
-    }
-
+    )
+    
     session: CheckoutSessionResponse = await stripe_checkout.create_checkout_session(checkout_request)
-
+    
     # Create payment transaction record
     transaction_doc = {
         "id": str(uuid.uuid4()),
@@ -2232,13 +2297,13 @@ async def create_checkout_session(
         "amount": plan['price'],
         "currency": plan['currency'],
         "payment_status": "pending",
-        "metadata": checkout_request["metadata"],
+        "metadata": checkout_request.metadata,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "updated_at": datetime.now(timezone.utc).isoformat()
     }
-
+    
     await db.payment_transactions.insert_one(transaction_doc)
-
+    
     return {"url": session.url, "session_id": session.session_id}
 
 # Get checkout status
@@ -2432,104 +2497,6 @@ async def stripe_webhook(request: Request):
     except Exception as e:
         logger.error(f"Webhook error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
-
-# ============= OWNER ADMIN ROUTES =============
-
-def require_owner(current_user: User = Depends(get_current_user)):
-    """Dependency that blocks access for non-owner accounts."""
-    if current_user.username != OWNER_EMAIL:
-        raise HTTPException(status_code=403, detail="Acesso restrito ao administrador master.")
-    return current_user
-
-@api_router.get("/owner/pending-registrations")
-async def list_pending_registrations(owner: User = Depends(require_owner)):
-    """List all users waiting for owner approval."""
-    pending = await db.users.find(
-        {"is_approved": False, "is_owner": False},
-        {"_id": 0, "hashed_password": 0}
-    ).to_list(1000)
-    return pending
-
-@api_router.get("/owner/all-users")
-async def list_all_users(owner: User = Depends(require_owner)):
-    """List all registered users (excluding owner)."""
-    users = await db.users.find(
-        {"is_owner": False},
-        {"_id": 0, "hashed_password": 0}
-    ).to_list(1000)
-    # Attach subscription status
-    for u in users:
-        sub = await db.subscriptions.find_one({"user_id": u["id"]}, {"_id": 0})
-        u["subscription"] = sub
-    return users
-
-@api_router.post("/owner/approve/{user_id}")
-async def approve_user(user_id: str, owner: User = Depends(require_owner)):
-    """Approve a pending registration so the user can log in and pay."""
-    result = await db.users.update_one(
-        {"id": user_id, "is_owner": False},
-        {"$set": {"is_approved": True}}
-    )
-    if result.modified_count == 0:
-        raise HTTPException(status_code=404, detail="Usuario nao encontrado ou ja aprovado.")
-    
-    # Notify the user by email
-    user_doc = await db.users.find_one({"id": user_id}, {"_id": 0})
-    if user_doc:
-        try:
-            params = {
-                "from": "noreply@emergentagent.com",
-                "to": [user_doc["username"]],
-                "subject": "Cadastro aprovado - SquashRank Pro",
-                "html": f"""
-                    <h2>Seu cadastro foi aprovado!</h2>
-                    <p>Ola {user_doc.get("federation_name", "Federacao")},</p>
-                    <p>Seu cadastro no SquashRank Pro foi aprovado pelo administrador.</p>
-                    <p>Acesse o sistema, faca login e escolha um plano para comecar a usar.</p>
-                """
-            }
-            resend.Emails.send(params)
-        except Exception as e:
-            logger.error(f"Error sending approval notification: {e}")
-    
-    return {"message": "Usuario aprovado com sucesso."}
-
-@api_router.post("/owner/reject/{user_id}")
-async def reject_user(user_id: str, owner: User = Depends(require_owner)):
-    """Reject and remove a pending registration."""
-    user_doc = await db.users.find_one({"id": user_id, "is_owner": False}, {"_id": 0})
-    if not user_doc:
-        raise HTTPException(status_code=404, detail="Usuario nao encontrado.")
-    
-    # Remove user and associated subscription
-    await db.users.delete_one({"id": user_id})
-    await db.subscriptions.delete_one({"user_id": user_id})
-    
-    # Notify user
-    try:
-        params = {
-            "from": "noreply@emergentagent.com",
-            "to": [user_doc["username"]],
-            "subject": "Cadastro nao aprovado - SquashRank Pro",
-            "html": f"""
-                <h2>Cadastro nao aprovado</h2>
-                <p>Ola {user_doc.get("federation_name", "Federacao")},</p>
-                <p>Infelizmente seu cadastro no SquashRank Pro nao foi aprovado.</p>
-                <p>Entre em contato com o administrador para mais informacoes.</p>
-            """
-        }
-        resend.Emails.send(params)
-    except Exception as e:
-        logger.error(f"Error sending rejection notification: {e}")
-    
-    return {"message": "Usuario rejeitado e removido."}
-
-@api_router.post("/owner/revoke/{user_id}")
-async def revoke_user_access(user_id: str, owner: User = Depends(require_owner)):
-    """Revoke access from an approved user (suspends their subscription)."""
-    await db.users.update_one({"id": user_id}, {"$set": {"is_approved": False}})
-    await db.subscriptions.update_one({"user_id": user_id}, {"$set": {"status": "canceled"}})
-    return {"message": "Acesso revogado."}
 
 # Dependency to check active subscription
 async def check_active_subscription(current_user: User = Depends(get_current_user)):

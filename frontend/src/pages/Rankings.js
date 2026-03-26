@@ -136,7 +136,7 @@ const Rankings = () => {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-3xl font-bold text-white">Top 5</h2>
-            <Badge className="bg-green-500 text-white px-3 py-1">{selectedClass} - {selectedCategory}</Badge>
+            <Badge className="bg-green-500 text-white px-3 py-1">{selectedClass} - {selectedClass === 'Duplas' ? 'Mista' : selectedCategory}</Badge>
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 items-end">
             {top5.map((player, index) => {
@@ -180,7 +180,7 @@ const Rankings = () => {
       <Card className="bg-slate-800/50 border-green-500/20">
         <CardHeader>
           <CardTitle className="text-white text-2xl flex items-center justify-between">
-            <span>Ranking Completo - {selectedClass} {selectedCategory}</span>
+            <span>Ranking Completo - {selectedClass} {selectedClass === 'Duplas' ? 'Mista' : selectedCategory}</span>
             <span className="text-sm text-gray-400 font-normal">{rankings.length} jogadores</span>
           </CardTitle>
         </CardHeader>
@@ -221,7 +221,7 @@ const Rankings = () => {
                             </div>
                           </td>
                           <td className="py-4 px-4 hidden md:table-cell"><Badge className="bg-blue-500">{selectedClass}</Badge></td>
-                          <td className="py-4 px-4 hidden lg:table-cell"><Badge className="bg-purple-500">{selectedCategory}</Badge></td>
+                          <td className="py-4 px-4 hidden lg:table-cell"><Badge className="bg-purple-500">{selectedClass === 'Duplas' ? 'Mista' : selectedCategory}</Badge></td>
                           <td className="py-4 px-4 text-right"><span className="text-green-400 font-bold text-xl">{player.total_points}</span></td>
                           <td className="py-4 px-4 text-center hidden sm:table-cell"><span className="text-gray-400 font-medium">{player.results_count}</span></td>
                         </tr>
@@ -260,7 +260,7 @@ const Rankings = () => {
               <div style={{ fontSize: '11px', color: '#7ab3f0', letterSpacing: '1px', marginTop: '3px' }}>FEDERAÇÃO DE SQUASH DO PARANÁ</div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '11px', color: '#7ab3f0', letterSpacing: '1px' }}>{selectedClass.toUpperCase()} CLASSE · {selectedCategory.toUpperCase()}</div>
+              <div style={{ fontSize: '11px', color: '#7ab3f0', letterSpacing: '1px' }}>{selectedClass.toUpperCase()} CLASSE · {(selectedClass === 'Duplas' ? 'Mista' : selectedCategory).toUpperCase()}</div>
               <div style={{ fontSize: '15px', fontWeight: '700', color: 'white', marginTop: '3px' }}>
                 {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}
               </div>

@@ -458,7 +458,6 @@ const AdminMatches = () => {
                   </div>
                   <p className="text-xs text-gray-400 mt-1">Exemplo: 11-7, 8-11, 11-6, 11-9</p>
                 </div>
-                </form>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>

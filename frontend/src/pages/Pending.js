@@ -7,9 +7,9 @@ import { toast } from 'sonner';
 import { logout } from '../lib/api';
 
 // Substitua pela sua chave Pix e QR code
-const PIX_KEY = 'gustavopizatto@hotmail.com';
+const PIX_KEY = '41992512250;
 const PIX_NAME = 'Gustavo Pizatto';
-const PIX_VALUE = 'R$ 99,90/mês';
+const PIX_VALUE = 'R$ 79,90/mês ou 600,00/ano';
 
 const Pending = () => {
   const navigate = useNavigate();

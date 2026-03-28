@@ -279,10 +279,8 @@ const AdminPlayers = () => {
               <div className="flex justify-center">
                 <div className="relative">
                   <Avatar className="w-24 h-24">
-                    <AvatarImage src={formData.photo_url} />
-                    <AvatarFallback className="bg-green-500 text-white text-2xl">
-                      {formData.name ? formData.name.charAt(0) : <Camera className="w-8 h-8" />}
-                    </AvatarFallback>
+                    <AvatarImage src={formData.photo_url || "/fsp.jpeg"} />
+                    <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover" /></AvatarFallback>
                   </Avatar>
                   <button
                     type="button"
@@ -570,10 +568,8 @@ const AdminPlayers = () => {
                         <CardContent className="pt-6">
                           <div className="flex items-center space-x-4 mb-4">
                             <Avatar className="w-16 h-16">
-                              <AvatarImage src={player.photo_url} />
-                              <AvatarFallback className="bg-green-500 text-white text-xl">
-                                {player.name.charAt(0)}
-                              </AvatarFallback>
+                              <AvatarImage src={player.photo_url || "/fsp.jpeg"} />
+                              <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover" /></AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
                               <h3 className="text-white font-semibold text-lg">{player.name}</h3>

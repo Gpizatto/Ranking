@@ -316,26 +316,6 @@ const AdminPlayers = () => {
               {uploading && (
                 <p className="text-center text-sm text-gray-400">Fazendo upload...</p>
               )}
-              <div className="mt-1">
-                <p className="text-gray-400 text-xs text-center mb-1">ou cole uma URL do Google Drive</p>
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="https://drive.google.com/file/d/..."
-                    className="bg-slate-700 border-slate-600 text-white text-xs"
-                    id="photo-url-input"
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handlePhotoFromUrl(e.target.value); e.target.value = ''; }}}
-                  />
-                  <Button
-                    type="button"
-                    size="sm"
-                    className="bg-blue-500 hover:bg-blue-600 shrink-0 text-xs"
-                    disabled={uploading}
-                    onClick={() => { const inp = document.getElementById('photo-url-input'); handlePhotoFromUrl(inp.value); inp.value = ''; }}
-                  >
-                    Usar
-                  </Button>
-                </div>
-              </div>
               <div>
                 <Label className="text-gray-300">Nome do Jogador</Label>
                 <Input

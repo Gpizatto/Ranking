@@ -253,7 +253,6 @@ class Player(BaseModel):
     main_class: Optional[str] = None  # Classe principal que joga
     birth_date: Optional[str] = None  # ISO date string 'YYYY-MM-DD'
     gender: Optional[str] = None      # 'Masculina' ou 'Feminina'
-    is_federated: bool = True         # Se False, não recebe pontos no ranking
     email: Optional[str] = None
     phone: Optional[str] = None
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -267,7 +266,6 @@ class PlayerCreate(BaseModel):
     main_class: Optional[str] = None
     birth_date: Optional[str] = None
     gender: Optional[str] = None
-    is_federated: bool = True
     email: Optional[str] = None
     phone: Optional[str] = None
 
@@ -833,11 +831,59 @@ async def merge_players(
     }
 
 
+@api_router.post("/players/upload-photo")
 async def upload_photo(file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
     contents = await file.read()
     base64_encoded = base64.b64encode(contents).decode('utf-8')
     photo_url = f"data:{file.content_type};base64,{base64_encoded}"
     return {"photo_url": photo_url}
+
+@api_router.post("/players/photo-from-url")
+async def photo_from_url(url: str, current_user: User = Depends(get_current_user)):
+    """
+    Converte uma URL pública (inclusive Google Drive) para base64.
+    Aceita formatos:
+    - https://drive.google.com/file/d/FILE_ID/view
+    - https://drive.google.com/open?id=FILE_ID
+    - Qualquer URL direta de imagem
+    """
+    import httpx
+    import re as _re
+
+    # Converte URLs do Google Drive para URL direta de download
+    drive_patterns = [
+        r'drive\.google\.com/file/d/([a-zA-Z0-9_-]+)',
+        r'drive\.google\.com/open\?id=([a-zA-Z0-9_-]+)',
+        r'id=([a-zA-Z0-9_-]+)',
+    ]
+    file_id = None
+    for pattern in drive_patterns:
+        match = _re.search(pattern, url)
+        if match:
+            file_id = match.group(1)
+            break
+
+    if file_id:
+        download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    else:
+        download_url = url
+
+    try:
+        async with httpx.AsyncClient(follow_redirects=True, timeout=15) as client:
+            response = await client.get(download_url)
+            if response.status_code != 200:
+                raise HTTPException(status_code=400, detail="Não foi possível baixar a imagem desta URL")
+            content_type = response.headers.get("content-type", "image/jpeg")
+            # Garante que é imagem
+            if not content_type.startswith("image/"):
+                content_type = "image/jpeg"
+            b64 = base64.b64encode(response.content).decode('utf-8')
+            photo_url = f"data:{content_type};base64,{b64}"
+            return {"photo_url": photo_url}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Erro ao baixar imagem: {str(e)}")
 
 @api_router.get("/players/template")
 async def download_players_template():
@@ -1672,20 +1718,18 @@ async def get_rankings(class_category: Optional[str] = None, gender_category: Op
     for player_id, data in player_results.items():
         points_list = sorted(data['results'], reverse=True)
         
-        # Get player info (needed to check federation status)
-        player = await db.players.find_one({"id": player_id}, {"_id": 0})
-        
-        # Non-federated players get 0 points in the ranking
-        is_federated = player.get('is_federated', True) if player else True
-        
         if config.formula == "sum_all":
-            total_points = sum(points_list) if is_federated else 0.0
+            total_points = sum(points_list)
         elif config.formula == "top_n":
-            total_points = sum(points_list[:config.top_n_count]) if is_federated else 0.0
+            total_points = sum(points_list[:config.top_n_count])
         elif config.formula == "decay":
-            total_points = sum([p * (0.9 ** i) for i, p in enumerate(points_list)]) if is_federated else 0.0
+            # Simple decay: multiply each result by a decay factor based on recency
+            total_points = sum([p * (0.9 ** i) for i, p in enumerate(points_list)])
         else:
-            total_points = sum(points_list) if is_federated else 0.0
+            total_points = sum(points_list)
+        
+        # Get player photo
+        player = await db.players.find_one({"id": player_id}, {"_id": 0})
         
         # Get last match for this player
         last_match_doc = await db.matches.find_one(
@@ -1717,7 +1761,6 @@ async def get_rankings(class_category: Optional[str] = None, gender_category: Op
             'photo_url': player.get('photo_url') if player else None,
             'total_points': round(total_points, 2),
             'results_count': len(points_list),
-            'is_federated': is_federated,
             'last_match': last_match
         })
     

@@ -71,38 +71,43 @@ const Rankings = () => {
     const element = document.getElementById('top10-card');
     if (!element) return;
     setImageFormatOpen(false);
+
+    // Dimensões base do card: sempre 800px de largura interna
+    // O scale do html2canvas amplia para o tamanho final
+    const BASE_W = 800;
+    const BASE_H = format.h ? Math.round(BASE_W * (format.h / format.w)) : null;
+    const SCALE  = format.w / BASE_W;
+
+    const originalStyle = element.getAttribute('style');
     try {
-      // Ajusta dimensões do card antes de capturar
-      const originalStyle = element.getAttribute('style');
-      if (format.h) {
-        element.style.width = `${format.w}px`;
-        element.style.height = `${format.h}px`;
-        element.style.overflow = 'hidden';
-      } else {
-        element.style.width = `${format.w}px`;
-        element.style.height = 'auto';
-      }
+      element.style.width    = `${BASE_W}px`;
+      element.style.height   = BASE_H ? `${BASE_H}px` : 'auto';
+      element.style.overflow = 'hidden';
+
+      // Sinaliza o formato para que o JSX ajuste os cards
+      element.setAttribute('data-format', format.id);
 
       const canvas = await html2canvas(element, {
         backgroundColor: '#0a1628',
-        scale: format.h ? (format.w / 800) : 2,
+        scale: SCALE,
         useCORS: true,
         allowTaint: true,
         logging: false,
-        width: format.w,
-        height: format.h || undefined,
+        width: BASE_W,
+        height: BASE_H || undefined,
       });
 
-      // Restaura estilo original
-      element.setAttribute('style', originalStyle);
+      element.setAttribute('style', originalStyle || '');
+      element.removeAttribute('data-format');
 
       const link = document.createElement('a');
-      link.download = `top10-${selectedClass}-${selectedCategory}-${format.id}.png`;
+      link.download = `top10-${selectedClass}-${(selectedClass === 'Duplas' ? 'Mista' : selectedCategory)}-${format.id}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
       toast.success('Imagem gerada com sucesso!');
     } catch (error) {
-      element && element.setAttribute('style', element.getAttribute('style'));
+      element && element.setAttribute('style', originalStyle || '');
+      element && element.removeAttribute('data-format');
       toast.error('Erro ao gerar imagem');
     }
   };
@@ -179,7 +184,7 @@ const Rankings = () => {
                     : <img src="/fsp.jpeg" alt="FSP" className="absolute inset-0 w-full h-full object-cover" />
                   }
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-                  <div className={`absolute top-3 left-3 z-10 w-10 h-10 rounded-full flex items-center justify-center font-black text-lg ${badgeBg[index]}`}>{index + 1}</div>
+                  <div className={`absolute top-3 left-3 z-10 w-10 h-10 rounded-full flex items-center justify-center font-black text-lg leading-none ${badgeBg[index]}`}>{index + 1}</div>
                   <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
                     <p className="text-white font-bold text-sm leading-tight line-clamp-2 mb-1">{player.player_name}</p>
                     <p className="text-green-400 font-bold text-lg leading-none">{player.total_points} <span className="text-xs font-normal text-gray-300">pts</span></p>
@@ -349,7 +354,7 @@ const Rankings = () => {
                   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.97) 0%, rgba(0,0,0,0.75) 40%, rgba(0,0,0,0.1) 70%, transparent 100%)' }} />
 
                   {/* Badge posição */}
-                  <div style={{ position: 'absolute', top: '8px', left: '8px', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '900', ...badgeStyle }}>
+                  <div style={{ position: 'absolute', top: '8px', left: '8px', width: '30px', height: '30px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '900', lineHeight: 1, textAlign: 'center', ...badgeStyle }}>
                     {index + 1}
                   </div>
 

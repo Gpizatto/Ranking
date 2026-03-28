@@ -25,6 +25,7 @@ const Rankings = () => {
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
   // Logo em base64 para funcionar no html2canvas
   const [logoBase64, setLogoBase64] = useState('');
+  const [imageFormatOpen, setImageFormatOpen] = useState(false);
 
   useEffect(() => {
     fetchRankings();
@@ -59,23 +60,49 @@ const Rankings = () => {
 
   const handlePlayerClick = (playerId) => { setSelectedPlayerId(playerId); };
 
-  const generateTop10Image = async () => {
+  const IMAGE_FORMATS = [
+    { id: 'feed', label: 'Feed Instagram', desc: '1080×1080', w: 1080, h: 1080 },
+    { id: 'story', label: 'Story / Reels', desc: '1080×1920', w: 1080, h: 1920 },
+    { id: 'landscape', label: 'Paisagem', desc: '1280×720', w: 1280, h: 720 },
+    { id: 'original', label: 'Original', desc: '800×auto', w: 800, h: null },
+  ];
+
+  const generateTop10Image = async (format) => {
     const element = document.getElementById('top10-card');
     if (!element) return;
+    setImageFormatOpen(false);
     try {
+      // Ajusta dimensões do card antes de capturar
+      const originalStyle = element.getAttribute('style');
+      if (format.h) {
+        element.style.width = `${format.w}px`;
+        element.style.height = `${format.h}px`;
+        element.style.overflow = 'hidden';
+      } else {
+        element.style.width = `${format.w}px`;
+        element.style.height = 'auto';
+      }
+
       const canvas = await html2canvas(element, {
         backgroundColor: '#0a1628',
-        scale: 2,
+        scale: format.h ? (format.w / 800) : 2,
         useCORS: true,
         allowTaint: true,
         logging: false,
+        width: format.w,
+        height: format.h || undefined,
       });
+
+      // Restaura estilo original
+      element.setAttribute('style', originalStyle);
+
       const link = document.createElement('a');
-      link.download = `top10-${selectedClass}-${selectedCategory}.png`;
+      link.download = `top10-${selectedClass}-${selectedCategory}-${format.id}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
       toast.success('Imagem gerada com sucesso!');
     } catch (error) {
+      element && element.setAttribute('style', element.getAttribute('style'));
       toast.error('Erro ao gerar imagem');
     }
   };
@@ -90,7 +117,7 @@ const Rankings = () => {
           <h1 className="text-2xl sm:text-4xl font-bold text-white mb-1" data-testid="rankings-title">Rankings Oficiais</h1>
           <p className="text-gray-400 text-sm">Classificação atualizada dos jogadores</p>
         </div>
-        <Button onClick={generateTop10Image} className="bg-purple-500 hover:bg-purple-600 shrink-0" data-testid="generate-image-button">
+        <Button onClick={() => setImageFormatOpen(true)} className="bg-purple-500 hover:bg-purple-600 shrink-0" data-testid="generate-image-button">
           <Download className="w-4 h-4 sm:mr-2" />
           <span className="hidden sm:inline">Gerar Imagem Top 10</span>
         </Button>
@@ -135,8 +162,8 @@ const Rankings = () => {
       {!loading && rankings.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-3xl font-bold text-white">Top 5</h2>
-            <Badge className="bg-green-500 text-white px-3 py-1">{selectedClass} - {selectedClass === 'Duplas' ? 'Mista' : selectedCategory}</Badge>
+            <h2 className="text-3xl font-bold text-white"><span className="sm:hidden">Top 3</span><span className="hidden sm:inline">Top 5</span></h2>
+            <Badge className="bg-green-500 text-white px-3 py-1">{selectedClass} - {selectedCategory}</Badge>
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 items-end">
             {top5.map((player, index) => {
@@ -180,7 +207,7 @@ const Rankings = () => {
       <Card className="bg-slate-800/50 border-green-500/20">
         <CardHeader>
           <CardTitle className="text-white text-2xl flex items-center justify-between">
-            <span>Ranking Completo - {selectedClass} {selectedClass === 'Duplas' ? 'Mista' : selectedCategory}</span>
+            <span>Ranking Completo - {selectedClass} {selectedCategory}</span>
             <span className="text-sm text-gray-400 font-normal">{rankings.length} jogadores</span>
           </CardTitle>
         </CardHeader>
@@ -221,7 +248,7 @@ const Rankings = () => {
                             </div>
                           </td>
                           <td className="py-4 px-4 hidden md:table-cell"><Badge className="bg-blue-500">{selectedClass}</Badge></td>
-                          <td className="py-4 px-4 hidden lg:table-cell"><Badge className="bg-purple-500">{selectedClass === 'Duplas' ? 'Mista' : selectedCategory}</Badge></td>
+                          <td className="py-4 px-4 hidden lg:table-cell"><Badge className="bg-purple-500">{selectedCategory}</Badge></td>
                           <td className="py-4 px-4 text-right"><span className="text-green-400 font-bold text-xl">{player.total_points}</span></td>
                           <td className="py-4 px-4 text-center hidden sm:table-cell"><span className="text-gray-400 font-medium">{player.results_count}</span></td>
                         </tr>
@@ -233,6 +260,33 @@ const Rankings = () => {
             )}
         </CardContent>
       </Card>
+
+      {/* Format Picker Dialog */}
+      <Dialog open={imageFormatOpen} onOpenChange={setImageFormatOpen}>
+        <DialogContent className="bg-slate-800 border-purple-500/20 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Download className="w-5 h-5 text-purple-400" />
+              Escolha o formato
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 mt-2">
+            {IMAGE_FORMATS.map(fmt => (
+              <button
+                key={fmt.id}
+                onClick={() => generateTop10Image(fmt)}
+                className="w-full flex items-center justify-between bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-purple-500/50 rounded-lg px-4 py-3 transition-all group"
+              >
+                <div className="text-left">
+                  <p className="text-white font-semibold text-sm group-hover:text-purple-300">{fmt.label}</p>
+                  <p className="text-gray-400 text-xs">{fmt.desc} px</p>
+                </div>
+                <Download className="w-4 h-4 text-gray-400 group-hover:text-purple-400" />
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Hidden Top 10 Card for Image Generation ── */}
       <div
@@ -260,7 +314,7 @@ const Rankings = () => {
               <div style={{ fontSize: '11px', color: '#7ab3f0', letterSpacing: '1px', marginTop: '3px' }}>FEDERAÇÃO DE SQUASH DO PARANÁ</div>
             </div>
             <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '11px', color: '#7ab3f0', letterSpacing: '1px' }}>{selectedClass.toUpperCase()} CLASSE · {(selectedClass === 'Duplas' ? 'Mista' : selectedCategory).toUpperCase()}</div>
+              <div style={{ fontSize: '11px', color: '#7ab3f0', letterSpacing: '1px' }}>{selectedClass.toUpperCase()} CLASSE · {selectedCategory.toUpperCase()}</div>
               <div style={{ fontSize: '15px', fontWeight: '700', color: 'white', marginTop: '3px' }}>
                 {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}
               </div>

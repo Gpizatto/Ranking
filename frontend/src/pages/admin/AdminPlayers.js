@@ -11,6 +11,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { toast } from 'sonner';
 
+const sortAlpha = arr => [...arr].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
+
 const AdminPlayers = () => {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -44,7 +47,7 @@ const AdminPlayers = () => {
   const fetchPlayers = async () => {
     try {
       const response = await axios.get(`${API}/players`);
-      setPlayers(response.data);
+      setPlayers(sortAlpha(response.data));
     } catch (error) {
       toast.error('Erro ao carregar jogadores');
     } finally {

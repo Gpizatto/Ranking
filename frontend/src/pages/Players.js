@@ -9,6 +9,9 @@ import PlayerModal from "../components/PlayerModal";
 import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
 
+const sortAlpha = arr => [...arr].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
+
 const PlayerCard = React.memo(({ player, onClick }) => {
   return (
     <Card
@@ -64,7 +67,7 @@ const Players = () => {
     try {
       const response = await axios.get(`${API}/players`);
 
-      setPlayers(response.data);
+      setPlayers(sortAlpha(response.data));
     } catch (error) {
       toast.error("Erro ao carregar jogadores");
     } finally {

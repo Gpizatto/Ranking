@@ -7,9 +7,9 @@ import { toast } from 'sonner';
 import { logout } from '../lib/api';
 
 // Substitua pela sua chave Pix e QR code
-const PIX_KEY = '41992512250;
+const PIX_KEY = '41992512250';
 const PIX_NAME = 'Gustavo Pizatto';
-const PIX_VALUE = 'R$ 79,90/mês ou 600,00/ano';
+const PIX_VALUE = 'R$ 79,90/mês ou 600,00/anual';
 
 const Pending = () => {
   const navigate = useNavigate();
@@ -55,14 +55,11 @@ const Pending = () => {
             {/* QR Code placeholder — substitua pela imagem do seu QR */}
             <div className="flex justify-center">
               <div className="bg-white p-4 rounded-xl">
-                <div className="w-48 h-48 bg-gray-100 flex items-center justify-center rounded">
-                  <div className="text-center text-gray-500 text-xs">
-                    <QrCode className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                    <p>Adicione a imagem</p>
-                    <p>do QR Code Pix aqui</p>
-                    <p className="text-xs mt-1 font-mono">public/qrcode-pix.png</p>
-                  </div>
-                </div>
+                <img
+                  src="/qrcode-pix.png"
+                  alt="QR Code Pix"
+                  className="w-48 h-48 object-contain rounded"
+                />
               </div>
             </div>
 

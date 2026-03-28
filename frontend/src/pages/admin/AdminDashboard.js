@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../../lib/api';
 import { API } from '../../lib/api';
-import { Trophy, Users, Calendar, FileText, Crown, AlertCircle } from 'lucide-react';
+import { Trophy, Users, Calendar, FileText, Crown, AlertCircle, UserCheck, UserX, Clock } from 'lucide-react';
+import { Badge } from '../../components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { toast } from 'sonner';
@@ -17,6 +18,8 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [isOwner, setIsOwner] = useState(false);
   const [pendingCount, setPendingCount] = useState(0);
+  const [pendingUsers, setPendingUsers] = useState([]);
+  const [actionLoading, setActionLoading] = useState('');
 
   useEffect(() => {
     fetchStats();
@@ -24,7 +27,7 @@ const AdminDashboard = () => {
     axios.get(`${API}/auth/me`).then(res => {
       if (res.data.is_owner) {
         setIsOwner(true);
-        axios.get(`${API}/owner/pending-registrations`).then(r => setPendingCount(r.data.length)).catch(() => {});
+        axios.get(`${API}/owner/pending-registrations`).then(r => { setPendingCount(r.data.length); setPendingUsers(r.data); }).catch(() => {});
       }
     }).catch(() => {});
   }, []);
@@ -72,6 +75,37 @@ const AdminDashboard = () => {
     }
   };
 
+  const handleApprove = async (userId, name) => {
+    setActionLoading(userId + '_approve');
+    try {
+      await axios.post(`${API}/owner/approve/${userId}`);
+      toast.success(`${name} aprovado com sucesso!`);
+      const updated = pendingUsers.filter(u => u.id !== userId);
+      setPendingUsers(updated);
+      setPendingCount(updated.length);
+    } catch (e) {
+      toast.error('Erro ao aprovar cadastro');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
+  const handleReject = async (userId, name) => {
+    if (!window.confirm(`Rejeitar e remover o cadastro de "${name}"? Esta ação não pode ser desfeita.`)) return;
+    setActionLoading(userId + '_reject');
+    try {
+      await axios.post(`${API}/owner/reject/${userId}`);
+      toast.success(`Cadastro de ${name} rejeitado.`);
+      const updated = pendingUsers.filter(u => u.id !== userId);
+      setPendingUsers(updated);
+      setPendingCount(updated.length);
+    } catch (e) {
+      toast.error('Erro ao rejeitar cadastro');
+    } finally {
+      setActionLoading('');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -83,23 +117,53 @@ const AdminDashboard = () => {
         <div className="text-center py-12 text-gray-400">Carregando...</div>
       ) : (
         <>
-          {/* Owner banner */}
+          {/* Cadastros pendentes */}
           {isOwner && pendingCount > 0 && (
-            <div className="flex items-center justify-between bg-yellow-500/10 border border-yellow-500/40 rounded-xl px-5 py-4">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-yellow-400 shrink-0" />
-                <div>
-                  <p className="text-yellow-300 font-semibold">{pendingCount} cadastro{pendingCount !== 1 ? 's' : ''} aguardando aprovação</p>
-                  <p className="text-yellow-400/70 text-sm">Acesse o painel Owner para aprovar ou rejeitar.</p>
-                </div>
-              </div>
-              <Link to="/admin/owner">
-                <button className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 text-black font-semibold text-sm px-4 py-2 rounded-lg transition-colors">
-                  <Crown className="w-4 h-4" />
-                  Ver painel
-                </button>
-              </Link>
-            </div>
+            <Card className="bg-yellow-500/10 border-yellow-500/40">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-yellow-300 flex items-center gap-2 text-base">
+                  <Clock className="w-5 h-5" />
+                  {pendingCount} cadastro{pendingCount !== 1 ? 's' : ''} aguardando aprovação
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {pendingUsers.map(user => (
+                  <div key={user.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-800/60 rounded-lg p-3 border border-yellow-500/20">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-white">{user.federation_name || '—'}</span>
+                        <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 text-xs">Aguardando</Badge>
+                      </div>
+                      <div className="text-sm text-gray-400">{user.username}</div>
+                      <div className="text-xs text-gray-500">
+                        {user.created_at ? new Date(user.created_at).toLocaleString('pt-BR') : '—'}
+                      </div>
+                    </div>
+                    <div className="flex gap-2 shrink-0">
+                      <Button
+                        onClick={() => handleApprove(user.id, user.federation_name || user.username)}
+                        disabled={actionLoading === user.id + '_approve'}
+                        className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
+                        size="sm"
+                      >
+                        <UserCheck className="w-4 h-4" />
+                        {actionLoading === user.id + '_approve' ? 'Aprovando...' : 'Aprovar'}
+                      </Button>
+                      <Button
+                        onClick={() => handleReject(user.id, user.federation_name || user.username)}
+                        disabled={actionLoading === user.id + '_reject'}
+                        variant="outline"
+                        className="border-red-500/50 text-red-400 hover:bg-red-500/10 gap-1.5"
+                        size="sm"
+                      >
+                        <UserX className="w-4 h-4" />
+                        {actionLoading === user.id + '_reject' ? 'Rejeitando...' : 'Rejeitar'}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
           )}
 
           {/* Subscription Card */}

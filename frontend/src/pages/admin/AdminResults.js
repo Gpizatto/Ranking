@@ -12,6 +12,9 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+const sortAlpha = arr => [...arr].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+
+
 const CLASSES = ['1ª', '2ª', '3ª', '4ª', '5ª', '6ª', 'Duplas'];
 const CATEGORIES = ['Feminina', 'Masculina', 'Mista'];
 
@@ -107,7 +110,7 @@ const AdminResults = () => {
       
       setResults(resultsRes.data);
       setFilteredResults(resultsRes.data);
-      setPlayers(playersRes.data);
+      setPlayers(sortAlpha(playersRes.data));
       setTournaments(tournamentsRes.data);
     } catch (error) {
       toast.error('Erro ao carregar dados');

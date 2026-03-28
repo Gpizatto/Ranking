@@ -21,10 +21,8 @@ const PlayerCard = React.memo(({ player, onClick }) => {
       <CardContent className="pt-6">
         <div className="flex items-center space-x-4 mb-3">
           <Avatar className="w-16 h-16">
-            <AvatarImage src={player.photo_url} loading="lazy" />
-            <AvatarFallback className="bg-green-500 text-white text-xl">
-              {player.name.charAt(0)}
-            </AvatarFallback>
+            <AvatarImage src={player.photo_url || "/fsp.jpeg"} loading="lazy" />
+            <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover" /></AvatarFallback>
           </Avatar>
 
           <div className="flex-1">

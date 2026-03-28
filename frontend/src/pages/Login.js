@@ -174,7 +174,13 @@ const handleRegister = async (e) => {
 
             <TabsContent value="register">
               <form onSubmit={handleRegister} className="space-y-4">
-                
+
+                <div className="flex items-start gap-2 bg-yellow-500/10 border border-yellow-500/40 rounded-lg px-3 py-2.5">
+                  <span className="text-yellow-400 text-base mt-0.5 shrink-0">⚠️</span>
+                  <p className="text-yellow-300 text-xs leading-relaxed">
+                    <strong>Atenção:</strong> a área administrativa é exclusiva para uso da Federação. Outros cadastros não serão aprovados.
+                  </p>
+                </div>
 
                 <div>
                   <Label className="text-gray-300">Email</Label>

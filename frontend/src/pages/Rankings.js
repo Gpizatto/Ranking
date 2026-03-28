@@ -176,7 +176,7 @@ const Rankings = () => {
                   data-testid={`top-player-card-${index + 1}`}>
                   {player.photo_url
                     ? <img src={player.photo_url} alt={player.player_name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                    : <div className="absolute inset-0 bg-gradient-to-br from-slate-700 to-slate-900 flex items-center justify-center"><span className="text-8xl font-bold text-white/20">{player.player_name.charAt(0)}</span></div>
+                    : <img src="/fsp.jpeg" alt="FSP" className="absolute inset-0 w-full h-full object-cover" />
                   }
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
                   <div className={`absolute top-3 left-3 z-10 w-10 h-10 rounded-full flex items-center justify-center font-black text-lg ${badgeBg[index]}`}>{index + 1}</div>
@@ -241,8 +241,8 @@ const Rankings = () => {
                           <td className="py-4 px-4">
                             <div className="flex items-center space-x-3 group-hover:text-green-400 transition-colors" onClick={() => handlePlayerClick(player.player_id)}>
                               <Avatar className="w-12 h-12 ring-2 ring-transparent group-hover:ring-green-500 transition-all">
-                                <AvatarImage src={player.photo_url} />
-                                <AvatarFallback className="bg-green-500 text-white">{player.player_name.charAt(0)}</AvatarFallback>
+                                <AvatarImage src={player.photo_url || "/fsp.jpeg"} />
+                                <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover" /></AvatarFallback>
                               </Avatar>
                               <span className="text-white font-semibold group-hover:underline">{player.player_name}</span>
                             </div>
@@ -342,7 +342,7 @@ const Rankings = () => {
                   {/* Foto full */}
                   {player.photo_url
                     ? <img src={player.photo_url} alt={player.player_name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '64px', fontWeight: '900', color: 'rgba(255,255,255,0.15)' }}>{player.player_name.charAt(0)}</div>
+                    : <img src="/fsp.jpeg" alt="FSP" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: 0.7 }} />
                   }
 
                   {/* Gradiente — cobre 60% de baixo pra cima para o nome aparecer bem */}

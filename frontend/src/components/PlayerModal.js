@@ -75,10 +75,8 @@ const PlayerModal = ({ playerId, player, onClose }) => {
             <DialogHeader>
               <div className="flex items-center space-x-4">
                 <Avatar className="w-16 h-16 sm:w-20 sm:h-20">
-                  <AvatarImage src={selectedPlayer.photo_url} />
-                  <AvatarFallback className="bg-green-500 text-white text-2xl">
-                    {selectedPlayer.name.charAt(0)}
-                  </AvatarFallback>
+                  <AvatarImage src={selectedPlayer.photo_url || "/fsp.jpeg"} />
+                  <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover rounded-full" /></AvatarFallback>
                 </Avatar>
                 <div>
                   <DialogTitle className="text-white text-xl sm:text-2xl">{selectedPlayer.name}</DialogTitle>

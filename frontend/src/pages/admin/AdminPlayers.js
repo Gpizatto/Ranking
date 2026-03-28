@@ -24,7 +24,7 @@ const AdminPlayers = () => {
     coach: '',
     main_class: '1ª',
     birth_date: '',
-    is_federated: true
+    gender: ''
   });
   const [uploading, setUploading] = useState(false);
   const [importResult, setImportResult] = useState(null);
@@ -33,7 +33,7 @@ const AdminPlayers = () => {
   const [mergeRemove, setMergeRemove] = useState('');
   const [mergeLoading, setMergeLoading] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [filters, setFilters] = useState({ name: '', federated: '', city: '', academy: '' });
+  const [filters, setFilters] = useState({ name: '', gender: '', city: '', academy: '' });
   const fileInputRef = useRef(null);
   const excelInputRef = useRef(null);
 
@@ -87,6 +87,20 @@ const AdminPlayers = () => {
     }
   };
 
+  const handlePhotoFromUrl = async (url) => {
+    if (!url.trim()) return;
+    setUploading(true);
+    try {
+      const response = await axios.post(`${API}/players/photo-from-url?url=${encodeURIComponent(url.trim())}`);
+      setFormData({ ...formData, photo_url: response.data.photo_url });
+      toast.success('Foto carregada com sucesso!');
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao carregar foto da URL');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -117,7 +131,7 @@ const AdminPlayers = () => {
       coach: player.coach || '',
       main_class: player.main_class || '1ª',
       birth_date: player.birth_date || '',
-      is_federated: player.is_federated !== undefined ? player.is_federated : true
+      gender: player.gender || ''
     });
     setDialogOpen(true);
   };
@@ -162,7 +176,7 @@ const AdminPlayers = () => {
   };
 
   const resetForm = () => {
-    setFormData({ name: '', photo_url: '', city: '', academy: '', coach: '', main_class: '1ª', birth_date: '', is_federated: true });
+    setFormData({ name: '', photo_url: '', city: '', academy: '', coach: '', main_class: '1ª', birth_date: '', gender: '' });
     setEditingPlayer(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -302,6 +316,26 @@ const AdminPlayers = () => {
               {uploading && (
                 <p className="text-center text-sm text-gray-400">Fazendo upload...</p>
               )}
+              <div className="mt-1">
+                <p className="text-gray-400 text-xs text-center mb-1">ou cole uma URL do Google Drive</p>
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="https://drive.google.com/file/d/..."
+                    className="bg-slate-700 border-slate-600 text-white text-xs"
+                    id="photo-url-input"
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handlePhotoFromUrl(e.target.value); e.target.value = ''; }}}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="bg-blue-500 hover:bg-blue-600 shrink-0 text-xs"
+                    disabled={uploading}
+                    onClick={() => { const inp = document.getElementById('photo-url-input'); handlePhotoFromUrl(inp.value); inp.value = ''; }}
+                  >
+                    Usar
+                  </Button>
+                </div>
+              </div>
               <div>
                 <Label className="text-gray-300">Nome do Jogador</Label>
                 <Input
@@ -371,25 +405,19 @@ const AdminPlayers = () => {
                   />
                 </div>
                 <div>
-                  <Label className="text-gray-300">Situação</Label>
-                  <div
-                    onClick={() => setFormData({ ...formData, is_federated: !formData.is_federated })}
-                    className={`mt-1 flex items-center justify-between px-4 py-2.5 rounded-lg cursor-pointer border transition-all select-none ${
-                      formData.is_federated
-                        ? 'bg-green-500/20 border-green-500/60 text-green-400'
-                        : 'bg-red-500/10 border-red-500/30 text-red-400'
-                    }`}
+                  <Label className="text-gray-300">Gênero</Label>
+                  <Select
+                    value={formData.gender}
+                    onValueChange={(value) => setFormData({ ...formData, gender: value })}
                   >
-                    <span className="font-semibold text-sm">
-                      {formData.is_federated ? '✅ Federado' : '❌ Não Federado'}
-                    </span>
-                    <div className={`w-10 h-5 rounded-full relative transition-colors ${formData.is_federated ? 'bg-green-500' : 'bg-slate-600'}`}>
-                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${formData.is_federated ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {formData.is_federated ? 'Recebe pontos no ranking' : 'Não pontua no ranking'}
-                  </p>
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue placeholder="Selecione" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Masculina">Masculina</SelectItem>
+                      <SelectItem value="Feminina">Feminina</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
               <Button type="submit" className="w-full bg-blue-500 hover:bg-blue-600" data-testid="player-submit-button">
@@ -455,23 +483,19 @@ const AdminPlayers = () => {
                     </div>
                   </div>
                   <div>
-                    <Label className="text-gray-300 text-xs mb-1 block">Situação</Label>
+                    <Label className="text-gray-300 text-xs mb-1 block">Gênero</Label>
                     <div className="flex flex-col gap-1">
-                      {[
-                        { value: '', label: 'Todos' },
-                        { value: 'true', label: '✅ Federados' },
-                        { value: 'false', label: '❌ Não Federados' }
-                      ].map(opt => (
+                      {['', 'Masculina', 'Feminina'].map(g => (
                         <button
-                          key={opt.value}
-                          onClick={() => setFilters({ ...filters, federated: opt.value })}
+                          key={g}
+                          onClick={() => setFilters({ ...filters, gender: g })}
                           className={`text-left text-sm px-3 py-1.5 rounded transition-colors ${
-                            filters.federated === opt.value
+                            filters.gender === g
                               ? 'bg-blue-500 text-white'
                               : 'text-gray-300 hover:bg-slate-700'
                           }`}
                         >
-                          {opt.label}
+                          {g === '' ? 'Todos' : g}
                         </button>
                       ))}
                     </div>
@@ -494,9 +518,9 @@ const AdminPlayers = () => {
                       className="bg-slate-700 border-slate-600 text-white text-sm"
                     />
                   </div>
-                  {(filters.name || filters.federated || filters.city || filters.academy) && (
+                  {(filters.name || filters.gender || filters.city || filters.academy) && (
                     <button
-                      onClick={() => setFilters({ name: '', federated: '', city: '', academy: '' })}
+                      onClick={() => setFilters({ name: '', gender: '', city: '', academy: '' })}
                       className="w-full text-xs text-red-400 hover:text-red-300 flex items-center justify-center gap-1 pt-1"
                     >
                       <X className="w-3 h-3" /> Limpar filtros
@@ -527,9 +551,9 @@ const AdminPlayers = () => {
               >
                 <Filter className="w-4 h-4" />
                 Filtros
-                {(filters.federated || filters.city || filters.academy) && (
+                {(filters.gender || filters.city || filters.academy) && (
                   <span className="bg-blue-400 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                    {[filters.federated, filters.city, filters.academy].filter(Boolean).length}
+                    {[filters.gender, filters.city, filters.academy].filter(Boolean).length}
                   </span>
                 )}
               </Button>
@@ -539,10 +563,10 @@ const AdminPlayers = () => {
             {(() => {
               const filtered = players.filter(p => {
                 const nameOk = !filters.name || p.name.toLowerCase().includes(filters.name.toLowerCase());
-                const federatedOk = !filters.federated || String(p.is_federated !== false) === filters.federated;
+                const genderOk = !filters.gender || p.gender === filters.gender;
                 const cityOk = !filters.city || (p.city || '').toLowerCase().includes(filters.city.toLowerCase());
                 const academyOk = !filters.academy || (p.academy || '').toLowerCase().includes(filters.academy.toLowerCase());
-                return nameOk && federatedOk && cityOk && academyOk;
+                return nameOk && genderOk && cityOk && academyOk;
               });
 
               if (filtered.length === 0) {
@@ -581,13 +605,9 @@ const AdminPlayers = () => {
                                   {(() => { const t = new Date(); const b = new Date(player.birth_date + 'T00:00:00'); return t.getFullYear() - b.getFullYear() - (t < new Date(t.getFullYear(), b.getMonth(), b.getDate()) ? 1 : 0); })()} anos
                                 </p>
                               )}
-                              <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${
-                                player.is_federated !== false
-                                  ? 'bg-green-500/20 text-green-400'
-                                  : 'bg-red-500/10 text-red-400'
-                              }`}>
-                                {player.is_federated !== false ? '✅ Federado' : '❌ Não Federado'}
-                              </span>
+                              {player.gender && (
+                                <p className="text-gray-400 text-xs">{player.gender}</p>
+                              )}
                               {player.city && (
                                 <p className="text-gray-400 text-xs">📍 {player.city}</p>
                               )}

@@ -704,7 +704,7 @@ async def revoke_user(username: str, current_user: User = Depends(get_current_us
 # Player Routes
 @api_router.get("/players", response_model=List[Player])
 async def get_players():
-    players = await db.players.find({}, {"_id": 0}).to_list(1000)
+    players = await db.players.find({}, {"_id": 0}).sort("name", 1).to_list(1000)
     for player in players:
         if isinstance(player.get('created_at'), str):
             player['created_at'] = datetime.fromisoformat(player['created_at'])
@@ -1399,7 +1399,7 @@ async def import_results(
         content = await file.read()
         wb = load_workbook(BytesIO(content))
 
-        players = await db.players.find({}, {"_id": 0}).to_list(1000)
+        players = await db.players.find({}, {"_id": 0}).sort("name", 1).to_list(1000)
         players_dict = {p['name'].lower().strip(): p for p in players}
 
         config = await get_ranking_config()
@@ -1988,7 +1988,7 @@ async def import_matches_excel(
         contents = await file.read()
         workbook = load_workbook(BytesIO(contents))
 
-        players = await db.players.find({}, {"_id": 0}).to_list(1000)
+        players = await db.players.find({}, {"_id": 0}).sort("name", 1).to_list(1000)
         players_dict = {p['name'].lower().strip(): p for p in players}
 
         matches_created = 0

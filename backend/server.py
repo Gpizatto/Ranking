@@ -1648,41 +1648,57 @@ async def update_ranking_config(config_data: RankingConfigUpdate, current_user: 
 # Rankings Route
 @api_router.get("/rankings")
 async def get_rankings(class_category: Optional[str] = None, gender_category: Optional[str] = None):
-    config = await get_ranking_config()
-    
-    # Build query
+    # ── 1. Config + results em paralelo ──────────────────────────────────────
     query = {}
     if class_category:
         query['class_category'] = class_category
     if gender_category:
         query['gender_category'] = gender_category
-    
-    # Get all results
-    results = await db.results.find(query, {"_id": 0}).to_list(10000)
-    
-    # Group by player
+
+    config, results = await asyncio.gather(
+        get_ranking_config(),
+        db.results.find(query, {"_id": 0}).to_list(10000)
+    )
+
+    if not results:
+        return []
+
+    # ── 2. Agrupar resultados por jogador ────────────────────────────────────
     player_results = {}
     for result in results:
-        player_id = result['player_id']
-        if player_id not in player_results:
-            player_results[player_id] = {
-                'player_id': player_id,
-                'player_name': result['player_name'],
-                'results': []
-            }
-        player_results[player_id]['results'].append(result['points'])
-    
-    # Calculate rankings based on formula
+        pid = result['player_id']
+        if pid not in player_results:
+            player_results[pid] = {'player_id': pid, 'player_name': result['player_name'], 'results': []}
+        player_results[pid]['results'].append(result['points'])
+
+    player_ids = list(player_results.keys())
+
+    # ── 3. Buscar TODOS os jogadores e TODAS as partidas em 2 queries únicas ─
+    players_list, matches_list = await asyncio.gather(
+        db.players.find({"id": {"$in": player_ids}}, {"_id": 0, "id": 1, "photo_url": 1, "is_federated": 1}).to_list(10000),
+        db.matches.find(
+            {"$or": [{"player1_id": {"$in": player_ids}}, {"player2_id": {"$in": player_ids}}]},
+            {"_id": 0}
+        ).sort("date", -1).to_list(10000)
+    )
+
+    # Indexar jogadores por id
+    players_map = {p['id']: p for p in players_list}
+
+    # Indexar último jogo por player_id (lista já está ordenada por date desc)
+    last_match_map = {}
+    for match in matches_list:
+        for pid_key in [match['player1_id'], match['player2_id']]:
+            if pid_key not in last_match_map:
+                last_match_map[pid_key] = match
+
+    # ── 4. Calcular pontos e montar resposta ─────────────────────────────────
     rankings = []
-    for player_id, data in player_results.items():
+    for pid, data in player_results.items():
         points_list = sorted(data['results'], reverse=True)
-        
-        # Get player info (needed to check federation status)
-        player = await db.players.find_one({"id": player_id}, {"_id": 0})
-        
-        # Non-federated players get 0 points in the ranking
-        is_federated = player.get('is_federated', True) if player else True
-        
+        player = players_map.get(pid, {})
+        is_federated = player.get('is_federated', True)
+
         if config.formula == "sum_all":
             total_points = sum(points_list) if is_federated else 0.0
         elif config.formula == "top_n":
@@ -1691,48 +1707,36 @@ async def get_rankings(class_category: Optional[str] = None, gender_category: Op
             total_points = sum([p * (0.9 ** i) for i, p in enumerate(points_list)]) if is_federated else 0.0
         else:
             total_points = sum(points_list) if is_federated else 0.0
-        
-        # Get last match for this player
-        last_match_doc = await db.matches.find_one(
-            {"$or": [{"player1_id": player_id}, {"player2_id": player_id}]},
-            {"_id": 0},
-            sort=[("date", -1)]
-        )
-        
+
         last_match = None
+        last_match_doc = last_match_map.get(pid)
         if last_match_doc:
-            is_player1 = last_match_doc['player1_id'] == player_id
-            opponent_name = last_match_doc['player2_name'] if is_player1 else last_match_doc['player1_name']
-            is_winner = last_match_doc['winner_id'] == player_id
+            is_player1 = last_match_doc['player1_id'] == pid
             set_result = calculate_set_result(last_match_doc['score'])
-            
             last_match = {
-                "opponent_name": opponent_name,
+                "opponent_name": last_match_doc['player2_name'] if is_player1 else last_match_doc['player1_name'],
                 "score": last_match_doc['score'],
                 "score_formatted": f"{', '.join(last_match_doc['score'])} ({set_result})",
                 "set_result": set_result,
-                "result": "Win" if is_winner else "Loss",
+                "result": "Win" if last_match_doc['winner_id'] == pid else "Loss",
                 "tournament_name": last_match_doc.get('tournament_name', ''),
                 "date": last_match_doc['date']
             }
-        
+
         rankings.append({
-            'player_id': player_id,
+            'player_id': pid,
             'player_name': data['player_name'],
-            'photo_url': player.get('photo_url') if player else None,
+            'photo_url': player.get('photo_url'),
             'total_points': round(total_points, 2),
             'results_count': len(points_list),
             'is_federated': is_federated,
             'last_match': last_match
         })
-    
-    # Sort by points
+
     rankings.sort(key=lambda x: x['total_points'], reverse=True)
-    
-    # Add rank
-    for i, ranking in enumerate(rankings, 1):
-        ranking['rank'] = i
-    
+    for i, r in enumerate(rankings, 1):
+        r['rank'] = i
+
     return rankings
 
 # Import from image
@@ -2239,7 +2243,7 @@ async def register_federation(federation_data: FederationCreate):
     if federation_data.start_trial:
         try:
             params = {
-                "from": "noreply@emergentagent.com",
+                "from": "noreply@fsp.com.br",
                 "to": [federation_data.email],
                 "subject": "Trial ativado - SquashRank Pro",
                 "html": f"""
@@ -2389,7 +2393,7 @@ async def get_checkout_status(
                         user = await db.users.find_one({"id": user_id}, {"_id": 0})
                         if user:
                             params = {
-                                "from": "noreply@emergentagent.com",
+                                "from": "noreply@fsp.com.br",
                                 "to": [user['username']],
                                 "subject": "Pagamento confirmado - SquashRank Pro",
                                 "html": f"""
@@ -2550,6 +2554,30 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+@app.on_event("startup")
+async def create_indexes():
+    """Cria índices no MongoDB para acelerar as queries críticas."""
+    try:
+        # Índices na coleção results — usados no endpoint /rankings
+        await db.results.create_index([("class_category", 1), ("gender_category", 1)])
+        await db.results.create_index([("player_id", 1)])
+
+        # Índices na coleção players
+        await db.players.create_index([("id", 1)], unique=True, sparse=True)
+        await db.players.create_index([("name", 1)])
+
+        # Índices na coleção matches — busca de último jogo por player
+        await db.matches.create_index([("player1_id", 1), ("date", -1)])
+        await db.matches.create_index([("player2_id", 1), ("date", -1)])
+        await db.matches.create_index([("date", -1)])
+
+        # Índices na coleção tournaments
+        await db.tournaments.create_index([("date", -1)])
+
+        logger.info("Índices do MongoDB criados com sucesso.")
+    except Exception as e:
+        logger.warning(f"Erro ao criar índices: {e}")
 
 @app.on_event("shutdown")
 async def shutdown_db_client():

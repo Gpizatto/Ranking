@@ -27,7 +27,7 @@ const AdminDashboard = () => {
     axios.get(`${API}/auth/me`).then(res => {
       if (res.data.is_owner) {
         setIsOwner(true);
-        axios.get(`${API}/owner/pending-registrations`).then(r => { setPendingCount(r.data.length); setPendingUsers(r.data); }).catch(() => {});
+        axios.get(`${API}/admin/pending-users`).then(r => { setPendingCount(r.data.length); setPendingUsers(r.data); }).catch(() => {});
       }
     }).catch(() => {});
   }, []);
@@ -75,12 +75,12 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleApprove = async (userId, name) => {
-    setActionLoading(userId + '_approve');
+  const handleApprove = async (username, name) => {
+    setActionLoading(username + '_approve');
     try {
-      await axios.post(`${API}/owner/approve/${userId}`);
+      await axios.post(`${API}/admin/approve-user/${username}`);
       toast.success(`${name} aprovado com sucesso!`);
-      const updated = pendingUsers.filter(u => u.id !== userId);
+      const updated = pendingUsers.filter(u => u.username !== username);
       setPendingUsers(updated);
       setPendingCount(updated.length);
     } catch (e) {
@@ -90,13 +90,13 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleReject = async (userId, name) => {
-    if (!window.confirm(`Rejeitar e remover o cadastro de "${name}"? Esta ação não pode ser desfeita.`)) return;
-    setActionLoading(userId + '_reject');
+  const handleReject = async (username, name) => {
+    if (!window.confirm(`Rejeitar o cadastro de "${name}"? O acesso não será liberado.`)) return;
+    setActionLoading(username + '_reject');
     try {
-      await axios.post(`${API}/owner/reject/${userId}`);
+      await axios.post(`${API}/admin/revoke-user/${username}`);
       toast.success(`Cadastro de ${name} rejeitado.`);
-      const updated = pendingUsers.filter(u => u.id !== userId);
+      const updated = pendingUsers.filter(u => u.username !== username);
       setPendingUsers(updated);
       setPendingCount(updated.length);
     } catch (e) {
@@ -141,23 +141,23 @@ const AdminDashboard = () => {
                     </div>
                     <div className="flex gap-2 shrink-0">
                       <Button
-                        onClick={() => handleApprove(user.id, user.federation_name || user.username)}
-                        disabled={actionLoading === user.id + '_approve'}
+                        onClick={() => handleApprove(user.username, user.federation_name || user.username)}
+                        disabled={actionLoading === user.username + '_approve'}
                         className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
                         size="sm"
                       >
                         <UserCheck className="w-4 h-4" />
-                        {actionLoading === user.id + '_approve' ? 'Aprovando...' : 'Aprovar'}
+                        {actionLoading === user.username + '_approve' ? 'Aprovando...' : 'Aprovar'}
                       </Button>
                       <Button
-                        onClick={() => handleReject(user.id, user.federation_name || user.username)}
-                        disabled={actionLoading === user.id + '_reject'}
+                        onClick={() => handleReject(user.username, user.federation_name || user.username)}
+                        disabled={actionLoading === user.username + '_reject'}
                         variant="outline"
                         className="border-red-500/50 text-red-400 hover:bg-red-500/10 gap-1.5"
                         size="sm"
                       >
                         <UserX className="w-4 h-4" />
-                        {actionLoading === user.id + '_reject' ? 'Rejeitando...' : 'Rejeitar'}
+                        {actionLoading === user.username + '_reject' ? 'Rejeitando...' : 'Rejeitar'}
                       </Button>
                     </div>
                   </div>

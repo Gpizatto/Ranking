@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from '../lib/api';
 import { API } from '../lib/api';
 import { Trophy, Medal, Download, MapPin, GraduationCap, User, TrendingUp } from 'lucide-react';
@@ -28,7 +28,31 @@ const Rankings = () => {
   const [imageFormatOpen, setImageFormatOpen] = useState(false);
 
   useEffect(() => {
+    const controller = new AbortController();
+
+    const fetchRankings = async () => {
+      setLoading(true);
+      // Limpa resultados anteriores imediatamente para evitar flash do ranking errado
+      setRankings([]);
+      try {
+        const effectiveCategory = selectedClass === 'Duplas' ? 'Mista' : selectedCategory;
+        const response = await axios.get(
+          `${API}/rankings?class_category=${selectedClass}&gender_category=${effectiveCategory}`,
+          { signal: controller.signal }
+        );
+        setRankings(response.data);
+      } catch (error) {
+        if (axios.isCancel?.(error) || error.name === 'CanceledError' || error.name === 'AbortError') return;
+        toast.error('Erro ao carregar rankings');
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchRankings();
+
+    // Cancela a requisição anterior se selectedClass ou selectedCategory mudar antes de terminar
+    return () => controller.abort();
   }, [selectedClass, selectedCategory]);
 
   // Converte a logo para base64 ao montar o componente
@@ -45,18 +69,7 @@ const Rankings = () => {
     img.src = '/fsp.jpeg';
   }, []);
 
-  const fetchRankings = async () => {
-    setLoading(true);
-    try {
-      const effectiveCategory = selectedClass === 'Duplas' ? 'Mista' : selectedCategory;
-      const response = await axios.get(`${API}/rankings?class_category=${selectedClass}&gender_category=${effectiveCategory}`);
-      setRankings(response.data);
-    } catch (error) {
-      toast.error('Erro ao carregar rankings');
-    } finally {
-      setLoading(false);
-    }
-  };
+
 
   const handlePlayerClick = (playerId) => { setSelectedPlayerId(playerId); };
 

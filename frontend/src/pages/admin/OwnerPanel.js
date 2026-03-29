@@ -40,8 +40,8 @@ const OwnerPanel = () => {
     setLoading(true);
     try {
       const [pendingRes, allRes] = await Promise.all([
-        axios.get(`${API}/owner/pending-registrations`),
-        axios.get(`${API}/owner/all-users`),
+        axios.get(`${API}/admin/pending-users`),
+        axios.get(`${API}/admin/all-users`),
       ]);
       setPending(pendingRes.data);
       setAllUsers(allRes.data);
@@ -56,11 +56,11 @@ const OwnerPanel = () => {
     fetchData();
   }, [fetchData]);
 
-  const handleApprove = async (userId, name) => {
-    setActionLoading(userId + '_approve');
+  const handleApprove = async (username, name) => {
+    setActionLoading(username + '_approve');
     try {
-      await axios.post(`${API}/owner/approve/${userId}`);
-      toast.success(`${name} aprovado com sucesso! Um email foi enviado.`);
+      await axios.post(`${API}/admin/approve-user/${username}`);
+      toast.success(`${name} aprovado com sucesso!`);
       fetchData();
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Erro ao aprovar');
@@ -69,12 +69,12 @@ const OwnerPanel = () => {
     }
   };
 
-  const handleReject = async (userId, name) => {
-    if (!window.confirm(`Rejeitar e remover o cadastro de "${name}"? Esta ação não pode ser desfeita.`)) return;
-    setActionLoading(userId + '_reject');
+  const handleReject = async (username, name) => {
+    if (!window.confirm(`Rejeitar o cadastro de "${name}"? O acesso não será liberado.`)) return;
+    setActionLoading(username + '_reject');
     try {
-      await axios.post(`${API}/owner/reject/${userId}`);
-      toast.success(`Cadastro de ${name} rejeitado e removido.`);
+      await axios.post(`${API}/admin/revoke-user/${username}`);
+      toast.success(`Cadastro de ${name} rejeitado.`);
       fetchData();
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Erro ao rejeitar');
@@ -83,11 +83,11 @@ const OwnerPanel = () => {
     }
   };
 
-  const handleRevoke = async (userId, name) => {
+  const handleRevoke = async (username, name) => {
     if (!window.confirm(`Revogar acesso de "${name}"? O usuário ficará bloqueado.`)) return;
-    setActionLoading(userId + '_revoke');
+    setActionLoading(username + '_revoke');
     try {
-      await axios.post(`${API}/owner/revoke/${userId}`);
+      await axios.post(`${API}/admin/revoke-user/${username}`);
       toast.success(`Acesso de ${name} revogado.`);
       fetchData();
     } catch (e) {
@@ -210,23 +210,23 @@ const OwnerPanel = () => {
                       </div>
                       <div className="flex gap-2 shrink-0">
                         <Button
-                          onClick={() => handleApprove(user.id, user.federation_name || user.username)}
-                          disabled={actionLoading === user.id + '_approve'}
+                          onClick={() => handleApprove(user.username, user.federation_name || user.username)}
+                          disabled={actionLoading === user.username + '_approve'}
                           className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
                           size="sm"
                         >
                           <UserCheck className="w-4 h-4" />
-                          {actionLoading === user.id + '_approve' ? 'Aprovando...' : 'Aprovar'}
+                          {actionLoading === user.username + '_approve' ? 'Aprovando...' : 'Aprovar'}
                         </Button>
                         <Button
-                          onClick={() => handleReject(user.id, user.federation_name || user.username)}
-                          disabled={actionLoading === user.id + '_reject'}
+                          onClick={() => handleReject(user.username, user.federation_name || user.username)}
+                          disabled={actionLoading === user.username + '_reject'}
                           variant="outline"
                           className="border-red-500/50 text-red-400 hover:bg-red-500/10 gap-1.5"
                           size="sm"
                         >
                           <UserX className="w-4 h-4" />
-                          {actionLoading === user.id + '_reject' ? 'Rejeitando...' : 'Rejeitar'}
+                          {actionLoading === user.username + '_reject' ? 'Rejeitando...' : 'Rejeitar'}
                         </Button>
                       </div>
                     </div>
@@ -278,14 +278,14 @@ const OwnerPanel = () => {
                           )}
                         </div>
                         <Button
-                          onClick={() => handleRevoke(user.id, user.federation_name || user.username)}
-                          disabled={actionLoading === user.id + '_revoke'}
+                          onClick={() => handleRevoke(user.username, user.federation_name || user.username)}
+                          disabled={actionLoading === user.username + '_revoke'}
                           variant="outline"
                           className="border-red-500/40 text-red-400 hover:bg-red-500/10 gap-1.5 shrink-0"
                           size="sm"
                         >
                           <ShieldOff className="w-4 h-4" />
-                          {actionLoading === user.id + '_revoke' ? 'Revogando...' : 'Revogar acesso'}
+                          {actionLoading === user.username + '_revoke' ? 'Revogando...' : 'Revogar acesso'}
                         </Button>
                       </div>
                     </CardContent>
@@ -319,17 +319,17 @@ const OwnerPanel = () => {
                       </div>
                       <div className="flex gap-2 shrink-0">
                         <Button
-                          onClick={() => handleApprove(user.id, user.federation_name || user.username)}
-                          disabled={actionLoading === user.id + '_approve'}
+                          onClick={() => handleApprove(user.username, user.federation_name || user.username)}
+                          disabled={actionLoading === user.username + '_approve'}
                           className="bg-green-600 hover:bg-green-700 text-white gap-1.5"
                           size="sm"
                         >
                           <UserCheck className="w-4 h-4" />
-                          {actionLoading === user.id + '_approve' ? 'Aprovando...' : 'Reativar'}
+                          {actionLoading === user.username + '_approve' ? 'Aprovando...' : 'Reativar'}
                         </Button>
                         <Button
-                          onClick={() => handleReject(user.id, user.federation_name || user.username)}
-                          disabled={actionLoading === user.id + '_reject'}
+                          onClick={() => handleReject(user.username, user.federation_name || user.username)}
+                          disabled={actionLoading === user.username + '_reject'}
                           variant="outline"
                           className="border-red-500/50 text-red-400 hover:bg-red-500/10 gap-1.5"
                           size="sm"

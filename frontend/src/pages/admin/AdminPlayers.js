@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from '../../lib/api';
 import { API } from '../../lib/api';
-import { Users, Plus, Edit, Trash2, Upload, Camera, FileText, Filter, X, Search, GitMerge, AlertTriangle } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Upload, Camera, FileText, Filter, X, Search, GitMerge, AlertTriangle, Link } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -30,6 +30,8 @@ const AdminPlayers = () => {
     is_federated: true
   });
   const [uploading, setUploading] = useState(false);
+  const [driveModalOpen, setDriveModalOpen] = useState(false);
+  const [driveUrl, setDriveUrl] = useState('');
   const [importResult, setImportResult] = useState(null);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [mergeKeep, setMergeKeep] = useState('');
@@ -212,6 +214,36 @@ const AdminPlayers = () => {
     }
   };
 
+
+  const handleDriveUrl = () => {
+    if (!driveUrl.trim()) return;
+
+    // Aceita vários formatos de URL do Google Drive e converte para URL direta
+    let fileId = null;
+
+    // Formato: /file/d/{id}/view ou /file/d/{id}/edit
+    const matchFile = driveUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    // Formato: id={id} (links de compartilhamento antigos)
+    const matchId = driveUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
+    // Formato: /open?id={id}
+    const matchOpen = driveUrl.match(/\/open\?id=([a-zA-Z0-9_-]+)/);
+
+    if (matchFile) fileId = matchFile[1];
+    else if (matchId) fileId = matchId[1];
+    else if (matchOpen) fileId = matchOpen[1];
+
+    if (!fileId) {
+      toast.error('URL do Google Drive não reconhecida. Copie o link de compartilhamento da imagem.');
+      return;
+    }
+
+    const directUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
+    setFormData({ ...formData, photo_url: directUrl });
+    setDriveUrl('');
+    setDriveModalOpen(false);
+    toast.success('Foto do Drive vinculada!');
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -276,33 +308,72 @@ const AdminPlayers = () => {
               </DialogTitle>
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="flex justify-center">
+              <div className="flex flex-col items-center gap-3">
                 <div className="relative">
                   <Avatar className="w-24 h-24">
                     <AvatarImage src={formData.photo_url || "/fsp.jpeg"} />
                     <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover" /></AvatarFallback>
                   </Avatar>
+                </div>
+                <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="absolute bottom-0 right-0 bg-blue-500 hover:bg-blue-600 rounded-full p-2"
                     disabled={uploading}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium rounded-lg transition-colors"
                     data-testid="upload-photo-button"
                   >
-                    <Upload className="w-4 h-4 text-white" />
+                    <Upload className="w-3.5 h-3.5" />
+                    {uploading ? 'Enviando...' : 'Computador'}
                   </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileUpload}
-                    className="hidden"
-                  />
+                  <button
+                    type="button"
+                    onClick={() => setDriveModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors"
+                  >
+                    <Link className="w-3.5 h-3.5" />
+                    Google Drive
+                  </button>
                 </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                {/* Modal inline para URL do Drive */}
+                {driveModalOpen && (
+                  <div className="w-full bg-slate-700/80 border border-green-500/30 rounded-lg p-3 space-y-2">
+                    <p className="text-xs text-gray-300 font-medium">Cole o link de compartilhamento do Google Drive:</p>
+                    <p className="text-xs text-gray-500">A imagem deve estar com acesso público ("Qualquer pessoa com o link").</p>
+                    <input
+                      type="url"
+                      value={driveUrl}
+                      onChange={e => setDriveUrl(e.target.value)}
+                      placeholder="https://drive.google.com/file/d/..."
+                      className="w-full bg-slate-600 border border-slate-500 text-white text-xs rounded px-2 py-1.5 placeholder-gray-400 focus:outline-none focus:border-green-400"
+                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleDriveUrl())}
+                    />
+                    <div className="flex gap-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => { setDriveModalOpen(false); setDriveUrl(''); }}
+                        className="px-3 py-1 text-xs text-gray-400 hover:text-white transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDriveUrl}
+                        className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded-lg transition-colors"
+                      >
+                        Usar esta foto
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
-              {uploading && (
-                <p className="text-center text-sm text-gray-400">Fazendo upload...</p>
-              )}
               <div>
                 <Label className="text-gray-300">Nome do Jogador</Label>
                 <Input

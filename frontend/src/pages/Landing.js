@@ -146,6 +146,13 @@ const Landing = () => {
         )}
       </div>
 
+      {/* Server wake-up notice */}
+      <div className="container mx-auto px-4 pb-6 text-center">
+        <p className="text-gray-600 text-xs">
+          💤 Caso as informações não apareçam, o servidor está acordando — esse processo leva cerca de 40 segundos.
+        </p>
+      </div>
+
       {/* Footer */}
       <div className="border-t border-slate-800 py-8 text-center text-gray-600 text-sm">
         SquashRank Pro © {new Date().getFullYear()} — Sistema de Rankings de Squash

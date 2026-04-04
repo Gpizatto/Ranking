@@ -14,10 +14,16 @@ const Layout = () => {
     axios.get(`${API}/theme`).then(res => {
       document.documentElement.setAttribute('data-theme', res.data.theme || 'green');
     }).catch(() => {});
-    axios.get(`${API}/auth/approval-status`).then(res => {
-      setIsOwner(res.data.is_owner || false);
-    }).catch(() => {});
-  }, []);
+
+    // Garante que o token está no header antes de buscar o status
+    const token = localStorage.getItem('token');
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      axios.get(`${API}/auth/approval-status`).then(res => {
+        setIsOwner(res.data.is_owner || false);
+      }).catch(() => setIsOwner(false));
+    }
+  }, [location.pathname]); // Re-executa ao navegar para garantir estado atualizado
 
 
   const isAuth = isAuthenticated();

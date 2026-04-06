@@ -97,6 +97,14 @@ const Rankings = () => {
       element.style.height   = BASE_H ? `${BASE_H}px` : 'auto';
       element.style.overflow = 'hidden';
 
+      // Remove sombras de todos os elementos filhos durante a geração
+      const allEls = element.querySelectorAll('*');
+      allEls.forEach(el => {
+        el.style.boxShadow = 'none';
+        el.style.textShadow = 'none';
+        el.style.filter = el.style.filter ? el.style.filter.replace(/drop-shadow[^)]*\)/g, '').trim() : '';
+      });
+
       // Sinaliza o formato para que o JSX ajuste os cards
       element.setAttribute('data-format', format.id);
 
@@ -110,6 +118,12 @@ const Rankings = () => {
         height: BASE_H || undefined,
       });
 
+      // Restaura estilos originais
+      allEls.forEach(el => {
+        el.style.boxShadow = '';
+        el.style.textShadow = '';
+        el.style.filter = '';
+      });
       element.setAttribute('style', originalStyle || '');
       element.removeAttribute('data-format');
 
@@ -119,6 +133,7 @@ const Rankings = () => {
       link.click();
       toast.success('Imagem gerada com sucesso!');
     } catch (error) {
+      element && element.querySelectorAll('*').forEach(el => { el.style.boxShadow = ''; el.style.textShadow = ''; el.style.filter = ''; });
       element && element.setAttribute('style', originalStyle || '');
       element && element.removeAttribute('data-format');
       toast.error('Erro ao gerar imagem');

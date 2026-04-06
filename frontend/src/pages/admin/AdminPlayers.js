@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import ReactDOM from 'react-dom';
 import axios from '../../lib/api';
 import { API } from '../../lib/api';
 import { Users, Plus, Edit, Trash2, Upload, Camera, FileText, Filter, X, Search, GitMerge, AlertTriangle, Link } from 'lucide-react';
@@ -501,94 +502,6 @@ const AdminPlayers = () => {
           </DialogContent>
         </Dialog>
 
-        {/* ── Crop Modal ── */}
-        {cropModal && (
-          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-            <div style={{ background: '#1e293b', borderRadius: '12px', padding: '20px', width: '100%', maxWidth: '360px', border: '1px solid rgba(99,255,180,0.2)' }}>
-              <h3 style={{ color: 'white', fontWeight: '700', fontSize: '15px', marginBottom: '4px' }}>Ajustar Foto</h3>
-              <p style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '12px' }}>Arraste para reposicionar. Use o zoom para enquadrar como ficará no ranking.</p>
-
-              {/* Preview com área de corte 150×230 */}
-              <div
-                style={{ position: 'relative', width: '150px', height: '230px', margin: '0 auto 12px', borderRadius: '6px', overflow: 'hidden', border: '2px solid #22c55e', cursor: 'grab', userSelect: 'none' }}
-                onMouseDown={(e) => { setCropDragging(true); cropDragStart.current = { x: e.clientX, y: e.clientY }; }}
-                onMouseMove={(e) => {
-                  if (!cropDragging) return;
-                  const dx = e.clientX - cropDragStart.current.x;
-                  const dy = e.clientY - cropDragStart.current.y;
-                  cropDragStart.current = { x: e.clientX, y: e.clientY };
-                  setCropPos(prev => ({ x: prev.x + dx, y: prev.y + dy }));
-                }}
-                onMouseUp={() => setCropDragging(false)}
-                onMouseLeave={() => setCropDragging(false)}
-                onTouchStart={(e) => { const t = e.touches[0]; setCropDragging(true); cropDragStart.current = { x: t.clientX, y: t.clientY }; }}
-                onTouchMove={(e) => {
-                  if (!cropDragging) return;
-                  const t = e.touches[0];
-                  const dx = t.clientX - cropDragStart.current.x;
-                  const dy = t.clientY - cropDragStart.current.y;
-                  cropDragStart.current = { x: t.clientX, y: t.clientY };
-                  setCropPos(prev => ({ x: prev.x + dx, y: prev.y + dy }));
-                }}
-                onTouchEnd={() => setCropDragging(false)}
-              >
-                {cropImageSrc && (
-                  <img
-                    src={cropImageSrc}
-                    alt="crop"
-                    draggable={false}
-                    onLoad={(e) => setCropNaturalSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
-                    style={{
-                      position: 'absolute',
-                      left: `${cropPos.x}px`,
-                      top: `${cropPos.y}px`,
-                      width: `${cropNaturalSize.w * cropZoom}px`,
-                      height: `${cropNaturalSize.h * cropZoom}px`,
-                      pointerEvents: 'none',
-                    }}
-                  />
-                )}
-                {/* Grade de referência */}
-                <div style={{ position: 'absolute', inset: 0, border: '1px solid rgba(255,255,255,0.15)', pointerEvents: 'none' }}>
-                  <div style={{ position: 'absolute', left: '33%', top: 0, bottom: 0, borderLeft: '1px solid rgba(255,255,255,0.1)' }} />
-                  <div style={{ position: 'absolute', left: '66%', top: 0, bottom: 0, borderLeft: '1px solid rgba(255,255,255,0.1)' }} />
-                  <div style={{ position: 'absolute', top: '33%', left: 0, right: 0, borderTop: '1px solid rgba(255,255,255,0.1)' }} />
-                  <div style={{ position: 'absolute', top: '66%', left: 0, right: 0, borderTop: '1px solid rgba(255,255,255,0.1)' }} />
-                </div>
-              </div>
-
-              {/* Zoom */}
-              <div style={{ marginBottom: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                  <span style={{ color: '#94a3b8', fontSize: '11px' }}>Zoom</span>
-                  <span style={{ color: '#22c55e', fontSize: '11px', fontWeight: '700' }}>{Math.round(cropZoom * 100)}%</span>
-                </div>
-                <input
-                  type="range" min="0.1" max="3" step="0.01"
-                  value={cropZoom}
-                  onChange={(e) => setCropZoom(parseFloat(e.target.value))}
-                  style={{ width: '100%', accentColor: '#22c55e' }}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <button
-                  onClick={() => setCropModal(false)}
-                  style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #475569', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: '13px' }}
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={uploadCroppedPhoto}
-                  style={{ flex: 2, padding: '8px', borderRadius: '8px', border: 'none', background: '#22c55e', color: 'white', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}
-                >
-                  {uploading ? 'Enviando...' : 'Usar esta foto'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         </div>
       </div>
 
@@ -910,6 +823,97 @@ const AdminPlayers = () => {
         </CardContent>
       </Card>
     </div>
+
+      {/* ── Crop Modal via Portal — renderiza fora de qualquer Dialog ── */}
+      {cropModal && ReactDOM.createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ background: '#1e293b', borderRadius: '12px', padding: '20px', width: '100%', maxWidth: '360px', border: '1px solid rgba(99,255,180,0.2)' }}>
+            <h3 style={{ color: 'white', fontWeight: '700', fontSize: '15px', marginBottom: '4px' }}>Ajustar Foto</h3>
+            <p style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '12px' }}>Arraste para reposicionar. Use o zoom para enquadrar como ficará no ranking.</p>
+
+            {/* Preview 150×230 — tamanho exato do card no ranking */}
+            <div
+              style={{ position: 'relative', width: '150px', height: '230px', margin: '0 auto 12px', borderRadius: '6px', overflow: 'hidden', border: '2px solid #22c55e', cursor: cropDragging ? 'grabbing' : 'grab', userSelect: 'none' }}
+              onMouseDown={(e) => { setCropDragging(true); cropDragStart.current = { x: e.clientX, y: e.clientY }; }}
+              onMouseMove={(e) => {
+                if (!cropDragging) return;
+                const dx = e.clientX - cropDragStart.current.x;
+                const dy = e.clientY - cropDragStart.current.y;
+                cropDragStart.current = { x: e.clientX, y: e.clientY };
+                setCropPos(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+              }}
+              onMouseUp={() => setCropDragging(false)}
+              onMouseLeave={() => setCropDragging(false)}
+              onTouchStart={(e) => { e.preventDefault(); const t = e.touches[0]; setCropDragging(true); cropDragStart.current = { x: t.clientX, y: t.clientY }; }}
+              onTouchMove={(e) => {
+                e.preventDefault();
+                if (!cropDragging) return;
+                const t = e.touches[0];
+                const dx = t.clientX - cropDragStart.current.x;
+                const dy = t.clientY - cropDragStart.current.y;
+                cropDragStart.current = { x: t.clientX, y: t.clientY };
+                setCropPos(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+              }}
+              onTouchEnd={() => setCropDragging(false)}
+            >
+              {cropImageSrc && (
+                <img
+                  src={cropImageSrc}
+                  alt="crop"
+                  draggable={false}
+                  onLoad={(e) => setCropNaturalSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
+                  style={{
+                    position: 'absolute',
+                    left: `${cropPos.x}px`,
+                    top: `${cropPos.y}px`,
+                    width: `${cropNaturalSize.w * cropZoom}px`,
+                    height: `${cropNaturalSize.h * cropZoom}px`,
+                    pointerEvents: 'none',
+                  }}
+                />
+              )}
+              {/* Grade de referência */}
+              <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+                <div style={{ position: 'absolute', left: '33%', top: 0, bottom: 0, borderLeft: '1px solid rgba(255,255,255,0.15)' }} />
+                <div style={{ position: 'absolute', left: '66%', top: 0, bottom: 0, borderLeft: '1px solid rgba(255,255,255,0.15)' }} />
+                <div style={{ position: 'absolute', top: '33%', left: 0, right: 0, borderTop: '1px solid rgba(255,255,255,0.15)' }} />
+                <div style={{ position: 'absolute', top: '66%', left: 0, right: 0, borderTop: '1px solid rgba(255,255,255,0.15)' }} />
+              </div>
+            </div>
+
+            {/* Zoom */}
+            <div style={{ marginBottom: '16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                <span style={{ color: '#94a3b8', fontSize: '11px' }}>Zoom</span>
+                <span style={{ color: '#22c55e', fontSize: '11px', fontWeight: '700' }}>{Math.round(cropZoom * 100)}%</span>
+              </div>
+              <input
+                type="range" min="0.1" max="3" step="0.01"
+                value={cropZoom}
+                onChange={(e) => setCropZoom(parseFloat(e.target.value))}
+                style={{ width: '100%', accentColor: '#22c55e' }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                onClick={() => setCropModal(false)}
+                style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #475569', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: '13px' }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={uploadCroppedPhoto}
+                disabled={uploading}
+                style={{ flex: 2, padding: '8px', borderRadius: '8px', border: 'none', background: '#22c55e', color: 'white', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}
+              >
+                {uploading ? 'Enviando...' : 'Usar esta foto'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
   );
 };
 

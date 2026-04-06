@@ -44,7 +44,7 @@ const AdminPlayers = () => {
   const [cropPos, setCropPos] = useState({ x: 0, y: 0 });
   const [cropZoom, setCropZoom] = useState(1);
   const [cropDragging, setCropDragging] = useState(false);
-  const [cropDragStart, setCropDragStart] = useState({ x: 0, y: 0 });
+  const cropDragStart = useRef({ x: 0, y: 0 });
   const [cropNaturalSize, setCropNaturalSize] = useState({ w: 1, h: 1 });
   const cropCanvasRef = useRef(null);
   const cropPendingFile = useRef(null);
@@ -511,12 +511,25 @@ const AdminPlayers = () => {
               {/* Preview com área de corte 150×230 */}
               <div
                 style={{ position: 'relative', width: '150px', height: '230px', margin: '0 auto 12px', borderRadius: '6px', overflow: 'hidden', border: '2px solid #22c55e', cursor: 'grab', userSelect: 'none' }}
-                onMouseDown={(e) => { setCropDragging(true); setCropDragStart({ x: e.clientX - cropPos.x, y: e.clientY - cropPos.y }); }}
-                onMouseMove={(e) => { if (!cropDragging) return; setCropPos({ x: e.clientX - cropDragStart.x, y: e.clientY - cropDragStart.y }); }}
+                onMouseDown={(e) => { setCropDragging(true); cropDragStart.current = { x: e.clientX, y: e.clientY }; }}
+                onMouseMove={(e) => {
+                  if (!cropDragging) return;
+                  const dx = e.clientX - cropDragStart.current.x;
+                  const dy = e.clientY - cropDragStart.current.y;
+                  cropDragStart.current = { x: e.clientX, y: e.clientY };
+                  setCropPos(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+                }}
                 onMouseUp={() => setCropDragging(false)}
                 onMouseLeave={() => setCropDragging(false)}
-                onTouchStart={(e) => { const t = e.touches[0]; setCropDragging(true); setCropDragStart({ x: t.clientX - cropPos.x, y: t.clientY - cropPos.y }); }}
-                onTouchMove={(e) => { if (!cropDragging) return; const t = e.touches[0]; setCropPos({ x: t.clientX - cropDragStart.x, y: t.clientY - cropDragStart.y }); }}
+                onTouchStart={(e) => { const t = e.touches[0]; setCropDragging(true); cropDragStart.current = { x: t.clientX, y: t.clientY }; }}
+                onTouchMove={(e) => {
+                  if (!cropDragging) return;
+                  const t = e.touches[0];
+                  const dx = t.clientX - cropDragStart.current.x;
+                  const dy = t.clientY - cropDragStart.current.y;
+                  cropDragStart.current = { x: t.clientX, y: t.clientY };
+                  setCropPos(prev => ({ x: prev.x + dx, y: prev.y + dy }));
+                }}
                 onTouchEnd={() => setCropDragging(false)}
               >
                 {cropImageSrc && (

@@ -11,6 +11,11 @@ export const AdminGuard = ({ children }) => {
       setStatus('unauthenticated');
       return;
     }
+    // Garante que o token está no header antes de verificar
+    const token = localStorage.getItem('token');
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    }
     axios.get(`${API}/auth/approval-status`)
       .then(res => {
         setStatus(res.data.is_approved ? 'approved' : 'pending');

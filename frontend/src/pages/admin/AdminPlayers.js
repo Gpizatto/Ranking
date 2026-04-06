@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from '../../lib/api';
 import { API } from '../../lib/api';
 import { Users, Plus, Edit, Trash2, Upload, Camera, FileText, Filter, X, Search, GitMerge, AlertTriangle, Link } from 'lucide-react';
@@ -39,6 +39,15 @@ const AdminPlayers = () => {
   const [mergeLoading, setMergeLoading] = useState(false);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState({ name: '', federated: '', city: '', academy: '' });
+  const [cropModal, setCropModal] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState('');
+  const [cropPos, setCropPos] = useState({ x: 0, y: 0 });
+  const [cropZoom, setCropZoom] = useState(1);
+  const [cropDragging, setCropDragging] = useState(false);
+  const [cropDragStart, setCropDragStart] = useState({ x: 0, y: 0 });
+  const [cropNaturalSize, setCropNaturalSize] = useState({ w: 1, h: 1 });
+  const cropCanvasRef = useRef(null);
+  const cropPendingFile = useRef(null);
   const fileInputRef = useRef(null);
   const excelInputRef = useRef(null);
 
@@ -57,40 +66,61 @@ const AdminPlayers = () => {
     }
   };
 
-  const handleFileUpload = async (e) => {
+  const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!file.type.startsWith('image/')) { toast.error('Por favor, selecione uma imagem'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Imagem deve ter no máximo 5MB'); return; }
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Por favor, selecione uma imagem');
-      return;
-    }
-
-    // Validate file size (5MB max)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Imagem deve ter no máximo 5MB');
-      return;
-    }
-
-    setUploading(true);
-
-    try {
-      const formDataUpload = new FormData();
-      formDataUpload.append('file', file);
-
-      const response = await axios.post(`${API}/players/upload-photo`, formDataUpload, {
-        headers: { 'Content-Type': 'multipart/form-data' }
-      });
-
-      setFormData({ ...formData, photo_url: response.data.photo_url });
-      toast.success('Foto carregada com sucesso!');
-    } catch (error) {
-      toast.error('Erro ao fazer upload da foto');
-    } finally {
-      setUploading(false);
-    }
+    // Abre editor de crop em vez de fazer upload direto
+    cropPendingFile.current = file;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setCropImageSrc(ev.target.result);
+      setCropPos({ x: 0, y: 0 });
+      setCropZoom(1);
+      setCropModal(true);
+    };
+    reader.readAsDataURL(file);
+    // reset input para permitir re-selecionar o mesmo arquivo
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
+
+  const uploadCroppedPhoto = useCallback(async () => {
+    const CARD_W = 150;
+    const CARD_H = 230;
+    const canvas = document.createElement('canvas');
+    canvas.width = CARD_W;
+    canvas.height = CARD_H;
+    const ctx = canvas.getContext('2d');
+
+    const img = new Image();
+    img.src = cropImageSrc;
+    await new Promise(r => { img.onload = r; });
+
+    // Desenha a imagem na posição/zoom definidos pelo usuário
+    const scaledW = img.naturalWidth * cropZoom;
+    const scaledH = img.naturalHeight * cropZoom;
+    ctx.drawImage(img, cropPos.x, cropPos.y, scaledW, scaledH);
+
+    canvas.toBlob(async (blob) => {
+      setUploading(true);
+      setCropModal(false);
+      try {
+        const formDataUpload = new FormData();
+        formDataUpload.append('file', blob, 'photo.jpg');
+        const response = await axios.post(`${API}/players/upload-photo`, formDataUpload, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+        setFormData(prev => ({ ...prev, photo_url: response.data.photo_url }));
+        toast.success('Foto carregada com sucesso!');
+      } catch {
+        toast.error('Erro ao fazer upload da foto');
+      } finally {
+        setUploading(false);
+      }
+    }, 'image/jpeg', 0.92);
+  }, [cropImageSrc, cropPos, cropZoom]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -470,6 +500,82 @@ const AdminPlayers = () => {
             </form>
           </DialogContent>
         </Dialog>
+
+        {/* ── Crop Modal ── */}
+        {cropModal && (
+          <div style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+            <div style={{ background: '#1e293b', borderRadius: '12px', padding: '20px', width: '100%', maxWidth: '360px', border: '1px solid rgba(99,255,180,0.2)' }}>
+              <h3 style={{ color: 'white', fontWeight: '700', fontSize: '15px', marginBottom: '4px' }}>Ajustar Foto</h3>
+              <p style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '12px' }}>Arraste para reposicionar. Use o zoom para enquadrar como ficará no ranking.</p>
+
+              {/* Preview com área de corte 150×230 */}
+              <div
+                style={{ position: 'relative', width: '150px', height: '230px', margin: '0 auto 12px', borderRadius: '6px', overflow: 'hidden', border: '2px solid #22c55e', cursor: 'grab', userSelect: 'none' }}
+                onMouseDown={(e) => { setCropDragging(true); setCropDragStart({ x: e.clientX - cropPos.x, y: e.clientY - cropPos.y }); }}
+                onMouseMove={(e) => { if (!cropDragging) return; setCropPos({ x: e.clientX - cropDragStart.x, y: e.clientY - cropDragStart.y }); }}
+                onMouseUp={() => setCropDragging(false)}
+                onMouseLeave={() => setCropDragging(false)}
+                onTouchStart={(e) => { const t = e.touches[0]; setCropDragging(true); setCropDragStart({ x: t.clientX - cropPos.x, y: t.clientY - cropPos.y }); }}
+                onTouchMove={(e) => { if (!cropDragging) return; const t = e.touches[0]; setCropPos({ x: t.clientX - cropDragStart.x, y: t.clientY - cropDragStart.y }); }}
+                onTouchEnd={() => setCropDragging(false)}
+              >
+                {cropImageSrc && (
+                  <img
+                    src={cropImageSrc}
+                    alt="crop"
+                    draggable={false}
+                    onLoad={(e) => setCropNaturalSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
+                    style={{
+                      position: 'absolute',
+                      left: `${cropPos.x}px`,
+                      top: `${cropPos.y}px`,
+                      width: `${cropNaturalSize.w * cropZoom}px`,
+                      height: `${cropNaturalSize.h * cropZoom}px`,
+                      pointerEvents: 'none',
+                    }}
+                  />
+                )}
+                {/* Grade de referência */}
+                <div style={{ position: 'absolute', inset: 0, border: '1px solid rgba(255,255,255,0.15)', pointerEvents: 'none' }}>
+                  <div style={{ position: 'absolute', left: '33%', top: 0, bottom: 0, borderLeft: '1px solid rgba(255,255,255,0.1)' }} />
+                  <div style={{ position: 'absolute', left: '66%', top: 0, bottom: 0, borderLeft: '1px solid rgba(255,255,255,0.1)' }} />
+                  <div style={{ position: 'absolute', top: '33%', left: 0, right: 0, borderTop: '1px solid rgba(255,255,255,0.1)' }} />
+                  <div style={{ position: 'absolute', top: '66%', left: 0, right: 0, borderTop: '1px solid rgba(255,255,255,0.1)' }} />
+                </div>
+              </div>
+
+              {/* Zoom */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                  <span style={{ color: '#94a3b8', fontSize: '11px' }}>Zoom</span>
+                  <span style={{ color: '#22c55e', fontSize: '11px', fontWeight: '700' }}>{Math.round(cropZoom * 100)}%</span>
+                </div>
+                <input
+                  type="range" min="0.1" max="3" step="0.01"
+                  value={cropZoom}
+                  onChange={(e) => setCropZoom(parseFloat(e.target.value))}
+                  style={{ width: '100%', accentColor: '#22c55e' }}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => setCropModal(false)}
+                  style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #475569', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: '13px' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={uploadCroppedPhoto}
+                  style={{ flex: 2, padding: '8px', borderRadius: '8px', border: 'none', background: '#22c55e', color: 'white', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}
+                >
+                  {uploading ? 'Enviando...' : 'Usar esta foto'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         </div>
       </div>
 

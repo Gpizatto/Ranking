@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { QrCode, Copy, CheckCircle, LogOut, Clock } from 'lucide-react';
+import { QrCode, Copy, CheckCircle, LogOut, Clock, RefreshCw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { toast } from 'sonner';
 import { logout } from '../lib/api';
+import axios, { API } from '../lib/api';
 
 // Substitua pela sua chave Pix e QR code
 const PIX_KEY = '41992512250';
@@ -14,6 +15,35 @@ const PIX_VALUE = 'R$ 79,90/mês ou 600,00/anual';
 const Pending = () => {
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
+  const [checking, setChecking] = useState(false);
+
+  const checkApproval = useCallback(async (silent = false) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    if (!silent) setChecking(true);
+    try {
+      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      const res = await axios.get(`${API}/auth/approval-status`);
+      if (res.data.is_approved) {
+        toast.success('Acesso liberado! Redirecionando...');
+        navigate('/admin');
+      } else if (!silent) {
+        toast.info('Acesso ainda pendente. Aguarde a confirmação.');
+      }
+    } catch {
+      // silencioso
+    } finally {
+      if (!silent) setChecking(false);
+    }
+  }, [navigate]);
+
+  // Polling automático a cada 30 segundos
+  useEffect(() => {
+    checkApproval(true); // verifica imediatamente ao montar
+    const interval = setInterval(() => checkApproval(true), 30000);
+    return () => clearInterval(interval);
+  }, [checkApproval]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(PIX_KEY);
@@ -96,6 +126,16 @@ const Pending = () => {
             </div>
           </CardContent>
         </Card>
+
+        {/* Botão verificar acesso */}
+        <Button
+          onClick={() => checkApproval(false)}
+          disabled={checking}
+          className="w-full bg-green-600 hover:bg-green-700 text-white"
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
+          {checking ? 'Verificando...' : 'Já paguei — verificar acesso'}
+        </Button>
 
         <Button
           onClick={handleLogout}

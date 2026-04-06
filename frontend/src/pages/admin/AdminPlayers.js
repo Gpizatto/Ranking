@@ -41,13 +41,9 @@ const AdminPlayers = () => {
   const [filterOpen, setFilterOpen] = useState(false);
   const [filters, setFilters] = useState({ name: '', federated: '', city: '', academy: '' });
   const [cropModal, setCropModal] = useState(false);
-  const [cropImageSrc, setCropImageSrc] = useState('');
-  const [cropPos, setCropPos] = useState({ x: 0, y: 0 });
-  const [cropZoom, setCropZoom] = useState(1);
-  const [cropDragging, setCropDragging] = useState(false);
-  const cropDragStart = useRef({ x: 0, y: 0 });
-  const [cropNaturalSize, setCropNaturalSize] = useState({ w: 1, h: 1 });
   const cropCanvasRef = useRef(null);
+  const cropStateRef = useRef({ imgSrc: '', x: 0, y: 0, zoom: 1, dragging: false, lastX: 0, lastY: 0, img: null, zoom_display: 1 });
+  const [cropZoomDisplay, setCropZoomDisplay] = useState(100);
   const cropPendingFile = useRef(null);
   const fileInputRef = useRef(null);
   const excelInputRef = useRef(null);
@@ -67,61 +63,131 @@ const AdminPlayers = () => {
     }
   };
 
+  const CROP_W = 150;
+  const CROP_H = 230;
+
+  const drawCropCanvas = useCallback(() => {
+    const canvas = cropCanvasRef.current;
+    if (!canvas) return;
+    const s = cropStateRef.current;
+    if (!s.img) return;
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, CROP_W, CROP_H);
+    const w = s.img.naturalWidth * s.zoom;
+    const h = s.img.naturalHeight * s.zoom;
+    ctx.drawImage(s.img, s.x, s.y, w, h);
+    // grade
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 1;
+    [CROP_W/3, CROP_W*2/3].forEach(x => { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,CROP_H); ctx.stroke(); });
+    [CROP_H/3, CROP_H*2/3].forEach(y => { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(CROP_W,y); ctx.stroke(); });
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, CROP_W-2, CROP_H-2);
+  }, []);
+
+  // Inicializa canvas com eventos nativos quando modal abre
+  useEffect(() => {
+    if (!cropModal) return;
+    const canvas = cropCanvasRef.current;
+    if (!canvas) return;
+    const s = cropStateRef.current;
+
+    const getXY = (e) => {
+      const r = canvas.getBoundingClientRect();
+      if (e.touches) return { x: e.touches[0].clientX - r.left, y: e.touches[0].clientY - r.top };
+      return { x: e.clientX - r.left, y: e.clientY - r.top };
+    };
+
+    const onDown = (e) => { e.preventDefault(); s.dragging = true; const p = getXY(e); s.lastX = p.x; s.lastY = p.y; canvas.style.cursor = 'grabbing'; };
+    const onMove = (e) => {
+      e.preventDefault();
+      if (!s.dragging) return;
+      const p = getXY(e);
+      s.x += p.x - s.lastX;
+      s.y += p.y - s.lastY;
+      s.lastX = p.x; s.lastY = p.y;
+      drawCropCanvas();
+    };
+    const onUp = (e) => { e.preventDefault(); s.dragging = false; canvas.style.cursor = 'grab'; };
+
+    canvas.addEventListener('mousedown', onDown);
+    canvas.addEventListener('mousemove', onMove);
+    canvas.addEventListener('mouseup', onUp);
+    canvas.addEventListener('mouseleave', onUp);
+    canvas.addEventListener('touchstart', onDown, { passive: false });
+    canvas.addEventListener('touchmove', onMove, { passive: false });
+    canvas.addEventListener('touchend', onUp, { passive: false });
+
+    return () => {
+      canvas.removeEventListener('mousedown', onDown);
+      canvas.removeEventListener('mousemove', onMove);
+      canvas.removeEventListener('mouseup', onUp);
+      canvas.removeEventListener('mouseleave', onUp);
+      canvas.removeEventListener('touchstart', onDown);
+      canvas.removeEventListener('touchmove', onMove);
+      canvas.removeEventListener('touchend', onUp);
+    };
+  }, [cropModal, drawCropCanvas]);
+
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith('image/')) { toast.error('Por favor, selecione uma imagem'); return; }
     if (file.size > 5 * 1024 * 1024) { toast.error('Imagem deve ter no máximo 5MB'); return; }
-
-    // Abre editor de crop em vez de fazer upload direto
     cropPendingFile.current = file;
     const reader = new FileReader();
     reader.onload = (ev) => {
-      setCropImageSrc(ev.target.result);
-      setCropPos({ x: 0, y: 0 });
-      setCropZoom(1);
-      setCropModal(true);
+      const img = new Image();
+      img.onload = () => {
+        // Encaixa a imagem no canvas inicialmente
+        const scale = Math.max(CROP_W / img.naturalWidth, CROP_H / img.naturalHeight);
+        const s = cropStateRef.current;
+        s.img = img; s.imgSrc = ev.target.result; s.zoom = scale;
+        s.x = (CROP_W - img.naturalWidth * scale) / 2;
+        s.y = (CROP_H - img.naturalHeight * scale) / 2;
+        s.dragging = false;
+        setCropZoomDisplay(Math.round(scale * 100));
+        setCropModal(true);
+        setTimeout(drawCropCanvas, 50);
+      };
+      img.src = ev.target.result;
     };
     reader.readAsDataURL(file);
-    // reset input para permitir re-selecionar o mesmo arquivo
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  const handleCropZoom = useCallback((val) => {
+    const s = cropStateRef.current;
+    const newZoom = val / 100;
+    // Zoom centrado no canvas
+    const cx = CROP_W / 2, cy = CROP_H / 2;
+    s.x = cx - (cx - s.x) * (newZoom / s.zoom);
+    s.y = cy - (cy - s.y) * (newZoom / s.zoom);
+    s.zoom = newZoom;
+    setCropZoomDisplay(val);
+    drawCropCanvas();
+  }, [drawCropCanvas]);
+
   const uploadCroppedPhoto = useCallback(async () => {
-    const CARD_W = 150;
-    const CARD_H = 230;
     const canvas = document.createElement('canvas');
-    canvas.width = CARD_W;
-    canvas.height = CARD_H;
+    canvas.width = CROP_W; canvas.height = CROP_H;
     const ctx = canvas.getContext('2d');
-
-    const img = new Image();
-    img.src = cropImageSrc;
-    await new Promise(r => { img.onload = r; });
-
-    // Desenha a imagem na posição/zoom definidos pelo usuário
-    const scaledW = img.naturalWidth * cropZoom;
-    const scaledH = img.naturalHeight * cropZoom;
-    ctx.drawImage(img, cropPos.x, cropPos.y, scaledW, scaledH);
-
+    const s = cropStateRef.current;
+    ctx.drawImage(s.img, s.x, s.y, s.img.naturalWidth * s.zoom, s.img.naturalHeight * s.zoom);
     canvas.toBlob(async (blob) => {
       setUploading(true);
       setCropModal(false);
       try {
         const formDataUpload = new FormData();
         formDataUpload.append('file', blob, 'photo.jpg');
-        const response = await axios.post(`${API}/players/upload-photo`, formDataUpload, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        const response = await axios.post(`${API}/players/upload-photo`, formDataUpload, { headers: { 'Content-Type': 'multipart/form-data' } });
         setFormData(prev => ({ ...prev, photo_url: response.data.photo_url }));
         toast.success('Foto carregada com sucesso!');
-      } catch {
-        toast.error('Erro ao fazer upload da foto');
-      } finally {
-        setUploading(false);
-      }
+      } catch { toast.error('Erro ao fazer upload da foto'); }
+      finally { setUploading(false); }
     }, 'image/jpeg', 0.92);
-  }, [cropImageSrc, cropPos, cropZoom]);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -825,89 +891,44 @@ const AdminPlayers = () => {
       </Card>
     </div>
 
-      {/* ── Crop Modal via Portal — renderiza fora de qualquer Dialog ── */}
+      {/* ── Crop Modal via Portal — canvas com listeners nativos ── */}
       {cropModal && ReactDOM.createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-          <div style={{ background: '#1e293b', borderRadius: '12px', padding: '20px', width: '100%', maxWidth: '360px', border: '1px solid rgba(99,255,180,0.2)' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
+          <div style={{ background: '#1e293b', borderRadius: '12px', padding: '20px', width: '100%', maxWidth: '340px', border: '1px solid rgba(34,197,94,0.3)' }}>
             <h3 style={{ color: 'white', fontWeight: '700', fontSize: '15px', marginBottom: '4px' }}>Ajustar Foto</h3>
-            <p style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '12px' }}>Arraste para reposicionar. Use o zoom para enquadrar como ficará no ranking.</p>
+            <p style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '12px' }}>Arraste para reposicionar • Zoom para enquadrar</p>
 
-            {/* Preview 150×230 — tamanho exato do card no ranking */}
-            <div
-              style={{ position: 'relative', width: '150px', height: '230px', margin: '0 auto 12px', borderRadius: '6px', overflow: 'hidden', border: '2px solid #22c55e', cursor: cropDragging ? 'grabbing' : 'grab', userSelect: 'none' }}
-              onMouseDown={(e) => { setCropDragging(true); cropDragStart.current = { x: e.clientX, y: e.clientY }; }}
-              onMouseMove={(e) => {
-                if (!cropDragging) return;
-                const dx = e.clientX - cropDragStart.current.x;
-                const dy = e.clientY - cropDragStart.current.y;
-                cropDragStart.current = { x: e.clientX, y: e.clientY };
-                setCropPos(prev => ({ x: prev.x + dx, y: prev.y + dy }));
-              }}
-              onMouseUp={() => setCropDragging(false)}
-              onMouseLeave={() => setCropDragging(false)}
-              onTouchStart={(e) => { e.preventDefault(); const t = e.touches[0]; setCropDragging(true); cropDragStart.current = { x: t.clientX, y: t.clientY }; }}
-              onTouchMove={(e) => {
-                e.preventDefault();
-                if (!cropDragging) return;
-                const t = e.touches[0];
-                const dx = t.clientX - cropDragStart.current.x;
-                const dy = t.clientY - cropDragStart.current.y;
-                cropDragStart.current = { x: t.clientX, y: t.clientY };
-                setCropPos(prev => ({ x: prev.x + dx, y: prev.y + dy }));
-              }}
-              onTouchEnd={() => setCropDragging(false)}
-            >
-              {cropImageSrc && (
-                <img
-                  src={cropImageSrc}
-                  alt="crop"
-                  draggable={false}
-                  onLoad={(e) => setCropNaturalSize({ w: e.target.naturalWidth, h: e.target.naturalHeight })}
-                  style={{
-                    position: 'absolute',
-                    left: `${cropPos.x}px`,
-                    top: `${cropPos.y}px`,
-                    width: `${cropNaturalSize.w * cropZoom}px`,
-                    height: `${cropNaturalSize.h * cropZoom}px`,
-                    pointerEvents: 'none',
-                  }}
-                />
-              )}
-              {/* Grade de referência */}
-              <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-                <div style={{ position: 'absolute', left: '33%', top: 0, bottom: 0, borderLeft: '1px solid rgba(255,255,255,0.15)' }} />
-                <div style={{ position: 'absolute', left: '66%', top: 0, bottom: 0, borderLeft: '1px solid rgba(255,255,255,0.15)' }} />
-                <div style={{ position: 'absolute', top: '33%', left: 0, right: 0, borderTop: '1px solid rgba(255,255,255,0.15)' }} />
-                <div style={{ position: 'absolute', top: '66%', left: 0, right: 0, borderTop: '1px solid rgba(255,255,255,0.15)' }} />
-              </div>
+            {/* Canvas — eventos registrados via useEffect, sem React handlers */}
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
+              <canvas
+                ref={cropCanvasRef}
+                width={150}
+                height={230}
+                style={{ borderRadius: '6px', cursor: 'grab', display: 'block', touchAction: 'none' }}
+              />
             </div>
 
-            {/* Zoom */}
+            {/* Zoom slider */}
             <div style={{ marginBottom: '16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
                 <span style={{ color: '#94a3b8', fontSize: '11px' }}>Zoom</span>
-                <span style={{ color: '#22c55e', fontSize: '11px', fontWeight: '700' }}>{Math.round(cropZoom * 100)}%</span>
+                <span style={{ color: '#22c55e', fontSize: '11px', fontWeight: '700' }}>{cropZoomDisplay}%</span>
               </div>
               <input
-                type="range" min="0.1" max="3" step="0.01"
-                value={cropZoom}
-                onChange={(e) => setCropZoom(parseFloat(e.target.value))}
+                type="range" min="10" max="300" step="1"
+                value={cropZoomDisplay}
+                onChange={(e) => handleCropZoom(parseInt(e.target.value))}
                 style={{ width: '100%', accentColor: '#22c55e' }}
               />
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button
-                onClick={() => setCropModal(false)}
-                style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #475569', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: '13px' }}
-              >
+              <button onClick={() => setCropModal(false)}
+                style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #475569', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: '13px' }}>
                 Cancelar
               </button>
-              <button
-                onClick={uploadCroppedPhoto}
-                disabled={uploading}
-                style={{ flex: 2, padding: '8px', borderRadius: '8px', border: 'none', background: '#22c55e', color: 'white', fontWeight: '700', cursor: 'pointer', fontSize: '13px' }}
-              >
+              <button onClick={uploadCroppedPhoto} disabled={uploading}
+                style={{ flex: 2, padding: '8px', borderRadius: '8px', border: 'none', background: '#22c55e', color: 'white', fontWeight: '700', cursor: uploading ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
                 {uploading ? 'Enviando...' : 'Usar esta foto'}
               </button>
             </div>

@@ -140,7 +140,6 @@ const AdminPlayers = () => {
     reader.onload = (ev) => {
       const img = new Image();
       img.onload = () => {
-        // Encaixa a imagem no canvas inicialmente
         const scale = Math.max(CROP_W / img.naturalWidth, CROP_H / img.naturalHeight);
         const s = cropStateRef.current;
         s.img = img; s.imgSrc = ev.target.result; s.zoom = scale;
@@ -148,8 +147,12 @@ const AdminPlayers = () => {
         s.y = (CROP_H - img.naturalHeight * scale) / 2;
         s.dragging = false;
         setCropZoomDisplay(Math.round(scale * 100));
-        setCropModal(true);
-        setTimeout(drawCropCanvas, 50);
+        // Fecha o Dialog do jogador para o overlay não bloquear o crop
+        setDialogOpen(false);
+        setTimeout(() => {
+          setCropModal(true);
+          setTimeout(drawCropCanvas, 80);
+        }, 200);
       };
       img.src = ev.target.result;
     };
@@ -178,6 +181,8 @@ const AdminPlayers = () => {
     canvas.toBlob(async (blob) => {
       setUploading(true);
       setCropModal(false);
+      // Reabre o Dialog do jogador após fechar o crop
+      setTimeout(() => setDialogOpen(true), 100);
       try {
         const formDataUpload = new FormData();
         formDataUpload.append('file', blob, 'photo.jpg');
@@ -923,7 +928,7 @@ const AdminPlayers = () => {
             </div>
 
             <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => setCropModal(false)}
+              <button onClick={() => { setCropModal(false); setTimeout(() => setDialogOpen(true), 100); }}
                 style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #475569', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: '13px' }}>
                 Cancelar
               </button>

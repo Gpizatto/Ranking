@@ -1,948 +1,432 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import ReactDOM from 'react-dom';
-import axios from '../../lib/api';
-import { API } from '../../lib/api';
-import { Users, Plus, Edit, Trash2, Upload, Camera, FileText, Filter, X, Search, GitMerge, AlertTriangle, Link } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
-import { Label } from '../../components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
-import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
+import axios from '../lib/api';
+import { API } from '../lib/api';
+import { Trophy, Medal, Download, MapPin, GraduationCap, User, TrendingUp } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
+import { Button } from '../components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
+import PlayerModal from '../components/PlayerModal';
+import html2canvas from 'html2canvas';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
-const sortAlpha = arr => [...arr].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+const CLASSES = ['1ª', '2ª', '3ª', '4ª', '5ª', '6ª', 'Duplas'];
+const CATEGORIES = ['Feminina', 'Masculina'];
 
+const Rankings = () => {
 
-const AdminPlayers = () => {
-  const [players, setPlayers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingPlayer, setEditingPlayer] = useState(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    photo_url: '',
-    city: '',
-    academy: '',
-    coach: '',
-    main_class: '1ª',
-    birth_date: '',
-    is_federated: true
-  });
-  const [uploading, setUploading] = useState(false);
-  const [driveModalOpen, setDriveModalOpen] = useState(false);
-  const [driveUrl, setDriveUrl] = useState('');
-  const [importResult, setImportResult] = useState(null);
-  const [mergeOpen, setMergeOpen] = useState(false);
-  const [mergeKeep, setMergeKeep] = useState('');
-  const [mergeRemove, setMergeRemove] = useState('');
-  const [mergeLoading, setMergeLoading] = useState(false);
-  const [filterOpen, setFilterOpen] = useState(false);
-  const [filters, setFilters] = useState({ name: '', federated: '', city: '', academy: '' });
-  const [cropModal, setCropModal] = useState(false);
-  const cropCanvasRef = useRef(null);
-  const cropStateRef = useRef({ imgSrc: '', x: 0, y: 0, zoom: 1, dragging: false, lastX: 0, lastY: 0, img: null, zoom_display: 1 });
-  const [cropZoomDisplay, setCropZoomDisplay] = useState(100);
-  const cropPendingFile = useRef(null);
-  const fileInputRef = useRef(null);
-  const excelInputRef = useRef(null);
+  const [rankings, setRankings] = useState([]);
+  const [selectedClass, setSelectedClass] = useState('1ª');
+  const [selectedCategory, setSelectedCategory] = useState('Feminina');
+  const [loading, setLoading] = useState(false);
+  const [selectedPlayerId, setSelectedPlayerId] = useState(null);
+  // Logo em base64 para funcionar no html2canvas
+  const [logoBase64, setLogoBase64] = useState('');
+  const [imageFormatOpen, setImageFormatOpen] = useState(false);
 
   useEffect(() => {
-    fetchPlayers();
-  }, []);
+    const controller = new AbortController();
 
-  const fetchPlayers = async () => {
-    try {
-      const response = await axios.get(`${API}/players`);
-      setPlayers(sortAlpha(response.data));
-    } catch (error) {
-      toast.error('Erro ao carregar jogadores');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const CROP_W = 150;
-  const CROP_H = 230;
-
-  const drawCropCanvas = useCallback(() => {
-    const canvas = cropCanvasRef.current;
-    if (!canvas) return;
-    const s = cropStateRef.current;
-    if (!s.img) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, CROP_W, CROP_H);
-    const w = s.img.naturalWidth * s.zoom;
-    const h = s.img.naturalHeight * s.zoom;
-    ctx.drawImage(s.img, s.x, s.y, w, h);
-    // grade
-    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-    ctx.lineWidth = 1;
-    [CROP_W/3, CROP_W*2/3].forEach(x => { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,CROP_H); ctx.stroke(); });
-    [CROP_H/3, CROP_H*2/3].forEach(y => { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(CROP_W,y); ctx.stroke(); });
-    ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, CROP_W-2, CROP_H-2);
-  }, []);
-
-  // Inicializa canvas com eventos nativos quando modal abre
-  useEffect(() => {
-    if (!cropModal) return;
-    const canvas = cropCanvasRef.current;
-    if (!canvas) return;
-    const s = cropStateRef.current;
-
-    const getXY = (e) => {
-      const r = canvas.getBoundingClientRect();
-      if (e.touches) return { x: e.touches[0].clientX - r.left, y: e.touches[0].clientY - r.top };
-      return { x: e.clientX - r.left, y: e.clientY - r.top };
-    };
-
-    const onDown = (e) => { e.preventDefault(); s.dragging = true; const p = getXY(e); s.lastX = p.x; s.lastY = p.y; canvas.style.cursor = 'grabbing'; };
-    const onMove = (e) => {
-      e.preventDefault();
-      if (!s.dragging) return;
-      const p = getXY(e);
-      s.x += p.x - s.lastX;
-      s.y += p.y - s.lastY;
-      s.lastX = p.x; s.lastY = p.y;
-      drawCropCanvas();
-    };
-    const onUp = (e) => { e.preventDefault(); s.dragging = false; canvas.style.cursor = 'grab'; };
-
-    canvas.addEventListener('mousedown', onDown);
-    canvas.addEventListener('mousemove', onMove);
-    canvas.addEventListener('mouseup', onUp);
-    canvas.addEventListener('mouseleave', onUp);
-    canvas.addEventListener('touchstart', onDown, { passive: false });
-    canvas.addEventListener('touchmove', onMove, { passive: false });
-    canvas.addEventListener('touchend', onUp, { passive: false });
-
-    return () => {
-      canvas.removeEventListener('mousedown', onDown);
-      canvas.removeEventListener('mousemove', onMove);
-      canvas.removeEventListener('mouseup', onUp);
-      canvas.removeEventListener('mouseleave', onUp);
-      canvas.removeEventListener('touchstart', onDown);
-      canvas.removeEventListener('touchmove', onMove);
-      canvas.removeEventListener('touchend', onUp);
-    };
-  }, [cropModal, drawCropCanvas]);
-
-  const handleFileUpload = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.type.startsWith('image/')) { toast.error('Por favor, selecione uma imagem'); return; }
-    if (file.size > 5 * 1024 * 1024) { toast.error('Imagem deve ter no máximo 5MB'); return; }
-    cropPendingFile.current = file;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const img = new Image();
-      img.onload = () => {
-        const scale = Math.max(CROP_W / img.naturalWidth, CROP_H / img.naturalHeight);
-        const s = cropStateRef.current;
-        s.img = img; s.imgSrc = ev.target.result; s.zoom = scale;
-        s.x = (CROP_W - img.naturalWidth * scale) / 2;
-        s.y = (CROP_H - img.naturalHeight * scale) / 2;
-        s.dragging = false;
-        setCropZoomDisplay(Math.round(scale * 100));
-        // Fecha o Dialog do jogador para o overlay não bloquear o crop
-        setDialogOpen(false);
-        setTimeout(() => {
-          setCropModal(true);
-          setTimeout(drawCropCanvas, 80);
-        }, 200);
-      };
-      img.src = ev.target.result;
-    };
-    reader.readAsDataURL(file);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleCropZoom = useCallback((val) => {
-    const s = cropStateRef.current;
-    const newZoom = val / 100;
-    // Zoom centrado no canvas
-    const cx = CROP_W / 2, cy = CROP_H / 2;
-    s.x = cx - (cx - s.x) * (newZoom / s.zoom);
-    s.y = cy - (cy - s.y) * (newZoom / s.zoom);
-    s.zoom = newZoom;
-    setCropZoomDisplay(val);
-    drawCropCanvas();
-  }, [drawCropCanvas]);
-
-  const uploadCroppedPhoto = useCallback(async () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = CROP_W; canvas.height = CROP_H;
-    const ctx = canvas.getContext('2d');
-    const s = cropStateRef.current;
-    ctx.drawImage(s.img, s.x, s.y, s.img.naturalWidth * s.zoom, s.img.naturalHeight * s.zoom);
-    canvas.toBlob(async (blob) => {
-      setUploading(true);
-      setCropModal(false);
-      // Reabre o Dialog do jogador após fechar o crop
-      setTimeout(() => setDialogOpen(true), 100);
+    const fetchRankings = async () => {
+      setLoading(true);
+      // Limpa resultados anteriores imediatamente para evitar flash do ranking errado
+      setRankings([]);
       try {
-        const formDataUpload = new FormData();
-        formDataUpload.append('file', blob, 'photo.jpg');
-        const response = await axios.post(`${API}/players/upload-photo`, formDataUpload, { headers: { 'Content-Type': 'multipart/form-data' } });
-        setFormData(prev => ({ ...prev, photo_url: response.data.photo_url }));
-        toast.success('Foto carregada com sucesso!');
-      } catch { toast.error('Erro ao fazer upload da foto'); }
-      finally { setUploading(false); }
-    }, 'image/jpeg', 0.92);
+        const effectiveCategory = selectedClass === 'Duplas' ? 'Mista' : selectedCategory;
+        const response = await axios.get(
+          `${API}/rankings?class_category=${selectedClass}&gender_category=${effectiveCategory}`,
+          { signal: controller.signal }
+        );
+        setRankings(response.data);
+      } catch (error) {
+        if (axios.isCancel?.(error) || error.name === 'CanceledError' || error.name === 'AbortError') return;
+        toast.error('Erro ao carregar rankings');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRankings();
+
+    // Cancela a requisição anterior se selectedClass ou selectedCategory mudar antes de terminar
+    return () => controller.abort();
+  }, [selectedClass, selectedCategory]);
+
+  // Converte a logo para base64 ao montar o componente
+  useEffect(() => {
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      canvas.getContext('2d').drawImage(img, 0, 0);
+      setLogoBase64(canvas.toDataURL('image/jpeg'));
+    };
+    img.src = '/fsp.jpeg';
   }, []);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
-    try {
-      if (editingPlayer) {
-        await axios.put(`${API}/players/${editingPlayer.id}`, formData);
-        toast.success('Jogador atualizado com sucesso!');
-      } else {
-        await axios.post(`${API}/players`, formData);
-        toast.success('Jogador criado com sucesso!');
+
+
+  const handlePlayerClick = (playerId) => { setSelectedPlayerId(playerId); };
+
+  const IMAGE_FORMATS = [
+    { id: 'feed', label: 'Feed Instagram', desc: '1080×1080', w: 1080, h: 1080 },
+    { id: 'story', label: 'Story / Reels', desc: '1080×1920', w: 1080, h: 1920 },
+    { id: 'landscape', label: 'Paisagem', desc: '1280×720', w: 1280, h: 720 },
+    { id: 'original', label: 'Original', desc: '800×auto', w: 800, h: null },
+  ];
+
+  const generateTop10Image = async (format) => {
+    const element = document.getElementById('top10-card');
+    if (!element) return;
+    setImageFormatOpen(false);
+
+    const BASE_W = 800;
+    const BASE_H = format.h ? Math.round(BASE_W * (format.h / format.w)) : null;
+    const SCALE  = format.w / BASE_W;
+
+    const originalStyle = element.getAttribute('style');
+
+    // Injeta CSS global que zera TODAS as sombras durante a captura
+    // (cobre tanto estilos inline quanto classes Tailwind/CSS externo)
+    const noShadowStyle = document.createElement('style');
+    noShadowStyle.id = 'no-shadow-capture';
+    noShadowStyle.textContent = `
+      #top10-card, #top10-card * {
+        box-shadow: none !important;
+        text-shadow: none !important;
+        filter: none !important;
+        -webkit-filter: none !important;
       }
-
-      setDialogOpen(false);
-      resetForm();
-      fetchPlayers();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao salvar jogador');
-    }
-  };
-
-  const handleEdit = (player) => {
-    setEditingPlayer(player);
-    setFormData({
-      name: player.name,
-      photo_url: player.photo_url || '',
-      city: player.city || '',
-      academy: player.academy || '',
-      coach: player.coach || '',
-      main_class: player.main_class || '1ª',
-      birth_date: player.birth_date || '',
-      is_federated: player.is_federated !== undefined ? player.is_federated : true
-    });
-    setDialogOpen(true);
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('Tem certeza que deseja excluir este jogador?')) return;
+    `;
 
     try {
-      await axios.delete(`${API}/players/${id}`);
-      toast.success('Jogador excluído com sucesso!');
-      fetchPlayers();
-    } catch (error) {
-      toast.error('Erro ao excluir jogador');
-    }
-  };
+      document.head.appendChild(noShadowStyle);
 
-  const handleImportExcel = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+      element.style.width    = `${BASE_W}px`;
+      element.style.height   = BASE_H ? `${BASE_H}px` : 'auto';
+      element.style.overflow = 'hidden';
+      element.setAttribute('data-format', format.id);
 
-    const formDataUpload = new FormData();
-    formDataUpload.append('file', file);
-
-    try {
-      const response = await axios.post(`${API}/import-players-excel`, formDataUpload, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#0a1628',
+        scale: SCALE,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        width: BASE_W,
+        height: BASE_H || undefined,
       });
 
-      setImportResult(response.data);
-      
-      if (response.data.players_created > 0 || response.data.players_updated > 0) {
-        toast.success(`${response.data.players_created} criados, ${response.data.players_updated} atualizados!`);
-        fetchPlayers();
-      }
-      
-      if (response.data.errors.length > 0) {
-        toast.error(`${response.data.errors.length} erros encontrados`);
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao importar Excel');
-    }
-  };
+      document.head.removeChild(noShadowStyle);
+      element.setAttribute('style', originalStyle || '');
+      element.removeAttribute('data-format');
 
-  const resetForm = () => {
-    setFormData({ name: '', photo_url: '', city: '', academy: '', coach: '', main_class: '1ª', birth_date: '', is_federated: true });
-    setEditingPlayer(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const handleDownloadTemplate = async () => {
-    try {
-      const response = await axios.get(`${API}/players/template`, {
-        responseType: 'blob'
-      });
-      
-      const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', 'modelo_jogadores.xlsx');
-      document.body.appendChild(link);
+      link.download = `top10-${selectedClass}-${(selectedClass === 'Duplas' ? 'Mista' : selectedCategory)}-${format.id}.png`;
+      link.href = canvas.toDataURL('image/png');
       link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      
-      toast.success('Modelo baixado com sucesso!');
+      toast.success('Imagem gerada com sucesso!');
     } catch (error) {
-      toast.error('Erro ao baixar modelo');
+      const tag = document.getElementById('no-shadow-capture');
+      if (tag) document.head.removeChild(tag);
+      element && element.setAttribute('style', originalStyle || '');
+      element && element.removeAttribute('data-format');
+      toast.error('Erro ao gerar imagem');
     }
   };
 
-  const handleMerge = async () => {
-    if (!mergeKeep || !mergeRemove) { toast.error('Selecione os dois jogadores'); return; }
-    if (mergeKeep === mergeRemove) { toast.error('Selecione jogadores diferentes'); return; }
-    if (!window.confirm('Tem certeza? O jogador duplicado será removido e todos os dados transferidos.')) return;
-    setMergeLoading(true);
-    try {
-      const response = await axios.post(`${API}/players/merge?keep_id=${mergeKeep}&remove_id=${mergeRemove}`);
-      toast.success(`${response.data.message} — ${response.data.results_transferred} resultados e ${response.data.matches_transferred} partidas transferidos`);
-      setMergeOpen(false);
-      setMergeKeep('');
-      setMergeRemove('');
-      fetchPlayers();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao mesclar jogadores');
-    } finally {
-      setMergeLoading(false);
-    }
-  };
-
-
-  const handleDriveUrl = () => {
-    if (!driveUrl.trim()) return;
-
-    // Aceita vários formatos de URL do Google Drive e converte para URL direta
-    let fileId = null;
-
-    // Formato: /file/d/{id}/view ou /file/d/{id}/edit
-    const matchFile = driveUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-    // Formato: id={id} (links de compartilhamento antigos)
-    const matchId = driveUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    // Formato: /open?id={id}
-    const matchOpen = driveUrl.match(/\/open\?id=([a-zA-Z0-9_-]+)/);
-
-    if (matchFile) fileId = matchFile[1];
-    else if (matchId) fileId = matchId[1];
-    else if (matchOpen) fileId = matchOpen[1];
-
-    if (!fileId) {
-      toast.error('URL do Google Drive não reconhecida. Copie o link de compartilhamento da imagem.');
-      return;
-    }
-
-    const directUrl = `https://drive.google.com/uc?export=view&id=${fileId}`;
-    setFormData({ ...formData, photo_url: directUrl });
-    setDriveUrl('');
-    setDriveModalOpen(false);
-    toast.success('Foto do Drive vinculada!');
-  };
+  const top10 = rankings.slice(0, 10);
+  const top5 = rankings.slice(0, 5);
 
   return (
-    <>
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-8">
+      <div className="flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2" data-testid="admin-players-title">Gerenciar Jogadores</h1>
-          <p className="text-gray-400 text-sm">Cadastre e edite jogadores</p>
+          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-1" data-testid="rankings-title">Rankings Oficiais</h1>
+          <p className="text-gray-400 text-sm">Classificação atualizada dos jogadores</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={() => setFilterOpen(!filterOpen)}
-            variant="outline"
-            className={`border-slate-600 gap-2 ${filterOpen ? 'bg-blue-500 text-white border-blue-500' : 'text-gray-300 hover:bg-slate-700'}`}
-          >
-            <Filter className="w-4 h-4" />
-            Filtros
-          </Button>
-          <Button
-            onClick={() => setMergeOpen(true)}
-            variant="outline"
-            className="border-orange-500/50 text-orange-400 hover:bg-orange-500/10 gap-2"
-          >
-            <GitMerge className="w-4 h-4" />
-            <span className="hidden sm:inline">Mesclar Duplicatas</span>
-          </Button>
-          <Button
-            onClick={handleDownloadTemplate}
-            className="bg-blue-500 hover:bg-blue-600"
-          >
-            <FileText className="w-4 h-4 sm:mr-2" />
-            <span className="hidden sm:inline">Baixar Modelo</span>
-          </Button>
-          <Button
-            onClick={() => excelInputRef.current?.click()}
-            className="bg-purple-500 hover:bg-purple-600"
-            data-testid="import-players-button"
-          >
-            <Upload className="w-4 h-4 sm:mr-2" />
-            <span className="hidden sm:inline">Importar Excel</span>
-          </Button>
-          <input
-            ref={excelInputRef}
-            type="file"
-            accept=".xlsx,.xls"
-            onChange={handleImportExcel}
-            className="hidden"
-          />
-          
-          <Dialog open={dialogOpen} onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) resetForm();
-          }}>
-            <DialogTrigger asChild>
-              <Button className="bg-green-500 hover:bg-green-600" data-testid="add-player-button">
-                <Plus className="w-4 h-4 mr-2" />
-                Novo Jogador
-              </Button>
-            </DialogTrigger>
-          <DialogContent className="bg-slate-800 border-green-500/20">
-            <DialogHeader>
-              <DialogTitle className="text-white">
-                {editingPlayer ? 'Editar Jogador' : 'Novo Jogador'}
-              </DialogTitle>
-            </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="flex flex-col items-center gap-3">
-                <div className="relative">
-                  <Avatar className="w-24 h-24">
-                    <AvatarImage src={formData.photo_url || "/fsp.jpeg"} />
-                    <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover" /></AvatarFallback>
-                  </Avatar>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploading}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-500 hover:bg-blue-600 text-white text-xs font-medium rounded-lg transition-colors"
-                    data-testid="upload-photo-button"
-                  >
-                    <Upload className="w-3.5 h-3.5" />
-                    {uploading ? 'Enviando...' : 'Computador'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDriveModalOpen(true)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition-colors"
-                  >
-                    <Link className="w-3.5 h-3.5" />
-                    Google Drive
-                  </button>
-                </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileUpload}
-                  className="hidden"
-                />
-                {/* Modal inline para URL do Drive */}
-                {driveModalOpen && (
-                  <div className="w-full bg-slate-700/80 border border-green-500/30 rounded-lg p-3 space-y-2">
-                    <p className="text-xs text-gray-300 font-medium">Cole o link de compartilhamento do Google Drive:</p>
-                    <p className="text-xs text-gray-500">A imagem deve estar com acesso público ("Qualquer pessoa com o link").</p>
-                    <input
-                      type="url"
-                      value={driveUrl}
-                      onChange={e => setDriveUrl(e.target.value)}
-                      placeholder="https://drive.google.com/file/d/..."
-                      className="w-full bg-slate-600 border border-slate-500 text-white text-xs rounded px-2 py-1.5 placeholder-gray-400 focus:outline-none focus:border-green-400"
-                      onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), handleDriveUrl())}
-                    />
-                    <div className="flex gap-2 justify-end">
-                      <button
-                        type="button"
-                        onClick={() => { setDriveModalOpen(false); setDriveUrl(''); }}
-                        className="px-3 py-1 text-xs text-gray-400 hover:text-white transition-colors"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleDriveUrl}
-                        className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs rounded-lg transition-colors"
-                      >
-                        Usar esta foto
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div>
-                <Label className="text-gray-300">Nome do Jogador</Label>
-                <Input
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="bg-slate-700 border-slate-600 text-white"
-                  required
-                  data-testid="player-name-input"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-gray-300">Cidade</Label>
-                  <Input
-                    value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    className="bg-slate-700 border-slate-600 text-white"
-                    placeholder="Curitiba, PR"
-                    data-testid="player-city-input"
-                  />
-                </div>
-                <div>
-                  <Label className="text-gray-300">Classe Principal</Label>
-                  <Select
-                    value={formData.main_class}
-                    onValueChange={(value) => setFormData({ ...formData, main_class: value })}
-                  >
-                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="player-class-select">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {['1ª', '2ª', '3ª', '4ª', '5ª', '6ª', 'Duplas'].map(cls => (
-                        <SelectItem key={cls} value={cls}>{cls}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div>
-                <Label className="text-gray-300">Academia</Label>
-                <Input
-                  value={formData.academy}
-                  onChange={(e) => setFormData({ ...formData, academy: e.target.value })}
-                  className="bg-slate-700 border-slate-600 text-white"
-                  placeholder="Nome da academia"
-                  data-testid="player-academy-input"
-                />
-              </div>
-              <div>
-                <Label className="text-gray-300">Treinador</Label>
-                <Input
-                  value={formData.coach}
-                  onChange={(e) => setFormData({ ...formData, coach: e.target.value })}
-                  className="bg-slate-700 border-slate-600 text-white"
-                  placeholder="Nome do treinador"
-                  data-testid="player-coach-input"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label className="text-gray-300">Data de Nascimento</Label>
-                  <Input
-                    type="date"
-                    value={formData.birth_date}
-                    onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
-                    className="bg-slate-700 border-slate-600 text-white"
-                  />
-                </div>
-                <div>
-                  <Label className="text-gray-300">Situação</Label>
-                  <div
-                    onClick={() => setFormData({ ...formData, is_federated: !formData.is_federated })}
-                    className={`mt-1 flex items-center justify-between px-4 py-2.5 rounded-lg cursor-pointer border transition-all select-none ${
-                      formData.is_federated
-                        ? 'bg-green-500/20 border-green-500/60 text-green-400'
-                        : 'bg-red-500/10 border-red-500/30 text-red-400'
-                    }`}
-                  >
-                    <span className="font-semibold text-sm">
-                      {formData.is_federated ? '✅ Federado' : '❌ Não Federado'}
-                    </span>
-                    <div className={`w-10 h-5 rounded-full relative transition-colors ${formData.is_federated ? 'bg-green-500' : 'bg-slate-600'}`}>
-                      <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${formData.is_federated ? 'translate-x-5' : 'translate-x-0.5'}`} />
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {formData.is_federated ? 'Recebe pontos no ranking' : 'Não pontua no ranking'}
-                  </p>
-                </div>
-              </div>
-              <Button type="submit" className="w-full bg-blue-500 hover:bg-blue-600" data-testid="player-submit-button">
-                {editingPlayer ? 'Atualizar' : 'Criar'}
-              </Button>
-            </form>
-          </DialogContent>
-        </Dialog>
-
-        </div>
+        <Button onClick={() => setImageFormatOpen(true)} className="bg-purple-500 hover:bg-purple-600 shrink-0" data-testid="generate-image-button">
+          <Download className="w-4 h-4 sm:mr-2" />
+          <span className="hidden sm:inline">Gerar Imagem Top 10</span>
+        </Button>
       </div>
 
-      {/* Import Result */}
-      {importResult && (
-        <Card className="bg-blue-500/10 border-blue-500/50">
-          <CardContent className="pt-6">
-            <h3 className="text-white font-semibold mb-2">Resultado da Importação:</h3>
-            <p className="text-green-400">✅ {importResult.players_created} jogadores criados</p>
-            <p className="text-blue-400">🔄 {importResult.players_updated} jogadores atualizados</p>
-            {importResult.errors.length > 0 && (
-              <div className="mt-2">
-                <p className="text-red-400">❌ {importResult.errors.length} erros:</p>
-                <ul className="text-xs text-gray-400 mt-1 max-h-32 overflow-y-auto">
-                  {importResult.errors.map((error, idx) => (
-                    <li key={idx}>{error}</li>
-                  ))}
-                </ul>
+      {/* Filters */}
+      <div className="grid md:grid-cols-2 gap-4">
+        <Card className="bg-slate-800/50 border-green-500/20">
+          <CardHeader><CardTitle className="text-white">Classe</CardTitle></CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              {CLASSES.map((cls) => (
+                <button key={cls} onClick={() => setSelectedClass(cls)}
+                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${selectedClass === cls ? 'bg-green-500 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+                  data-testid={`class-filter-${cls}`}>{cls}</button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-slate-800/50 border-blue-500/20">
+          <CardHeader><CardTitle className="text-white">Categoria</CardTitle></CardHeader>
+          <CardContent>
+            {selectedClass === 'Duplas' ? (
+              <div className="flex gap-2">
+                <div className="flex-1 px-4 py-2 rounded-lg font-semibold bg-purple-500 text-white text-center">Mista</div>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                {CATEGORIES.map((cat) => (
+                  <button key={cat} onClick={() => setSelectedCategory(cat)}
+                    className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-all ${selectedCategory === cat ? 'bg-blue-500 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
+                    data-testid={`category-filter-${cat}`}>{cat}</button>
+                ))}
               </div>
             )}
           </CardContent>
         </Card>
-      )}
+      </div>
 
-      {loading ? (
-        <div className="text-center py-12 text-gray-400">Carregando...</div>
-      ) : (
-        <div className="flex gap-4">
-
-          {/* Painel lateral de filtros */}
-          <div className={`transition-all duration-200 ${filterOpen ? 'w-64 min-w-[16rem]' : 'w-0 overflow-hidden'}`}>
-            {filterOpen && (
-              <Card className="bg-slate-800/50 border-blue-500/20 sticky top-4">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-white text-sm flex items-center gap-2">
-                      <Filter className="w-4 h-4" /> Filtros
-                    </CardTitle>
-                    <button onClick={() => setFilterOpen(false)} className="text-gray-400 hover:text-white">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <Label className="text-gray-300 text-xs mb-1 block">Nome</Label>
-                    <div className="relative">
-                      <Search className="absolute left-2 top-2.5 w-3 h-3 text-gray-400" />
-                      <Input
-                        placeholder="Buscar por nome..."
-                        value={filters.name}
-                        onChange={(e) => setFilters({ ...filters, name: e.target.value })}
-                        className="bg-slate-700 border-slate-600 text-white text-sm pl-7"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-gray-300 text-xs mb-1 block">Situação</Label>
-                    <div className="flex flex-col gap-1">
-                      {[
-                        { value: '', label: 'Todos' },
-                        { value: 'true', label: '✅ Federados' },
-                        { value: 'false', label: '❌ Não Federados' }
-                      ].map(opt => (
-                        <button
-                          key={opt.value}
-                          onClick={() => setFilters({ ...filters, federated: opt.value })}
-                          className={`text-left text-sm px-3 py-1.5 rounded transition-colors ${
-                            filters.federated === opt.value
-                              ? 'bg-blue-500 text-white'
-                              : 'text-gray-300 hover:bg-slate-700'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-gray-300 text-xs mb-1 block">Cidade</Label>
-                    <Input
-                      placeholder="Filtrar por cidade..."
-                      value={filters.city}
-                      onChange={(e) => setFilters({ ...filters, city: e.target.value })}
-                      className="bg-slate-700 border-slate-600 text-white text-sm"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-gray-300 text-xs mb-1 block">Academia</Label>
-                    <Input
-                      placeholder="Filtrar por academia..."
-                      value={filters.academy}
-                      onChange={(e) => setFilters({ ...filters, academy: e.target.value })}
-                      className="bg-slate-700 border-slate-600 text-white text-sm"
-                    />
-                  </div>
-                  {(filters.name || filters.federated || filters.city || filters.academy) && (
-                    <button
-                      onClick={() => setFilters({ name: '', federated: '', city: '', academy: '' })}
-                      className="w-full text-xs text-red-400 hover:text-red-300 flex items-center justify-center gap-1 pt-1"
-                    >
-                      <X className="w-3 h-3" /> Limpar filtros
-                    </button>
-                  )}
-                </CardContent>
-              </Card>
-            )}
+      {/* Top 5 Cards */}
+      {!loading && rankings.length > 0 && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-3xl font-bold text-white"><span className="sm:hidden">Top 3</span><span className="hidden sm:inline">Top 5</span></h2>
+            <Badge className="bg-green-500 text-white px-3 py-1">{selectedClass} - {selectedClass === 'Duplas' ? 'Mista' : selectedCategory}</Badge>
           </div>
-
-          {/* Conteúdo principal */}
-          <div className="flex-1 min-w-0">
-            {/* Barra de busca rápida + botão filtros */}
-            <div className="flex gap-2 mb-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
-                <Input
-                  placeholder="Buscar jogador..."
-                  value={filters.name}
-                  onChange={(e) => setFilters({ ...filters, name: e.target.value })}
-                  className="bg-slate-800/50 border-slate-600 text-white pl-9"
-                />
-              </div>
-              <Button
-                onClick={() => setFilterOpen(!filterOpen)}
-                variant="outline"
-                className={`border-slate-600 gap-2 ${filterOpen ? 'bg-blue-500 text-white border-blue-500' : 'text-gray-300 hover:bg-slate-700'}`}
-              >
-                <Filter className="w-4 h-4" />
-                Filtros
-                {(filters.federated || filters.city || filters.academy) && (
-                  <span className="bg-blue-400 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">
-                    {[filters.federated, filters.city, filters.academy].filter(Boolean).length}
-                  </span>
-                )}
-              </Button>
-            </div>
-
-            {/* Grid de jogadores filtrado */}
-            {(() => {
-              const filtered = players.filter(p => {
-                const nameOk = !filters.name || p.name.toLowerCase().includes(filters.name.toLowerCase());
-                const federatedOk = !filters.federated || String(p.is_federated !== false) === filters.federated;
-                const cityOk = !filters.city || (p.city || '').toLowerCase().includes(filters.city.toLowerCase());
-                const academyOk = !filters.academy || (p.academy || '').toLowerCase().includes(filters.academy.toLowerCase());
-                return nameOk && federatedOk && cityOk && academyOk;
-              });
-
-              if (filtered.length === 0) {
-                return (
-                  <Card className="bg-slate-800/50 border-blue-500/20">
-                    <CardContent className="py-12">
-                      <div className="text-center text-gray-400">
-                        <Users className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                        <p>{players.length === 0 ? 'Nenhum jogador cadastrado' : 'Nenhum jogador encontrado com esses filtros'}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              }
-
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 items-end">
+            {top5.map((player, index) => {
+              const borderColors = ['border-yellow-400', 'border-gray-300', 'border-orange-400', 'border-blue-400', 'border-green-400'];
+              const badgeBg = ['bg-yellow-400 text-yellow-900', 'bg-gray-300 text-gray-900', 'bg-orange-400 text-orange-900', 'bg-blue-400 text-blue-900', 'bg-green-400 text-green-900'];
+              const heights = ['h-[280px] sm:h-[360px]', 'h-[280px] sm:h-[360px]', 'h-[280px] sm:h-[360px]', 'h-[280px] sm:h-[360px]', 'h-[280px] sm:h-[360px]'];
               return (
-                <>
-                  <p className="text-gray-400 text-sm mb-3">{filtered.length} jogador{filtered.length !== 1 ? 'es' : ''} encontrado{filtered.length !== 1 ? 's' : ''}</p>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="players-admin-grid">
-                    {filtered.map((player) => (
-                      <Card key={player.id} className="bg-slate-800/50 border-blue-500/20" data-testid={`player-admin-card-${player.id}`}>
-                        <CardContent className="pt-6">
-                          <div className="flex items-center space-x-4 mb-4">
-                            <Avatar className="w-16 h-16">
-                              <AvatarImage src={player.photo_url || "/fsp.jpeg"} />
-                              <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover" /></AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <h3 className="text-white font-semibold text-lg">{player.name}</h3>
-                              {player.birth_date && (
-                                <p className="text-gray-400 text-xs mt-0.5">
-                                  🎂 {new Date(player.birth_date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                                  {' · '}
-                                  {(() => { const t = new Date(); const b = new Date(player.birth_date + 'T00:00:00'); return t.getFullYear() - b.getFullYear() - (t < new Date(t.getFullYear(), b.getMonth(), b.getDate()) ? 1 : 0); })()} anos
-                                </p>
-                              )}
-                              <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${
-                                player.is_federated !== false
-                                  ? 'bg-green-500/20 text-green-400'
-                                  : 'bg-red-500/10 text-red-400'
-                              }`}>
-                                {player.is_federated !== false ? '✅ Federado' : '❌ Não Federado'}
-                              </span>
-                              {player.city && (
-                                <p className="text-gray-400 text-xs">📍 {player.city}</p>
-                              )}
-                              {player.academy && (
-                                <p className="text-gray-400 text-xs truncate">🏫 {player.academy}</p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => handleEdit(player)}
-                              size="sm"
-                              className="flex-1 bg-blue-500 hover:bg-blue-600"
-                              data-testid={`edit-player-${player.id}`}
-                            >
-                              <Edit className="w-3 h-3 mr-1" />
-                              Editar
-                            </Button>
-                            <Button
-                              onClick={() => handleDelete(player.id)}
-                              size="sm"
-                              className="flex-1 bg-red-500 hover:bg-red-600"
-                              data-testid={`delete-player-${player.id}`}
-                            >
-                              <Trash2 className="w-3 h-3 mr-1" />
-                              Excluir
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
+                <div key={player.player_id} onClick={() => handlePlayerClick(player.player_id)}
+                  className={`relative overflow-hidden rounded-xl cursor-pointer group border-2 ${borderColors[index]} ${heights[index]} ${index >= 3 ? "hidden sm:block" : ""}`}
+                  data-testid={`top-player-card-${index + 1}`}>
+                  {player.photo_url
+                    ? <img src={player.photo_url} alt={player.player_name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    : <img src="/fsp.jpeg" alt="FSP" className="absolute inset-0 w-full h-full object-cover" />
+                  }
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+                  <div className={`absolute top-3 left-3 z-10 w-10 h-10 rounded-full flex items-center justify-center font-black text-lg leading-none ${badgeBg[index]}`}>{index + 1}</div>
+                  <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
+                    <p className="text-white font-bold text-sm leading-tight line-clamp-2 mb-1">{player.player_name}</p>
+                    <p className="text-green-400 font-bold text-lg leading-none">{player.total_points} <span className="text-xs font-normal text-gray-300">pts</span></p>
+                    <p className="text-gray-400 text-xs mt-1">{player.results_count} torneios</p>
                   </div>
-                </>
+                  <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex flex-col items-center justify-center gap-3 p-4">
+                    {player.last_match && (
+                      <div className="text-center space-y-1">
+                        <div className="text-xs text-green-400 font-semibold uppercase tracking-wide">Última Partida</div>
+                        <div className="text-base text-white font-medium">vs {player.last_match.opponent_name}</div>
+                        <div className="text-gray-300 font-mono text-sm">{player.last_match.score_formatted}</div>
+                        <Badge className={player.last_match.result === 'Win' ? 'bg-green-500' : 'bg-red-500'}>{player.last_match.result === 'Win' ? 'Vitória' : 'Derrota'}</Badge>
+                      </div>
+                    )}
+                    <Button variant="outline" className="border-green-500 text-green-400 hover:bg-green-500 hover:text-white text-sm">Ver Perfil →</Button>
+                  </div>
+                </div>
               );
-            })()}
+            })}
           </div>
         </div>
       )}
 
-      {/* Merge Players Dialog */}
-      <Dialog open={mergeOpen} onOpenChange={setMergeOpen}>
-        <DialogContent className="bg-slate-800 border-orange-500/20 max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="text-white flex items-center gap-2">
-              <GitMerge className="w-5 h-5 text-orange-400" />
-              Mesclar Jogadores Duplicados
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-3 flex gap-2">
-              <AlertTriangle className="w-4 h-4 text-orange-400 shrink-0 mt-0.5" />
-              <p className="text-orange-300 text-xs">
-                Todos os resultados e partidas do jogador duplicado serão transferidos para o jogador correto. O duplicado será removido permanentemente.
-              </p>
-            </div>
-            <div>
-              <Label className="text-gray-300 mb-1 block">Jogador correto (manter)</Label>
-              <Select value={mergeKeep} onValueChange={setMergeKeep}>
-                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                  <SelectValue placeholder="Selecione o jogador principal..." />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-700 border-slate-600 max-h-60">
-                  {players.filter(p => p.id !== mergeRemove).map(p => (
-                    <SelectItem key={p.id} value={p.id} className="text-white hover:bg-slate-600">
-                      {p.name} {p.city ? `— ${p.city}` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-gray-300 mb-1 block">Jogador duplicado (remover)</Label>
-              <Select value={mergeRemove} onValueChange={setMergeRemove}>
-                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                  <SelectValue placeholder="Selecione o duplicado..." />
-                </SelectTrigger>
-                <SelectContent className="bg-slate-700 border-slate-600 max-h-60">
-                  {players.filter(p => p.id !== mergeKeep).map(p => (
-                    <SelectItem key={p.id} value={p.id} className="text-white hover:bg-slate-600">
-                      {p.name} {p.city ? `— ${p.city}` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {mergeKeep && mergeRemove && (
-              <div className="bg-slate-700/50 rounded-lg p-3 text-sm">
-                <p className="text-gray-400">Resultado da mesclagem:</p>
-                <p className="text-white mt-1">
-                  <span className="text-red-400 line-through">{players.find(p => p.id === mergeRemove)?.name}</span>
-                  {' → '}
-                  <span className="text-green-400">{players.find(p => p.id === mergeKeep)?.name}</span>
-                </p>
+      {/* Complete Rankings Table */}
+      <Card className="bg-slate-800/50 border-green-500/20">
+        <CardHeader>
+          <CardTitle className="text-white text-2xl flex items-center justify-between">
+            <span>Ranking Completo - {selectedClass} {selectedClass === 'Duplas' ? 'Mista' : selectedCategory}</span>
+            <span className="text-sm text-gray-400 font-normal">{rankings.length} jogadores</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {loading ? <div className="text-center py-12 text-gray-400">Carregando...</div>
+            : rankings.length === 0 ? <div className="text-center py-12 text-gray-400">Nenhum resultado encontrado</div>
+            : (
+              <div className="overflow-x-auto">
+                <table className="w-full" data-testid="rankings-table">
+                  <thead>
+                    <tr className="border-b-2 border-slate-700">
+                      <th className="text-left py-4 px-4 text-gray-400 font-semibold uppercase text-xs">Rank</th>
+                      <th className="text-left py-4 px-4 text-gray-400 font-semibold uppercase text-xs">Jogador</th>
+                      <th className="text-left py-4 px-2 text-gray-400 font-semibold uppercase text-xs hidden md:table-cell">Classe</th>
+                      <th className="text-left py-4 px-2 text-gray-400 font-semibold uppercase text-xs hidden lg:table-cell">Categoria</th>
+                      <th className="text-right py-4 px-4 text-gray-400 font-semibold uppercase text-xs">Pontos</th>
+                      <th className="text-center py-4 px-4 text-gray-400 font-semibold uppercase text-xs hidden sm:table-cell">Torneios</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rankings.map((player, index) => {
+                      const isTop3 = index < 3;
+                      const medalColors = ['text-yellow-400', 'text-gray-300', 'text-orange-400'];
+                      return (
+                        <tr key={player.player_id} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-all cursor-pointer group" data-testid={`ranking-row-${index}`}>
+                          <td className="py-3 px-2 sm:px-4">
+                            <div className="flex items-center">
+                              {isTop3 ? (<>{index === 0 && <Trophy className="w-5 h-5 text-yellow-400 mr-2" />}{index === 1 && <Medal className="w-5 h-5 text-gray-300 mr-2" />}{index === 2 && <Medal className="w-5 h-5 text-orange-400 mr-2" />}<span className={`font-black text-xl ${medalColors[index]}`}>{player.rank}</span></>) : (<span className="text-white font-bold text-lg">{player.rank}</span>)}
+                            </div>
+                          </td>
+                          <td className="py-4 px-4">
+                            <div className="flex items-center space-x-3 group-hover:text-green-400 transition-colors" onClick={() => handlePlayerClick(player.player_id)}>
+                              <Avatar className="w-12 h-12 ring-2 ring-transparent group-hover:ring-green-500 transition-all">
+                                <AvatarImage src={player.photo_url || "/fsp.jpeg"} />
+                                <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover" /></AvatarFallback>
+                              </Avatar>
+                              <span className="text-white font-semibold group-hover:underline">{player.player_name}</span>
+                            </div>
+                          </td>
+                          <td className="py-4 px-4 hidden md:table-cell"><Badge className="bg-blue-500">{selectedClass}</Badge></td>
+                          <td className="py-4 px-4 hidden lg:table-cell"><Badge className="bg-purple-500">{selectedClass === 'Duplas' ? 'Mista' : selectedCategory}</Badge></td>
+                          <td className="py-4 px-4 text-right"><span className="text-green-400 font-bold text-xl">{player.total_points}</span></td>
+                          <td className="py-4 px-4 text-center hidden sm:table-cell"><span className="text-gray-400 font-medium">{player.results_count}</span></td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
-            <div className="flex gap-2 justify-end pt-2">
-              <Button variant="outline" className="border-slate-600 text-gray-300"
-                onClick={() => { setMergeOpen(false); setMergeKeep(''); setMergeRemove(''); }}>
-                Cancelar
-              </Button>
-              <Button
-                onClick={handleMerge}
-                disabled={!mergeKeep || !mergeRemove || mergeLoading}
-                className="bg-orange-500 hover:bg-orange-600"
+        </CardContent>
+      </Card>
+
+      {/* Format Picker Dialog */}
+      <Dialog open={imageFormatOpen} onOpenChange={setImageFormatOpen}>
+        <DialogContent className="bg-slate-800 border-purple-500/20 max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-white flex items-center gap-2">
+              <Download className="w-5 h-5 text-purple-400" />
+              Escolha o formato
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 mt-2">
+            {IMAGE_FORMATS.map(fmt => (
+              <button
+                key={fmt.id}
+                onClick={() => generateTop10Image(fmt)}
+                className="w-full flex items-center justify-between bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-purple-500/50 rounded-lg px-4 py-3 transition-all group"
               >
-                <GitMerge className="w-4 h-4 mr-2" />
-                {mergeLoading ? 'Mesclando...' : 'Mesclar'}
-              </Button>
-            </div>
+                <div className="text-left">
+                  <p className="text-white font-semibold text-sm group-hover:text-purple-300">{fmt.label}</p>
+                  <p className="text-gray-400 text-xs">{fmt.desc} px</p>
+                </div>
+                <Download className="w-4 h-4 text-gray-400 group-hover:text-purple-400" />
+              </button>
+            ))}
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Excel Format Guide */}
-      <Card className="bg-slate-800/50 border-purple-500/20">
-        <CardHeader>
-          <CardTitle className="text-white text-sm">📋 Formato do Excel para Importação de Jogadores</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm text-gray-400 space-y-2">
-          <p><strong className="text-white">Sheet "Players"</strong> com colunas:</p>
-          <p className="font-mono bg-slate-900 p-2 rounded text-xs">
-            Name | City | Academy | Coach | Class
-          </p>
-          <p>Exemplo:</p>
-          <p className="font-mono bg-slate-900 p-2 rounded text-xs">
-            João Silva | Curitiba, PR | Academia XYZ | Carlos Souza | 1a
-          </p>
-          <p className="text-xs text-yellow-400">
-            ℹ️ Se o jogador já existir (mesmo nome), os dados serão atualizados.
-          </p>
-        </CardContent>
-      </Card>
-    </div>
+      {/* ── Hidden Card for Image Generation ── */}
+      <div
+        id="top10-card"
+        style={{ position: 'fixed', left: '-9999px', width: '800px', background: '#080f1e', fontFamily: 'Arial, sans-serif', overflow: 'hidden' }}
+      >
+        {/* Marca d'água */}
+        {logoBase64 && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1, pointerEvents: 'none' }}>
+            <img src={logoBase64} alt="" style={{ width: '500px', height: '500px', objectFit: 'contain', opacity: 0.05 }} />
+          </div>
+        )}
 
-      {/* ── Crop Modal via Portal — canvas com listeners nativos ── */}
-      {cropModal && ReactDOM.createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 99999, background: 'rgba(0,0,0,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
-          <div style={{ background: '#1e293b', borderRadius: '12px', padding: '20px', width: '100%', maxWidth: '340px', border: '1px solid rgba(34,197,94,0.3)' }}>
-            <h3 style={{ color: 'white', fontWeight: '700', fontSize: '15px', marginBottom: '4px' }}>Ajustar Foto</h3>
-            <p style={{ color: '#94a3b8', fontSize: '11px', marginBottom: '12px' }}>Arraste para reposicionar • Zoom para enquadrar</p>
+        <div style={{ position: 'relative', zIndex: 2 }}>
 
-            {/* Canvas — eventos registrados via useEffect, sem React handlers */}
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
-              <canvas
-                ref={cropCanvasRef}
-                width={150}
-                height={230}
-                style={{ borderRadius: '6px', cursor: 'grab', display: 'block', touchAction: 'none' }}
-              />
+          {/* Header */}
+          <div style={{ padding: '18px 24px', display: 'flex', alignItems: 'center', gap: '16px', background: 'linear-gradient(90deg, #0d1f3c 0%, #0a1628 100%)', borderBottom: '2px solid rgba(74,163,255,0.2)' }}>
+            {logoBase64
+              ? <img src={logoBase64} alt="FSP" style={{ width: '60px', height: '60px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }} />
+              : <div style={{ width: '60px', height: '60px', borderRadius: '12px', background: '#1a3a6e', flexShrink: 0 }} />
+            }
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '24px', fontWeight: '900', color: 'white', letterSpacing: '3px', lineHeight: 1 }}>RANKING FSP</div>
+              <div style={{ fontSize: '11px', color: '#7ab3f0', letterSpacing: '1px', marginTop: '4px' }}>FEDERAÇÃO DE SQUASH DO PARANÁ</div>
             </div>
-
-            {/* Zoom slider */}
-            <div style={{ marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <span style={{ color: '#94a3b8', fontSize: '11px' }}>Zoom</span>
-                <span style={{ color: '#22c55e', fontSize: '11px', fontWeight: '700' }}>{cropZoomDisplay}%</span>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '11px', color: '#7ab3f0', letterSpacing: '1px', marginBottom: '4px' }}>{selectedClass.toUpperCase()} CLASSE · {(selectedClass === 'Duplas' ? 'Mista' : selectedCategory).toUpperCase()}</div>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: 'white' }}>
+                {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}
               </div>
-              <input
-                type="range" min="10" max="300" step="1"
-                value={cropZoomDisplay}
-                onChange={(e) => handleCropZoom(parseInt(e.target.value))}
-                style={{ width: '100%', accentColor: '#22c55e' }}
-              />
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button onClick={() => { setCropModal(false); setTimeout(() => setDialogOpen(true), 100); }}
-                style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1px solid #475569', background: 'transparent', color: '#94a3b8', cursor: 'pointer', fontSize: '13px' }}>
-                Cancelar
-              </button>
-              <button onClick={uploadCroppedPhoto} disabled={uploading}
-                style={{ flex: 2, padding: '8px', borderRadius: '8px', border: 'none', background: '#22c55e', color: 'white', fontWeight: '700', cursor: uploading ? 'not-allowed' : 'pointer', fontSize: '13px' }}>
-                {uploading ? 'Enviando...' : 'Usar esta foto'}
-              </button>
             </div>
           </div>
-        </div>,
-        document.body
-      )}
-    </>
+
+          {/* Top 5 — cards grandes com foto */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', padding: '16px 16px 8px' }}>
+            {rankings.slice(0, 5).map((player, index) => {
+              const badgeStyle =
+                index === 0 ? { background: '#d4a017', color: '#3a2800' }
+                : index === 1 ? { background: '#9e9e9e', color: '#1a1a1a' }
+                : index === 2 ? { background: '#cd7f32', color: '#2a1500' }
+                : { background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.3)' };
+              const borderColor =
+                index === 0 ? '#d4a017'
+                : index === 1 ? '#9e9e9e'
+                : index === 2 ? '#cd7f32'
+                : 'rgba(255,255,255,0.1)';
+              const cardH = index === 0 ? '320px' : index <= 2 ? '300px' : '280px';
+              return (
+                <div key={player.player_id} style={{ position: 'relative', height: cardH, borderRadius: '8px', overflow: 'hidden', border: `2px solid ${borderColor}`, background: '#0d1f3c', alignSelf: 'end' }}>
+                  {player.photo_url
+                    ? <img src={player.photo_url} alt={player.player_name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                    : <img src="/fsp.jpeg" alt="FSP" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: 0.5 }} />
+                  }
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.05) 70%, transparent 100%)' }} />
+                  {/* Badge posição */}
+                  <div style={{ position: 'absolute', top: '8px', left: '8px', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '900', ...badgeStyle }}>
+                    {index + 1}
+                  </div>
+                  {/* Nome + pontos */}
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px 10px 12px' }}>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: 'white', lineHeight: '1.25', marginBottom: '4px', wordBreak: 'break-word' }}>
+                      {player.player_name}
+                    </div>
+                    <div style={{ fontSize: '13px', color: '#4fc3f7', fontWeight: '700' }}>
+                      {player.total_points} <span style={{ fontSize: '10px', color: '#90caf9', fontWeight: '400' }}>pts</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 6º ao 10º — lista simples */}
+          {rankings.length > 5 && (
+            <div style={{ margin: '0 16px 16px', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(74,163,255,0.15)', background: 'rgba(13,31,60,0.6)' }}>
+              {rankings.slice(5, 10).map((player, i) => {
+                const pos = i + 6;
+                const isLast = i === Math.min(rankings.length - 6, 4);
+                return (
+                  <div key={player.player_id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '10px 16px', borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.06)', background: i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '800', color: '#94a3b8', flexShrink: 0 }}>
+                      {pos}
+                    </div>
+                    <div style={{ flex: 1, fontSize: '14px', fontWeight: '700', color: 'white', letterSpacing: '0.3px' }}>
+                      {player.player_name}
+                    </div>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#4fc3f7' }}>
+                      {player.total_points} <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '400' }}>pts</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Footer */}
+          <div style={{ textAlign: 'center', padding: '10px 20px', fontSize: '10px', color: '#2a4a72', letterSpacing: '2px', borderTop: '1px solid rgba(74,163,255,0.12)' }}>
+            FEDERACAOSQUASHPR.COM.BR
+          </div>
+
+        </div>
+      </div>
+
+      {/* Player Details Modal */}
+      <PlayerModal playerId={selectedPlayerId} onClose={() => setSelectedPlayerId(null)} />
+    </div>
   );
 };
 
-export default AdminPlayers;
+export default Rankings;

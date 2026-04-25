@@ -23,7 +23,6 @@ const Rankings = () => {
   const [selectedCategory, setSelectedCategory] = useState('Feminina');
   const [loading, setLoading] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
-  // Logo em base64 para funcionar no html2canvas
   const [logoBase64, setLogoBase64] = useState('');
   const [imageFormatOpen, setImageFormatOpen] = useState(false);
 
@@ -32,7 +31,6 @@ const Rankings = () => {
 
     const fetchRankings = async () => {
       setLoading(true);
-      // Limpa resultados anteriores imediatamente para evitar flash do ranking errado
       setRankings([]);
       try {
         const effectiveCategory = selectedClass === 'Duplas' ? 'Mista' : selectedCategory;
@@ -50,12 +48,9 @@ const Rankings = () => {
     };
 
     fetchRankings();
-
-    // Cancela a requisição anterior se selectedClass ou selectedCategory mudar antes de terminar
     return () => controller.abort();
   }, [selectedClass, selectedCategory]);
 
-  // Converte a logo para base64 ao montar o componente
   useEffect(() => {
     const img = new Image();
     img.crossOrigin = 'anonymous';
@@ -68,8 +63,6 @@ const Rankings = () => {
     };
     img.src = '/fsp.jpeg';
   }, []);
-
-
 
   const handlePlayerClick = (playerId) => { setSelectedPlayerId(playerId); };
 
@@ -91,8 +84,7 @@ const Rankings = () => {
 
     const originalStyle = element.getAttribute('style');
 
-    // Injeta CSS global que zera TODAS as sombras durante a captura
-    // (cobre tanto estilos inline quanto classes Tailwind/CSS externo)
+    // Remove todas as sombras, filtros e border-radius das imagens durante a captura
     const noShadowStyle = document.createElement('style');
     noShadowStyle.id = 'no-shadow-capture';
     noShadowStyle.textContent = `
@@ -101,6 +93,11 @@ const Rankings = () => {
         text-shadow: none !important;
         filter: none !important;
         -webkit-filter: none !important;
+      }
+      #top10-card img {
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        filter: none !important;
       }
     `;
 
@@ -156,39 +153,52 @@ const Rankings = () => {
         </Button>
       </div>
 
-      {/* Filters */}
-      <div className="grid md:grid-cols-2 gap-4">
-        <Card className="bg-slate-800/50 border-green-500/20">
-          <CardHeader><CardTitle className="text-white">Classe</CardTitle></CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-2">
-              {CLASSES.map((cls) => (
-                <button key={cls} onClick={() => setSelectedClass(cls)}
-                  className={`px-4 py-2 rounded-lg font-semibold transition-all ${selectedClass === cls ? 'bg-green-500 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
-                  data-testid={`class-filter-${cls}`}>{cls}</button>
+      {/* ── Filtros compactos em uma linha ── */}
+      <div className="bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Classes */}
+          <div className="flex flex-wrap gap-1.5 flex-1">
+            {CLASSES.map((cls) => (
+              <button
+                key={cls}
+                onClick={() => setSelectedClass(cls)}
+                data-testid={`class-filter-${cls}`}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  selectedClass === cls
+                    ? 'bg-green-500 text-white'
+                    : 'text-slate-400 hover:text-white outline outline-1 outline-slate-700 hover:outline-slate-500'
+                }`}
+              >
+                {cls}
+              </button>
+            ))}
+          </div>
+
+          {/* Divisor vertical */}
+          <div className="w-px h-6 bg-slate-700 shrink-0 hidden sm:block" />
+
+          {/* Categoria */}
+          {selectedClass === 'Duplas' ? (
+            <div className="px-3 py-1.5 rounded-md text-xs font-semibold bg-purple-500 text-white shrink-0">Mista</div>
+          ) : (
+            <div className="flex gap-1.5 shrink-0">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={() => setSelectedCategory(cat)}
+                  data-testid={`category-filter-${cat}`}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                    selectedCategory === cat
+                      ? 'bg-blue-500 text-white'
+                      : 'text-slate-400 hover:text-white outline outline-1 outline-slate-700 hover:outline-slate-500'
+                  }`}
+                >
+                  {cat}
+                </button>
               ))}
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-slate-800/50 border-blue-500/20">
-          <CardHeader><CardTitle className="text-white">Categoria</CardTitle></CardHeader>
-          <CardContent>
-            {selectedClass === 'Duplas' ? (
-              <div className="flex gap-2">
-                <div className="flex-1 px-4 py-2 rounded-lg font-semibold bg-purple-500 text-white text-center">Mista</div>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                {CATEGORIES.map((cat) => (
-                  <button key={cat} onClick={() => setSelectedCategory(cat)}
-                    className={`flex-1 px-4 py-2 rounded-lg font-semibold transition-all ${selectedCategory === cat ? 'bg-blue-500 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'}`}
-                    data-testid={`category-filter-${cat}`}>{cat}</button>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+          )}
+        </div>
       </div>
 
       {/* Top 5 Cards */}
@@ -205,7 +215,7 @@ const Rankings = () => {
               const heights = ['h-[280px] sm:h-[360px]', 'h-[280px] sm:h-[360px]', 'h-[280px] sm:h-[360px]', 'h-[280px] sm:h-[360px]', 'h-[280px] sm:h-[360px]'];
               return (
                 <div key={player.player_id} onClick={() => handlePlayerClick(player.player_id)}
-                  className={`relative overflow-hidden rounded-xl cursor-pointer group border-2 ${borderColors[index]} ${heights[index]} ${index >= 3 ? "hidden sm:block" : ""}`}
+                  className={`relative overflow-hidden rounded-xl cursor-pointer group border-2 ${borderColors[index]} ${heights[index]} ${index >= 3 ? "hidden sm:block" : ""} transition-transform duration-200 hover:-translate-y-1`}
                   data-testid={`top-player-card-${index + 1}`}>
                   {player.photo_url
                     ? <img src={player.photo_url} alt={player.player_name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
@@ -236,7 +246,7 @@ const Rankings = () => {
         </div>
       )}
 
-      {/* Complete Rankings Table */}
+      {/* Ranking Completo */}
       <Card className="bg-slate-800/50 border-green-500/20">
         <CardHeader>
           <CardTitle className="text-white text-2xl flex items-center justify-between">
@@ -256,6 +266,8 @@ const Rankings = () => {
                       <th className="text-left py-4 px-4 text-gray-400 font-semibold uppercase text-xs">Jogador</th>
                       <th className="text-left py-4 px-2 text-gray-400 font-semibold uppercase text-xs hidden md:table-cell">Classe</th>
                       <th className="text-left py-4 px-2 text-gray-400 font-semibold uppercase text-xs hidden lg:table-cell">Categoria</th>
+                      <th className="text-center py-4 px-3 text-gray-400 font-semibold uppercase text-xs hidden sm:table-cell">Tend.</th>
+                      <th className="text-center py-4 px-3 text-gray-400 font-semibold uppercase text-xs hidden md:table-cell">% Vitórias</th>
                       <th className="text-right py-4 px-4 text-gray-400 font-semibold uppercase text-xs">Pontos</th>
                       <th className="text-center py-4 px-4 text-gray-400 font-semibold uppercase text-xs hidden sm:table-cell">Torneios</th>
                     </tr>
@@ -268,7 +280,16 @@ const Rankings = () => {
                         <tr key={player.player_id} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-all cursor-pointer group" data-testid={`ranking-row-${index}`}>
                           <td className="py-3 px-2 sm:px-4">
                             <div className="flex items-center">
-                              {isTop3 ? (<>{index === 0 && <Trophy className="w-5 h-5 text-yellow-400 mr-2" />}{index === 1 && <Medal className="w-5 h-5 text-gray-300 mr-2" />}{index === 2 && <Medal className="w-5 h-5 text-orange-400 mr-2" />}<span className={`font-black text-xl ${medalColors[index]}`}>{player.rank}</span></>) : (<span className="text-white font-bold text-lg">{player.rank}</span>)}
+                              {isTop3 ? (
+                                <>
+                                  {index === 0 && <Trophy className="w-5 h-5 text-yellow-400 mr-2" />}
+                                  {index === 1 && <Medal className="w-5 h-5 text-gray-300 mr-2" />}
+                                  {index === 2 && <Medal className="w-5 h-5 text-orange-400 mr-2" />}
+                                  <span className={`font-black text-xl ${medalColors[index]}`}>{player.rank}</span>
+                                </>
+                              ) : (
+                                <span className="text-white font-bold text-lg">{player.rank}</span>
+                              )}
                             </div>
                           </td>
                           <td className="py-4 px-4">
@@ -282,6 +303,35 @@ const Rankings = () => {
                           </td>
                           <td className="py-4 px-4 hidden md:table-cell"><Badge className="bg-blue-500">{selectedClass}</Badge></td>
                           <td className="py-4 px-4 hidden lg:table-cell"><Badge className="bg-purple-500">{selectedClass === 'Duplas' ? 'Mista' : selectedCategory}</Badge></td>
+
+                          {/* Tendência */}
+                          <td className="py-4 px-3 text-center hidden sm:table-cell">
+                            {player.position_change > 0 && (
+                              <span className="text-green-400 text-xs font-bold">▲{player.position_change}</span>
+                            )}
+                            {player.position_change < 0 && (
+                              <span className="text-red-400 text-xs font-bold">▼{Math.abs(player.position_change)}</span>
+                            )}
+                            {(!player.position_change || player.position_change === 0) && (
+                              <span className="text-slate-600 text-xs">—</span>
+                            )}
+                          </td>
+
+                          {/* % Vitórias */}
+                          <td className="py-4 px-3 text-center hidden md:table-cell">
+                            {player.win_rate != null ? (
+                              <span className={`text-sm font-bold ${
+                                player.win_rate >= 70 ? 'text-green-400'
+                                : player.win_rate >= 50 ? 'text-gray-300'
+                                : 'text-slate-500'
+                              }`}>
+                                {player.win_rate}%
+                              </span>
+                            ) : (
+                              <span className="text-slate-600 text-xs">—</span>
+                            )}
+                          </td>
+
                           <td className="py-4 px-4 text-right"><span className="text-green-400 font-bold text-xl">{player.total_points}</span></td>
                           <td className="py-4 px-4 text-center hidden sm:table-cell"><span className="text-gray-400 font-medium">{player.results_count}</span></td>
                         </tr>
@@ -321,21 +371,17 @@ const Rankings = () => {
         </DialogContent>
       </Dialog>
 
-      {/* ── Hidden Card for Image Generation ── */}
+      {/* Hidden Card para geração de imagem — inalterado */}
       <div
         id="top10-card"
         style={{ position: 'fixed', left: '-9999px', width: '800px', background: '#080f1e', fontFamily: 'Arial, sans-serif', overflow: 'hidden' }}
       >
-        {/* Marca d'água */}
         {logoBase64 && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1, pointerEvents: 'none' }}>
             <img src={logoBase64} alt="" style={{ width: '500px', height: '500px', objectFit: 'contain', opacity: 0.05 }} />
           </div>
         )}
-
         <div style={{ position: 'relative', zIndex: 2 }}>
-
-          {/* Header */}
           <div style={{ padding: '18px 24px', display: 'flex', alignItems: 'center', gap: '16px', background: 'linear-gradient(90deg, #0d1f3c 0%, #0a1628 100%)', borderBottom: '2px solid rgba(74,163,255,0.2)' }}>
             {logoBase64
               ? <img src={logoBase64} alt="FSP" style={{ width: '60px', height: '60px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }} />
@@ -352,8 +398,6 @@ const Rankings = () => {
               </div>
             </div>
           </div>
-
-          {/* Top 5 — cards grandes com foto */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', padding: '16px 16px 8px' }}>
             {rankings.slice(0, 5).map((player, index) => {
               const badgeStyle =
@@ -374,11 +418,9 @@ const Rankings = () => {
                     : <img src="/fsp.jpeg" alt="FSP" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: 0.5 }} />
                   }
                   <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.05) 70%, transparent 100%)' }} />
-                  {/* Badge posição */}
                   <div style={{ position: 'absolute', top: '8px', left: '8px', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '900', ...badgeStyle }}>
                     {index + 1}
                   </div>
-                  {/* Nome + pontos */}
                   <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px 10px 12px' }}>
                     <div style={{ fontSize: '13px', fontWeight: '800', color: 'white', lineHeight: '1.25', marginBottom: '4px', wordBreak: 'break-word' }}>
                       {player.player_name}
@@ -391,8 +433,6 @@ const Rankings = () => {
               );
             })}
           </div>
-
-          {/* 6º ao 10º — lista simples */}
           {rankings.length > 5 && (
             <div style={{ margin: '0 16px 16px', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(74,163,255,0.15)', background: 'rgba(13,31,60,0.6)' }}>
               {rankings.slice(5, 10).map((player, i) => {
@@ -414,16 +454,12 @@ const Rankings = () => {
               })}
             </div>
           )}
-
-          {/* Footer */}
           <div style={{ textAlign: 'center', padding: '10px 20px', fontSize: '10px', color: '#2a4a72', letterSpacing: '2px', borderTop: '1px solid rgba(74,163,255,0.12)' }}>
             FEDERACAOSQUASHPR.COM.BR
           </div>
-
         </div>
       </div>
 
-      {/* Player Details Modal */}
       <PlayerModal playerId={selectedPlayerId} onClose={() => setSelectedPlayerId(null)} />
     </div>
   );

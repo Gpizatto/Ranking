@@ -144,7 +144,7 @@ SUBSCRIPTION_PLANS = {
     },
     "anual": {
         "name": "Plano Anual",
-        "price": 999.00,  # R$ 999,00/ano (economiza ~17%)
+        "price": 600.00,  
         "currency": "brl",
         "duration_days": 365
     }

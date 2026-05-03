@@ -10,7 +10,7 @@ import axios, { API } from '../lib/api';
 // Substitua pela sua chave Pix e QR code
 const PIX_KEY = '41992512250';
 const PIX_NAME = 'Gustavo Pizatto';
-const PIX_VALUE = 'R$ 79,90/mês ou 600,00/anual';
+const PIX_VALUE = 'R$ 99,90/mês ou 600,00/anual';
 
 const Pending = () => {
   const navigate = useNavigate();

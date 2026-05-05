@@ -220,15 +220,13 @@ const Rankings = () => {
                     ? <img src={player.photo_url} alt={player.player_name} className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105" />
                     : <img src="/fsp.jpeg" alt="FSP" className="absolute inset-0 w-full h-full object-cover object-top" />
                   }
-                  {/* Gradiente suave apenas na parte inferior para legibilidade do texto */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
                   {/* Badge de posição */}
                   <div className={`absolute top-3 left-3 z-10 w-10 h-10 rounded-full flex items-center justify-center font-black text-lg leading-none ${badgeBg[index]} shadow-lg`}>{index + 1}</div>
-                  {/* Info na parte inferior */}
-                  <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
-                    <p className="text-white font-bold text-sm leading-tight line-clamp-2 mb-1 drop-shadow-md">{player.player_name}</p>
-                    <p className="text-green-400 font-bold text-lg leading-none drop-shadow-md">{player.total_points} <span className="text-xs font-normal text-gray-300">pts</span></p>
-                    <p className="text-gray-300 text-xs mt-1">{player.results_count} torneios</p>
+                  {/* Info na parte inferior — fundo sólido semi-transparente para legibilidade */}
+                  <div className="absolute bottom-0 left-0 right-0 z-10 bg-black/60 backdrop-blur-sm px-3 py-2.5">
+                    <p className="text-white font-bold text-sm leading-tight line-clamp-2 mb-0.5">{player.player_name}</p>
+                    <p className="text-green-400 font-bold text-base leading-none">{player.total_points} <span className="text-xs font-normal text-gray-300">pts</span></p>
+                    <p className="text-gray-300 text-xs mt-0.5">{player.results_count} torneios</p>
                   </div>
                   {/* Hover overlay com info adicional */}
                   <div className="absolute inset-0 bg-black/85 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex flex-col items-center justify-center gap-3 p-4">
@@ -420,12 +418,11 @@ const Rankings = () => {
                     ? <img src={player.photo_url} alt={player.player_name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
                     : <img src="/fsp.jpeg" alt="FSP" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block', opacity: 0.5 }} />
                   }
-                  {/* Gradiente suave só embaixo para legibilidade do nome */}
-                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 35%, transparent 60%)' }} />
+
                   <div style={{ position: 'absolute', top: '8px', left: '8px', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '900', ...badgeStyle }}>
                     {index + 1}
                   </div>
-                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '10px 10px 12px' }}>
+                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px 10px 10px', background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}>
                     <div style={{ fontSize: '13px', fontWeight: '800', color: 'white', lineHeight: '1.25', marginBottom: '4px', wordBreak: 'break-word' }}>
                       {player.player_name}
                     </div>

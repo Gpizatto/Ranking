@@ -74,9 +74,10 @@ const PlayerModal = ({ playerId, player, onClose }) => {
           <>
             <DialogHeader>
               <div className="flex items-center space-x-4">
+                {/* FIX: object-top para mostrar rosto */}
                 <Avatar className="w-16 h-16 sm:w-20 sm:h-20">
-                  <AvatarImage src={selectedPlayer.photo_url || "/fsp.jpeg"} />
-                  <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover rounded-full" /></AvatarFallback>
+                  <AvatarImage src={selectedPlayer.photo_url || "/fsp.jpeg"} className="object-cover object-top" />
+                  <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover object-top rounded-full" /></AvatarFallback>
                 </Avatar>
                 <div>
                   <DialogTitle className="text-white text-xl sm:text-2xl">{selectedPlayer.name}</DialogTitle>

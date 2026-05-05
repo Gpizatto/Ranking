@@ -84,7 +84,6 @@ const Rankings = () => {
 
     const originalStyle = element.getAttribute('style');
 
-    // Remove todas as sombras, filtros e border-radius das imagens durante a captura
     const noShadowStyle = document.createElement('style');
     noShadowStyle.id = 'no-shadow-capture';
     noShadowStyle.textContent = `
@@ -201,7 +200,7 @@ const Rankings = () => {
         </div>
       </div>
 
-      {/* Top 5 Cards */}
+      {/* Top 5 Cards — SEM overlay escuro nas fotos */}
       {!loading && rankings.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -212,23 +211,27 @@ const Rankings = () => {
             {top5.map((player, index) => {
               const borderColors = ['border-yellow-400', 'border-gray-300', 'border-orange-400', 'border-blue-400', 'border-green-400'];
               const badgeBg = ['bg-yellow-400 text-yellow-900', 'bg-gray-300 text-gray-900', 'bg-orange-400 text-orange-900', 'bg-blue-400 text-blue-900', 'bg-green-400 text-green-900'];
-              const heights = ['h-[280px] sm:h-[360px]', 'h-[280px] sm:h-[360px]', 'h-[280px] sm:h-[360px]', 'h-[280px] sm:h-[360px]', 'h-[280px] sm:h-[360px]'];
               return (
                 <div key={player.player_id} onClick={() => handlePlayerClick(player.player_id)}
-                  className={`relative overflow-hidden rounded-xl cursor-pointer group border-2 ${borderColors[index]} ${heights[index]} ${index >= 3 ? "hidden sm:block" : ""} transition-transform duration-200 hover:-translate-y-1`}
+                  className={`relative overflow-hidden rounded-xl cursor-pointer group border-2 ${borderColors[index]} h-[280px] sm:h-[360px] ${index >= 3 ? "hidden sm:block" : ""} transition-transform duration-200 hover:-translate-y-1`}
                   data-testid={`top-player-card-${index + 1}`}>
+                  {/* Foto sem overlay escuro */}
                   {player.photo_url
-                    ? <img src={player.photo_url} alt={player.player_name} className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                    : <img src="/fsp.jpeg" alt="FSP" className="absolute inset-0 w-full h-full object-cover" />
+                    ? <img src={player.photo_url} alt={player.player_name} className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105" />
+                    : <img src="/fsp.jpeg" alt="FSP" className="absolute inset-0 w-full h-full object-cover object-top" />
                   }
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-                  <div className={`absolute top-3 left-3 z-10 w-10 h-10 rounded-full flex items-center justify-center font-black text-lg leading-none ${badgeBg[index]}`}>{index + 1}</div>
+                  {/* Gradiente suave apenas na parte inferior para legibilidade do texto */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent" />
+                  {/* Badge de posição */}
+                  <div className={`absolute top-3 left-3 z-10 w-10 h-10 rounded-full flex items-center justify-center font-black text-lg leading-none ${badgeBg[index]} shadow-lg`}>{index + 1}</div>
+                  {/* Info na parte inferior */}
                   <div className="absolute bottom-0 left-0 right-0 p-4 z-10">
-                    <p className="text-white font-bold text-sm leading-tight line-clamp-2 mb-1">{player.player_name}</p>
-                    <p className="text-green-400 font-bold text-lg leading-none">{player.total_points} <span className="text-xs font-normal text-gray-300">pts</span></p>
-                    <p className="text-gray-400 text-xs mt-1">{player.results_count} torneios</p>
+                    <p className="text-white font-bold text-sm leading-tight line-clamp-2 mb-1 drop-shadow-md">{player.player_name}</p>
+                    <p className="text-green-400 font-bold text-lg leading-none drop-shadow-md">{player.total_points} <span className="text-xs font-normal text-gray-300">pts</span></p>
+                    <p className="text-gray-300 text-xs mt-1">{player.results_count} torneios</p>
                   </div>
-                  <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex flex-col items-center justify-center gap-3 p-4">
+                  {/* Hover overlay com info adicional */}
+                  <div className="absolute inset-0 bg-black/85 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex flex-col items-center justify-center gap-3 p-4">
                     {player.last_match && (
                       <div className="text-center space-y-1">
                         <div className="text-xs text-green-400 font-semibold uppercase tracking-wide">Última Partida</div>
@@ -371,7 +374,7 @@ const Rankings = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Hidden Card para geração de imagem — inalterado */}
+      {/* Hidden Card para geração de imagem */}
       <div
         id="top10-card"
         style={{ position: 'fixed', left: '-9999px', width: '800px', background: '#080f1e', fontFamily: 'Arial, sans-serif', overflow: 'hidden' }}
@@ -414,10 +417,11 @@ const Rankings = () => {
               return (
                 <div key={player.player_id} style={{ position: 'relative', height: cardH, borderRadius: '8px', overflow: 'hidden', border: `2px solid ${borderColor}`, background: '#0d1f3c', alignSelf: 'end' }}>
                   {player.photo_url
-                    ? <img src={player.photo_url} alt={player.player_name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                    : <img src="/fsp.jpeg" alt="FSP" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', display: 'block', opacity: 0.5 }} />
+                    ? <img src={player.photo_url} alt={player.player_name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
+                    : <img src="/fsp.jpeg" alt="FSP" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block', opacity: 0.5 }} />
                   }
-                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.95) 0%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.05) 70%, transparent 100%)' }} />
+                  {/* Gradiente suave só embaixo para legibilidade do nome */}
+                  <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top, rgba(0,0,0,0.85) 0%, rgba(0,0,0,0.2) 35%, transparent 60%)' }} />
                   <div style={{ position: 'absolute', top: '8px', left: '8px', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '900', ...badgeStyle }}>
                     {index + 1}
                   </div>

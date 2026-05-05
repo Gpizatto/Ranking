@@ -172,6 +172,7 @@ const AdminPlayers = () => {
     drawCropCanvas();
   }, [drawCropCanvas]);
 
+  // FIX: Usar PNG lossless em vez de JPEG comprimido para preservar qualidade original
   const uploadCroppedPhoto = useCallback(async () => {
     const canvas = document.createElement('canvas');
     canvas.width = CROP_W; canvas.height = CROP_H;
@@ -185,13 +186,15 @@ const AdminPlayers = () => {
       setTimeout(() => setDialogOpen(true), 100);
       try {
         const formDataUpload = new FormData();
-        formDataUpload.append('file', blob, 'photo.jpg');
+        // PNG preserva qualidade sem compressão com perdas
+        formDataUpload.append('file', blob, 'photo.png');
         const response = await axios.post(`${API}/players/upload-photo`, formDataUpload, { headers: { 'Content-Type': 'multipart/form-data' } });
         setFormData(prev => ({ ...prev, photo_url: response.data.photo_url }));
         toast.success('Foto carregada com sucesso!');
       } catch { toast.error('Erro ao fazer upload da foto'); }
       finally { setUploading(false); }
-    }, 'image/jpeg', 0.92);
+    // PNG lossless — sem parâmetro de qualidade (ignorado para PNG)
+    }, 'image/png');
   }, []);
 
   const handleSubmit = async (e) => {
@@ -320,14 +323,10 @@ const AdminPlayers = () => {
   const handleDriveUrl = () => {
     if (!driveUrl.trim()) return;
 
-    // Aceita vários formatos de URL do Google Drive e converte para URL direta
     let fileId = null;
 
-    // Formato: /file/d/{id}/view ou /file/d/{id}/edit
     const matchFile = driveUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-    // Formato: id={id} (links de compartilhamento antigos)
     const matchId = driveUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    // Formato: /open?id={id}
     const matchOpen = driveUrl.match(/\/open\?id=([a-zA-Z0-9_-]+)/);
 
     if (matchFile) fileId = matchFile[1];
@@ -413,9 +412,10 @@ const AdminPlayers = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="flex flex-col items-center gap-3">
                 <div className="relative">
+                  {/* FIX: object-top para mostrar rosto e não o corpo */}
                   <Avatar className="w-24 h-24">
-                    <AvatarImage src={formData.photo_url || "/fsp.jpeg"} />
-                    <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover" /></AvatarFallback>
+                    <AvatarImage src={formData.photo_url || "/fsp.jpeg"} className="object-cover object-top" />
+                    <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover object-top" /></AvatarFallback>
                   </Avatar>
                 </div>
                 <div className="flex gap-2">
@@ -742,9 +742,10 @@ const AdminPlayers = () => {
                       <Card key={player.id} className="bg-slate-800/50 border-blue-500/20" data-testid={`player-admin-card-${player.id}`}>
                         <CardContent className="pt-6">
                           <div className="flex items-center space-x-4 mb-4">
+                            {/* FIX: object-top para mostrar rosto */}
                             <Avatar className="w-16 h-16">
-                              <AvatarImage src={player.photo_url || "/fsp.jpeg"} />
-                              <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover" /></AvatarFallback>
+                              <AvatarImage src={player.photo_url || "/fsp.jpeg"} className="object-cover object-top" />
+                              <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover object-top" /></AvatarFallback>
                             </Avatar>
                             <div className="flex-1">
                               <h3 className="text-white font-semibold text-lg">{player.name}</h3>

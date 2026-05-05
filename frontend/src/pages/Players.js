@@ -20,9 +20,10 @@ const PlayerCard = React.memo(({ player, onClick }) => {
     >
       <CardContent className="pt-6">
         <div className="flex items-center space-x-4 mb-3">
+          {/* FIX: object-top para mostrar rosto e não o corpo */}
           <Avatar className="w-16 h-16">
-            <AvatarImage src={player.photo_url || "/fsp.jpeg"} loading="lazy" />
-            <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover" /></AvatarFallback>
+            <AvatarImage src={player.photo_url || "/fsp.jpeg"} loading="lazy" className="object-cover object-top" />
+            <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover object-top" /></AvatarFallback>
           </Avatar>
 
           <div className="flex-1">

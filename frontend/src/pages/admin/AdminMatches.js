@@ -15,7 +15,6 @@ import { ptBR } from 'date-fns/locale';
 
 const sortAlpha = arr => [...arr].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
-
 const ROUNDS = ['Final', 'Semi Final', 'Quarter Final', 'Round of 16', 'Round of 32', 'Group Stage'];
 
 const AdminMatches = () => {
@@ -28,6 +27,7 @@ const AdminMatches = () => {
   const [formData, setFormData] = useState({
     tournament_id: '',
     category: '1ª',
+    gender_category: 'Masculina',   // ← NOVO campo adicionado
     player1_id: '',
     player2_id: '',
     winner_id: '',
@@ -58,7 +58,6 @@ const AdminMatches = () => {
         axios.get(`${API}/players`),
         axios.get(`${API}/tournaments`)
       ]);
-      
       setMatches(matchesRes.data);
       setPlayers(sortAlpha(playersRes.data));
       setTournaments(tournamentsRes.data);
@@ -71,22 +70,21 @@ const AdminMatches = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
-    // Filter out empty score entries
     const scoreFiltered = isWO ? ['W.O.'] : formData.score.filter(s => s.trim() !== '');
-    
     if (!isWO && scoreFiltered.length === 0) {
       toast.error('Adicione pelo menos um placar ou marque como W.O.');
       return;
     }
+    // gender_category automaticamente "Mista" quando category = "Duplas"
+    const gender_category = formData.category === 'Duplas' ? 'Mista' : formData.gender_category;
 
     try {
       await axios.post(`${API}/matches`, {
         ...formData,
+        gender_category,
         score: scoreFiltered,
         date: new Date(formData.date).toISOString()
       });
-      
       toast.success('Partida registrada com sucesso!');
       setDialogOpen(false);
       resetForm();
@@ -98,7 +96,6 @@ const AdminMatches = () => {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Tem certeza que deseja excluir esta partida?')) return;
-
     try {
       await axios.delete(`${API}/matches/${id}`);
       toast.success('Partida excluída com sucesso!');
@@ -109,14 +106,8 @@ const AdminMatches = () => {
   };
 
   const handleImportExcel = async () => {
-    if (!importTournamentId) {
-      toast.error('Selecione um torneio');
-      return;
-    }
-    if (!importMatchFile) {
-      toast.error('Selecione um arquivo Excel');
-      return;
-    }
+    if (!importTournamentId) { toast.error('Selecione um torneio'); return; }
+    if (!importMatchFile) { toast.error('Selecione um arquivo Excel'); return; }
 
     setImportMatchLoading(true);
     const formDataUpload = new FormData();
@@ -128,20 +119,16 @@ const AdminMatches = () => {
         formDataUpload,
         { headers: { 'Content-Type': 'multipart/form-data' } }
       );
-
       setImportResult(response.data);
-
       if (response.data.matches_created > 0 || response.data.matches_skipped >= 0) {
         const msg = `${response.data.matches_created} partidas importadas` +
           (response.data.matches_skipped > 0 ? `, ${response.data.matches_skipped} ignoradas (duplicadas)` : '');
         toast.success(msg);
         fetchData();
       }
-
       if (response.data.errors && response.data.errors.length > 0) {
         toast.error(`${response.data.errors.length} erros encontrados`);
       }
-
       setImportDialogMatchesOpen(false);
       setImportTournamentId('');
       setImportMatchFile(null);
@@ -157,6 +144,7 @@ const AdminMatches = () => {
     setFormData({
       tournament_id: '',
       category: '1ª',
+      gender_category: 'Masculina',
       player1_id: '',
       player2_id: '',
       winner_id: '',
@@ -166,15 +154,8 @@ const AdminMatches = () => {
     });
   };
 
-  const addScoreSet = () => {
-    setFormData({ ...formData, score: [...formData.score, ''] });
-  };
-
-  const removeScoreSet = (index) => {
-    const newScore = formData.score.filter((_, i) => i !== index);
-    setFormData({ ...formData, score: newScore });
-  };
-
+  const addScoreSet = () => setFormData({ ...formData, score: [...formData.score, ''] });
+  const removeScoreSet = (index) => setFormData({ ...formData, score: formData.score.filter((_, i) => i !== index) });
   const updateScore = (index, value) => {
     const newScore = [...formData.score];
     newScore[index] = value;
@@ -183,10 +164,7 @@ const AdminMatches = () => {
 
   const handleDownloadTemplate = async () => {
     try {
-      const response = await axios.get(`${API}/matches/template`, {
-        responseType: 'blob'
-      });
-      
+      const response = await axios.get(`${API}/matches/template`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
@@ -195,7 +173,6 @@ const AdminMatches = () => {
       link.click();
       link.remove();
       window.URL.revokeObjectURL(url);
-      
       toast.success('Modelo baixado com sucesso!');
     } catch (error) {
       toast.error('Erro ao baixar modelo');
@@ -216,6 +193,14 @@ const AdminMatches = () => {
   const uniqueCategories = [...new Set(matches.map(m => m.category))].sort();
   const uniqueRounds = [...new Set(matches.map(m => m.round))].filter(Boolean);
 
+  // Categorias de gênero disponíveis — se Duplas, só Mista
+  const genderOptions = formData.category === 'Duplas'
+    ? [{ value: 'Mista', label: 'Mista' }]
+    : [
+        { value: 'Masculina', label: 'Masculina' },
+        { value: 'Feminina', label: 'Feminina' },
+      ];
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -224,18 +209,11 @@ const AdminMatches = () => {
           <p className="text-gray-400 text-sm">Registre partidas e histórico de jogos</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button
-            onClick={handleDownloadTemplate}
-            className="bg-blue-500 hover:bg-blue-600"
-          >
+          <Button onClick={handleDownloadTemplate} className="bg-blue-500 hover:bg-blue-600">
             <FileText className="w-4 h-4 mr-2" />
             Baixar Modelo
           </Button>
-          <Button
-            onClick={() => setImportDialogMatchesOpen(true)}
-            className="bg-purple-500 hover:bg-purple-600"
-            data-testid="import-matches-button"
-          >
+          <Button onClick={() => setImportDialogMatchesOpen(true)} className="bg-purple-500 hover:bg-purple-600" data-testid="import-matches-button">
             <FileSpreadsheet className="w-4 h-4 mr-2" />
             Importar Excel
           </Button>
@@ -246,7 +224,7 @@ const AdminMatches = () => {
             onChange={(e) => setImportMatchFile(e.target.files?.[0] || null)}
             className="hidden"
           />
-          
+
           {/* Dialog de Importar Partidas */}
           <Dialog open={importDialogMatchesOpen} onOpenChange={setImportDialogMatchesOpen}>
             <DialogContent className="bg-slate-800 border-purple-500/20 max-w-md">
@@ -256,7 +234,6 @@ const AdminMatches = () => {
               <div className="space-y-4">
                 <p className="text-gray-400 text-sm">
                   Selecione o torneio e o arquivo Excel exportado do Tournament Planner.
-                  O arquivo pode ter múltiplas abas (uma por dia).
                 </p>
                 <div>
                   <Label className="text-gray-300">Torneio *</Label>
@@ -276,12 +253,7 @@ const AdminMatches = () => {
                 <div>
                   <Label className="text-gray-300">Arquivo Excel *</Label>
                   <div className="mt-1 flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="border-slate-600 text-gray-300 hover:bg-slate-700"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
+                    <Button type="button" variant="outline" className="border-slate-600 text-gray-300 hover:bg-slate-700" onClick={() => fileInputRef.current?.click()}>
                       <Upload className="w-4 h-4 mr-2" />
                       Escolher arquivo
                     </Button>
@@ -291,18 +263,11 @@ const AdminMatches = () => {
                   </div>
                 </div>
                 <div className="flex gap-2 justify-end">
-                  <Button
-                    variant="outline"
-                    className="border-slate-600 text-gray-300"
-                    onClick={() => { setImportDialogMatchesOpen(false); setImportTournamentId(''); setImportMatchFile(null); }}
-                  >
+                  <Button variant="outline" className="border-slate-600 text-gray-300"
+                    onClick={() => { setImportDialogMatchesOpen(false); setImportTournamentId(''); setImportMatchFile(null); }}>
                     Cancelar
                   </Button>
-                  <Button
-                    className="bg-purple-500 hover:bg-purple-600"
-                    onClick={handleImportExcel}
-                    disabled={importMatchLoading}
-                  >
+                  <Button className="bg-purple-500 hover:bg-purple-600" onClick={handleImportExcel} disabled={importMatchLoading}>
                     {importMatchLoading ? 'Importando...' : 'Importar'}
                   </Button>
                 </div>
@@ -310,10 +275,8 @@ const AdminMatches = () => {
             </DialogContent>
           </Dialog>
 
-          <Dialog open={dialogOpen} onOpenChange={(open) => {
-            setDialogOpen(open);
-            if (!open) resetForm();
-          }}>
+          {/* Dialog Nova Partida */}
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm(); }}>
             <DialogTrigger asChild>
               <Button className="bg-green-500 hover:bg-green-600" data-testid="add-match-button">
                 <Plus className="w-4 h-4 mr-2" />
@@ -325,32 +288,34 @@ const AdminMatches = () => {
                 <DialogTitle className="text-white">Registrar Nova Partida</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
+
+                {/* Torneio */}
+                <div>
+                  <Label className="text-gray-300">Torneio</Label>
+                  <Select value={formData.tournament_id} onValueChange={(value) => setFormData({ ...formData, tournament_id: value })} required>
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="tournament-select">
+                      <SelectValue placeholder="Selecione o torneio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tournaments.map(tournament => (
+                        <SelectItem key={tournament.id} value={tournament.id}>{tournament.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Classe + Categoria de gênero — na mesma linha */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label className="text-gray-300">Torneio</Label>
-                    <Select
-                      value={formData.tournament_id}
-                      onValueChange={(value) => setFormData({ ...formData, tournament_id: value })}
-                      required
-                    >
-                      <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="tournament-select">
-                        <SelectValue placeholder="Selecione o torneio" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {tournaments.map(tournament => (
-                          <SelectItem key={tournament.id} value={tournament.id}>
-                            {tournament.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label className="text-gray-300">Categoria</Label>
+                    <Label className="text-gray-300">Classe</Label>
                     <Select
                       value={formData.category}
-                      onValueChange={(value) => setFormData({ ...formData, category: value })}
+                      onValueChange={(value) => setFormData({
+                        ...formData,
+                        category: value,
+                        // Se Duplas, forçar Mista; senão manter a seleção atual ou voltar para Masculina
+                        gender_category: value === 'Duplas' ? 'Mista' : (formData.gender_category === 'Mista' ? 'Masculina' : formData.gender_category)
+                      })}
                       required
                     >
                       <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="category-select">
@@ -367,50 +332,58 @@ const AdminMatches = () => {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* ← CAMPO NOVO: Masculina / Feminina / Mista */}
+                  <div>
+                    <Label className="text-gray-300">Categoria</Label>
+                    <Select
+                      value={formData.category === 'Duplas' ? 'Mista' : formData.gender_category}
+                      onValueChange={(value) => setFormData({ ...formData, gender_category: value })}
+                      disabled={formData.category === 'Duplas'}
+                    >
+                      <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="gender-category-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {genderOptions.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
+                {/* Jogadores */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-gray-300">Jogador 1</Label>
-                    <Select
-                      value={formData.player1_id}
-                      onValueChange={(value) => setFormData({ ...formData, player1_id: value })}
-                      required
-                    >
+                    <Select value={formData.player1_id} onValueChange={(value) => setFormData({ ...formData, player1_id: value })} required>
                       <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="player1-select">
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent>
                         {players.map(player => (
-                          <SelectItem key={player.id} value={player.id}>
-                            {player.name}
-                          </SelectItem>
+                          <SelectItem key={player.id} value={player.id}>{player.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-
                   <div>
                     <Label className="text-gray-300">Jogador 2</Label>
-                    <Select
-                      value={formData.player2_id}
-                      onValueChange={(value) => setFormData({ ...formData, player2_id: value })}
-                      required
-                    >
+                    <Select value={formData.player2_id} onValueChange={(value) => setFormData({ ...formData, player2_id: value })} required>
                       <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="player2-select">
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
                       <SelectContent>
                         {players.map(player => (
-                          <SelectItem key={player.id} value={player.id}>
-                            {player.name}
-                          </SelectItem>
+                          <SelectItem key={player.id} value={player.id}>{player.name}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
 
+                {/* W.O. toggle */}
                 <div className="flex items-center gap-3 p-3 bg-slate-700/50 rounded-lg">
                   <input
                     type="checkbox"
@@ -428,12 +401,11 @@ const AdminMatches = () => {
                   </label>
                 </div>
 
+                {/* Placar */}
                 <div className={isWO ? 'opacity-40 pointer-events-none' : ''}>
                   <div className="flex items-center justify-between mb-2">
                     <Label className="text-gray-300">Placar (formato: 11-7)</Label>
-                    <Button type="button" onClick={addScoreSet} size="sm" variant="ghost" className="text-green-400">
-                      + Set
-                    </Button>
+                    <Button type="button" onClick={addScoreSet} size="sm" variant="ghost" className="text-green-400">+ Set</Button>
                   </div>
                   <div className="space-y-2">
                     {formData.score.map((score, index) => (
@@ -446,13 +418,7 @@ const AdminMatches = () => {
                           data-testid={`score-input-${index}`}
                         />
                         {formData.score.length > 1 && (
-                          <Button
-                            type="button"
-                            onClick={() => removeScoreSet(index)}
-                            size="sm"
-                            variant="ghost"
-                            className="text-red-400"
-                          >
+                          <Button type="button" onClick={() => removeScoreSet(index)} size="sm" variant="ghost" className="text-red-400">
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         )}
@@ -462,14 +428,11 @@ const AdminMatches = () => {
                   <p className="text-xs text-gray-400 mt-1">Exemplo: 11-7, 8-11, 11-6, 11-9</p>
                 </div>
 
+                {/* Vencedor + Rodada */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <Label className="text-gray-300">Vencedor</Label>
-                    <Select
-                      value={formData.winner_id}
-                      onValueChange={(value) => setFormData({ ...formData, winner_id: value })}
-                      required
-                    >
+                    <Select value={formData.winner_id} onValueChange={(value) => setFormData({ ...formData, winner_id: value })} required>
                       <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="winner-select">
                         <SelectValue placeholder="Selecione" />
                       </SelectTrigger>
@@ -487,13 +450,9 @@ const AdminMatches = () => {
                       </SelectContent>
                     </Select>
                   </div>
-
                   <div>
                     <Label className="text-gray-300">Rodada</Label>
-                    <Select
-                      value={formData.round}
-                      onValueChange={(value) => setFormData({ ...formData, round: value })}
-                    >
+                    <Select value={formData.round} onValueChange={(value) => setFormData({ ...formData, round: value })}>
                       <SelectTrigger className="bg-slate-700 border-slate-600 text-white" data-testid="round-select">
                         <SelectValue />
                       </SelectTrigger>
@@ -506,6 +465,7 @@ const AdminMatches = () => {
                   </div>
                 </div>
 
+                {/* Data */}
                 <div>
                   <Label className="text-gray-300">Data</Label>
                   <Input
@@ -536,7 +496,7 @@ const AdminMatches = () => {
             {importResult.matches_skipped > 0 && (
               <p className="text-yellow-400">⏭️ {importResult.matches_skipped} ignoradas (já existiam)</p>
             )}
-            {importResult.errors.length > 0 && (
+            {importResult.errors && importResult.errors.length > 0 && (
               <div className="mt-2">
                 <p className="text-red-400">❌ {importResult.errors.length} erros:</p>
                 <ul className="text-xs text-gray-400 mt-1 max-h-32 overflow-y-auto">
@@ -550,7 +510,6 @@ const AdminMatches = () => {
         </Card>
       )}
 
-      {/* Matches List */}
       {/* Filtros */}
       {!loading && matches.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -599,6 +558,7 @@ const AdminMatches = () => {
         </div>
       )}
 
+      {/* Lista de partidas */}
       {loading ? (
         <div className="text-center py-12 text-gray-400">Carregando...</div>
       ) : matches.length === 0 ? (
@@ -632,11 +592,11 @@ const AdminMatches = () => {
                 <tbody>
                   {filteredMatches.map((match) => (
                     <tr key={match.id} className="border-b border-slate-700/50 hover:bg-slate-700/30" data-testid={`match-row-${match.id}`}>
-                      <td className="py-3 px-4 text-gray-300">
+                      <td className="py-3 px-4 text-gray-300 hidden sm:table-cell">
                         {format(new Date(match.date), 'dd/MM/yyyy', { locale: ptBR })}
                       </td>
-                      <td className="py-3 px-4 text-white">{match.tournament_name}</td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 text-white hidden md:table-cell">{match.tournament_name}</td>
+                      <td className="py-3 px-4 hidden sm:table-cell">
                         <Badge className="bg-blue-500">{match.category}</Badge>
                       </td>
                       <td className="py-3 px-4">
@@ -651,9 +611,11 @@ const AdminMatches = () => {
                         </div>
                       </td>
                       <td className="py-3 px-2 text-gray-300 font-mono text-xs hidden md:table-cell">
-                        {match.score && match.score.includes('W.O.') ? <span className="text-yellow-400 font-semibold">W.O.</span> : match.score.join(' ')}
+                        {match.score && match.score.includes('W.O.')
+                          ? <span className="text-yellow-400 font-semibold">W.O.</span>
+                          : match.score.join(' ')}
                       </td>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-4 hidden lg:table-cell">
                         <Badge className="bg-purple-500">{match.round}</Badge>
                       </td>
                       <td className="py-3 px-4 text-center">
@@ -675,7 +637,7 @@ const AdminMatches = () => {
         </Card>
       )}
 
-      {/* Excel Format Guide */}
+      {/* Guia de formato Excel */}
       <Card className="bg-slate-800/50 border-purple-500/20">
         <CardHeader>
           <CardTitle className="text-white text-sm">📋 Formato do Excel para Importação</CardTitle>

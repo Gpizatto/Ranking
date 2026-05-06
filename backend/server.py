@@ -319,6 +319,7 @@ class Match(BaseModel):
 class MatchCreate(BaseModel):
     tournament_id: str
     category: str
+    gender_category: str = "Masculina"  # "Masculina", "Feminina" ou "Mista"
     player1_id: str
     player2_id: str
     winner_id: str
@@ -1753,8 +1754,8 @@ async def create_match(match_data: MatchCreate, current_user: User = Depends(get
     winner_name = match.player1_name if winner_id == match.player1_id else match.player2_name
     loser_name = match.player2_name if winner_id == match.player1_id else match.player1_name
 
-    # Usar gender_category do match_data se disponível, senão "Masculina" como fallback
-    gender_cat = getattr(match_data, 'gender_category', 'Masculina') or 'Masculina'
+    # Usar gender_category informado no formulário
+    gender_cat = match_data.gender_category or 'Masculina'
 
     for p_id, p_name, placement, points in [
         (winner_id, winner_name, winner_placement, winner_points),

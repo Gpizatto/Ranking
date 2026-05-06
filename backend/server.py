@@ -18,6 +18,7 @@ import asyncio
 import re
 import random
 import string
+import time
 import resend
 from openpyxl import load_workbook, Workbook
 from io import BytesIO
@@ -58,6 +59,35 @@ if RESEND_API_KEY:
 # Create the main app
 app = FastAPI()
 api_router = APIRouter(prefix="/api")
+
+# ============= CACHE EM MEMÓRIA =============
+# Cache simples para o endpoint de rankings.
+# Cada chave é "class_category|gender_category".
+# Estrutura: { chave: { "data": [...], "ts": timestamp } }
+# TTL padrão: 5 minutos. Invalidado automaticamente ao criar/editar/deletar resultados.
+
+_rankings_cache: Dict[str, Any] = {}
+CACHE_TTL_SECONDS = 300  # 5 minutos
+
+def _cache_key(class_category: Optional[str], gender_category: Optional[str]) -> str:
+    return f"{class_category or '*'}|{gender_category or '*'}"
+
+def _cache_get(class_category: Optional[str], gender_category: Optional[str]) -> Optional[list]:
+    """Retorna dados do cache se existir e não tiver expirado. Caso contrário, None."""
+    key = _cache_key(class_category, gender_category)
+    entry = _rankings_cache.get(key)
+    if entry and (time.time() - entry["ts"]) < CACHE_TTL_SECONDS:
+        return entry["data"]
+    return None
+
+def _cache_set(class_category: Optional[str], gender_category: Optional[str], data: list) -> None:
+    """Armazena dados no cache com timestamp atual."""
+    key = _cache_key(class_category, gender_category)
+    _rankings_cache[key] = {"data": data, "ts": time.time()}
+
+def invalidate_rankings_cache() -> None:
+    """Limpa todo o cache de rankings. Chamar após qualquer alteração em results ou matches."""
+    _rankings_cache.clear()
 
 # ============= HELPER FUNCTIONS =============
 
@@ -1096,6 +1126,7 @@ async def delete_tournament(tournament_id: str, current_user: User = Depends(get
     # Deleção em cascata — remove resultados e partidas vinculados
     await db.results.delete_many({"tournament_id": tournament_id})
     await db.matches.delete_many({"tournament_id": tournament_id})
+    invalidate_rankings_cache()
     return {"message": "Tournament deleted"}
 
 @api_router.get("/tournaments/{tournament_id}/matches")
@@ -1154,6 +1185,7 @@ async def create_result(result_data: ResultCreate, current_user: User = Depends(
     doc = result.model_dump()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.results.insert_one(doc)
+    invalidate_rankings_cache()
     return result
 
 @api_router.delete("/results/{result_id}")
@@ -1161,6 +1193,7 @@ async def delete_result(result_id: str, current_user: User = Depends(get_current
     result = await db.results.delete_one({"id": result_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Result not found")
+    invalidate_rankings_cache()
     return {"message": "Result deleted"}
 
 @api_router.get("/results/template")
@@ -1339,6 +1372,7 @@ async def import_results(
                 except Exception as e:
                     errors.append(f"Aba '{sheet_name}' linha {row_idx}: {str(e)}")
 
+        invalidate_rankings_cache()
         return {
             "message": f"{results_created} resultados importados, {results_updated} atualizados",
             "results_created": results_created,
@@ -1447,6 +1481,7 @@ async def update_ranking_config(config_data: RankingConfigUpdate, current_user: 
     config_doc = await db.ranking_config.find_one({"id": config.id}, {"_id": 0})
     if isinstance(config_doc.get('updated_at'), str):
         config_doc['updated_at'] = datetime.fromisoformat(config_doc['updated_at'])
+    invalidate_rankings_cache()
     return RankingConfig(**config_doc)
 
 
@@ -1454,6 +1489,11 @@ async def update_ranking_config(config_data: RankingConfigUpdate, current_user: 
 
 @api_router.get("/rankings")
 async def get_rankings(class_category: Optional[str] = None, gender_category: Optional[str] = None):
+    # ── 0. Verificar cache ────────────────────────────────────────────────────
+    cached = _cache_get(class_category, gender_category)
+    if cached is not None:
+        return cached
+
     # ── 1. Config + results em paralelo ──────────────────────────────────────
     query = {}
     if class_category:
@@ -1633,6 +1673,9 @@ async def get_rankings(class_category: Optional[str] = None, gender_category: Op
             # Novo no ranking ou apenas 1 torneio cadastrado
             r['position_change'] = None
 
+    # ── 9. Salvar no cache ───────────────────────────────────────────────────
+    _cache_set(class_category, gender_category, rankings)
+
     return rankings
 
 
@@ -1769,6 +1812,7 @@ async def create_match(match_data: MatchCreate, current_user: User = Depends(get
             result_doc['created_at'] = result_doc['created_at'].isoformat()
             await db.results.insert_one(result_doc)
 
+    invalidate_rankings_cache()
     return match
 
 @api_router.delete("/matches/{match_id}")
@@ -1776,6 +1820,7 @@ async def delete_match(match_id: str, current_user: User = Depends(get_current_u
     result = await db.matches.delete_one({"id": match_id})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Match not found")
+    invalidate_rankings_cache()
     return {"message": "Match deleted"}
 
 @api_router.get("/matches/template")
@@ -1980,6 +2025,7 @@ async def import_matches_excel(
                 except Exception as e:
                     errors.append(f"Aba '{sheet_name}' linha {row_idx}: {str(e)}")
 
+        invalidate_rankings_cache()
         return {
             "matches_created": matches_created,
             "matches_skipped": matches_skipped,

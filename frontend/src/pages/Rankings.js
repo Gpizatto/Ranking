@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../lib/api';
 import { API } from '../lib/api';
+import { cachedGet, TTL } from '../lib/cache';
 import { Trophy, Medal, Download, MapPin, GraduationCap, User, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
@@ -31,14 +32,11 @@ const Rankings = () => {
 
     const fetchRankings = async () => {
       setLoading(true);
-      setRankings([]);
       try {
         const effectiveCategory = selectedClass === 'Duplas' ? 'Mista' : selectedCategory;
-        const response = await axios.get(
-          `${API}/rankings?class_category=${selectedClass}&gender_category=${effectiveCategory}`,
-          { signal: controller.signal }
-        );
-        setRankings(response.data);
+        const url = `${API}/rankings?class_category=${selectedClass}&gender_category=${effectiveCategory}`;
+        const data = await cachedGet(url, TTL.RANKINGS, axios);
+        setRankings(data);
       } catch (error) {
         if (axios.isCancel?.(error) || error.name === 'CanceledError' || error.name === 'AbortError') return;
         toast.error('Erro ao carregar rankings');
@@ -51,7 +49,9 @@ const Rankings = () => {
     return () => controller.abort();
   }, [selectedClass, selectedCategory]);
 
+  // Logo convertida uma única vez por sessão (fora do ciclo de render)
   useEffect(() => {
+    if (logoBase64) return; // já foi processada, não repete
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {

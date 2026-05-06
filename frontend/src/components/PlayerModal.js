@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios, { API } from '../lib/api';
+import { cachedGet, TTL } from '../lib/cache';
 import { MapPin, GraduationCap, User, Trophy, TrendingUp } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
@@ -28,19 +29,18 @@ const PlayerModal = ({ playerId, player, onClose }) => {
 
     const fetchDetails = async () => {
       try {
-        // Se já temos o objeto player completo, usa direto sem buscar /players
+        // Se já temos o objeto player completo, usa direto
         if (player && (player.id || player.player_id)) {
           setSelectedPlayer(player);
         }
 
-        const detailsRes = await axios.get(`${API}/players/${resolvedId}/details`);
-        setPlayerDetails(detailsRes.data);
+        // Detalhes do jogador — cache de 3 min
+        const details = await cachedGet(`${API}/players/${resolvedId}/details`, TTL.PLAYERS, axios);
+        setPlayerDetails(details);
 
-        // Se não tinha player, busca agora
+        // Se não tinha o objeto player, usa os dados que vieram do details
         if (!player || (!player.id && !player.player_id)) {
-          const playersRes = await axios.get(`${API}/players`);
-          const found = playersRes.data.find(p => p.id === resolvedId);
-          setSelectedPlayer(found || null);
+          setSelectedPlayer(details.player || null);
         }
       } catch {
         toast.error('Erro ao carregar detalhes do jogador');

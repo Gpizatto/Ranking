@@ -147,13 +147,6 @@ class UserCreate(BaseModel):
     username: str
     password: str
 
-class FederationRegisterRequest(BaseModel):
-    federation_name: str
-    email: str
-    password: str
-    plan_type: str
-    start_trial: bool = False
-
 class UserLogin(BaseModel):
     username: str
     password: str

@@ -104,20 +104,8 @@ def get_result_label(placement: int) -> str:
 
 # ============= SUBSCRIPTION PLANS =============
 
-SUBSCRIPTION_PLANS = {
-    "mensal": {
-        "name": "Plano Mensal",
-        "price": 99.90,
-        "currency": "brl",
-        "duration_days": 30
-    },
-    "anual": {
-        "name": "Plano Anual",
-        "price": 600.00,
-        "currency": "brl",
-        "duration_days": 365
-    }
-}
+# Importado de config.py — fonte única de verdade para preços
+from config import SUBSCRIPTION_PLANS
 
 def check_subscription_active(subscription: Dict) -> bool:
     if not subscription:

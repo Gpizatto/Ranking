@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios, { API } from "../lib/api";
+import { cachedGet, TTL } from "../lib/cache";
 
 import { Users, Search, MapPin } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
@@ -64,9 +65,8 @@ const Players = () => {
 
   const fetchPlayers = async () => {
     try {
-      const response = await axios.get(`${API}/players`);
-
-      setPlayers(sortAlpha(response.data));
+      const data = await cachedGet(`${API}/players`, TTL.PLAYERS, axios);
+      setPlayers(sortAlpha(data));
     } catch (error) {
       toast.error("Erro ao carregar jogadores");
     } finally {

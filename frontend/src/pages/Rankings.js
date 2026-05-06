@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from '../lib/api';
 import { API } from '../lib/api';
 import { Trophy, Medal, Download, MapPin, GraduationCap, User, TrendingUp } from 'lucide-react';
@@ -73,14 +73,14 @@ const Rankings = () => {
     { id: 'original', label: 'Original', desc: '800×auto', w: 800, h: null },
   ];
 
-  const generateTop10Image = async (format) => {
+  const generateTop10Image = async (imageFormat) => {
     const element = document.getElementById('top10-card');
     if (!element) return;
     setImageFormatOpen(false);
 
     const BASE_W = 800;
-    const BASE_H = format.h ? Math.round(BASE_W * (format.h / format.w)) : null;
-    const SCALE  = format.w / BASE_W;
+    const BASE_H = imageFormat.h ? Math.round(BASE_W * (imageFormat.h / imageFormat.w)) : null;
+    const SCALE  = imageFormat.w / BASE_W;
 
     const originalStyle = element.getAttribute('style');
 
@@ -106,7 +106,7 @@ const Rankings = () => {
       element.style.width    = `${BASE_W}px`;
       element.style.height   = BASE_H ? `${BASE_H}px` : 'auto';
       element.style.overflow = 'hidden';
-      element.setAttribute('data-format', format.id);
+      element.setAttribute('data-format', imageFormat.id);
 
       const canvas = await html2canvas(element, {
         backgroundColor: '#0a1628',
@@ -123,7 +123,7 @@ const Rankings = () => {
       element.removeAttribute('data-format');
 
       const link = document.createElement('a');
-      link.download = `top10-${selectedClass}-${(selectedClass === 'Duplas' ? 'Mista' : selectedCategory)}-${format.id}.png`;
+      link.download = `top10-${selectedClass}-${(selectedClass === 'Duplas' ? 'Mista' : selectedCategory)}-${imageFormat.id}.png`;
       link.href = canvas.toDataURL('image/png');
       link.click();
       toast.success('Imagem gerada com sucesso!');
@@ -136,8 +136,8 @@ const Rankings = () => {
     }
   };
 
-  const top10 = rankings.slice(0, 10);
   const top5 = rankings.slice(0, 5);
+  const top6to10 = rankings.slice(5, 10);
 
   return (
     <div className="space-y-8">
@@ -434,11 +434,11 @@ const Rankings = () => {
               );
             })}
           </div>
-          {rankings.length > 5 && (
+          {top6to10.length > 0 && (
             <div style={{ margin: '0 16px 16px', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(74,163,255,0.15)', background: 'rgba(13,31,60,0.6)' }}>
-              {rankings.slice(5, 10).map((player, i) => {
+              {top6to10.map((player, i) => {
                 const pos = i + 6;
-                const isLast = i === Math.min(rankings.length - 6, 4);
+                const isLast = i === top6to10.length - 1;
                 return (
                   <div key={player.player_id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '10px 16px', borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.06)', background: i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
                     <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '800', color: '#94a3b8', flexShrink: 0 }}>

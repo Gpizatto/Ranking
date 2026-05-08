@@ -54,20 +54,17 @@ const PlayerCard = React.memo(({ player, onClick }) => {
 const Players = () => {
 
 
-  const [players, setPlayers] = useState([]);
+  // Inicializa direto do cache no primeiro render — sem ciclo extra
+  const [players, setPlayers] = useState(() => {
+    const cached = getCached(`${API}/players`);
+    return cached ? sortAlpha(cached) : [];
+  });
   const [searchTerm, setSearchTerm] = useState("");
-  // Inicializa com cache síncrono se disponível — página aparece instantânea
-  const [loading, setLoading] = useState(!getCached(`${API}/players`));
+  const [loading, setLoading] = useState(() => !getCached(`${API}/players`));
   const [selectedPlayer, setSelectedPlayer] = useState(null);
 
   useEffect(() => {
-    // Pré-popular do cache imediatamente (síncrono)
-    const cached = getCached(`${API}/players`);
-    if (cached) {
-      setPlayers(sortAlpha(cached));
-      setLoading(false);
-      return;
-    }
+    if (players.length > 0) return; // já populado pelo cache no useState
     fetchPlayers();
   }, []);
 

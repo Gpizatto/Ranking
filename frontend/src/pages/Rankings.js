@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../lib/api';
 import { API } from '../lib/api';
-import { cachedGet, TTL } from '../lib/cache';
+import { cachedGet, getCached, TTL } from '../lib/cache';
 import { Trophy, Medal, Download, MapPin, GraduationCap, User, TrendingUp } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
@@ -31,17 +31,27 @@ const Rankings = () => {
     const controller = new AbortController();
 
     const fetchRankings = async () => {
+      const effectiveCategory = selectedClass === 'Duplas' ? 'Mista' : selectedCategory;
+      const url = `${API}/rankings?class_category=${selectedClass}&gender_category=${effectiveCategory}`;
+
+      // 1. Mostrar dados do cache IMEDIATAMENTE (síncrono — sem travar a UI)
+      const cached = getCached(url);
+      if (cached) {
+        setRankings(cached);
+        setLoading(false);
+        return; // cache válido — não vai ao servidor
+      }
+
+      // 2. Sem cache — mostrar loading e buscar do servidor
       setLoading(true);
       try {
-        const effectiveCategory = selectedClass === 'Duplas' ? 'Mista' : selectedCategory;
-        const url = `${API}/rankings?class_category=${selectedClass}&gender_category=${effectiveCategory}`;
         const data = await cachedGet(url, TTL.RANKINGS, axios);
-        setRankings(data);
+        if (!controller.signal.aborted) setRankings(data);
       } catch (error) {
         if (axios.isCancel?.(error) || error.name === 'CanceledError' || error.name === 'AbortError') return;
         toast.error('Erro ao carregar rankings');
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     };
 

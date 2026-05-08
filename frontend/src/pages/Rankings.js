@@ -59,7 +59,7 @@ const Rankings = () => {
       canvas.width = img.width;
       canvas.height = img.height;
       canvas.getContext('2d').drawImage(img, 0, 0);
-      setLogoBase64(canvas.toDataURL('image/jpeg'));
+      setLogoBase64(canvas.toDataURL('image/png'));
     };
     img.src = '/fsp.jpeg';
   }, []);
@@ -78,12 +78,21 @@ const Rankings = () => {
     if (!element) return;
     setImageFormatOpen(false);
 
+    // Dimensões finais desejadas
+    const FINAL_W = imageFormat.w;
+    const FINAL_H = imageFormat.h;
+
+    // BASE_W é o tamanho de layout do card oculto (800px)
     const BASE_W = 800;
-    const BASE_H = imageFormat.h ? Math.round(BASE_W * (imageFormat.h / imageFormat.w)) : null;
-    const SCALE  = imageFormat.w / BASE_W;
+    const BASE_H = FINAL_H ? Math.round(BASE_W * (FINAL_H / FINAL_W)) : null;
+
+    // Scale = razão entre o tamanho final e o layout base
+    // Usar mínimo 2x para garantir nitidez em qualquer formato
+    const SCALE = Math.max(2, FINAL_W / BASE_W);
 
     const originalStyle = element.getAttribute('style');
 
+    // Remove sombras e filtros que prejudicam a captura
     const noShadowStyle = document.createElement('style');
     noShadowStyle.id = 'no-shadow-capture';
     noShadowStyle.textContent = `
@@ -97,6 +106,8 @@ const Rankings = () => {
         border-radius: 0 !important;
         box-shadow: none !important;
         filter: none !important;
+        image-rendering: -webkit-optimize-contrast !important;
+        image-rendering: crisp-edges !important;
       }
     `;
 
@@ -108,23 +119,29 @@ const Rankings = () => {
       element.style.overflow = 'hidden';
       element.setAttribute('data-format', imageFormat.id);
 
+      // Aguarda um frame para garantir que o layout foi aplicado
+      await new Promise(resolve => requestAnimationFrame(resolve));
+
       const canvas = await html2canvas(element, {
         backgroundColor: '#0a1628',
-        scale: SCALE,
+        scale: SCALE,          // scale alto = mais pixels = mais nitidez
         useCORS: true,
         allowTaint: true,
         logging: false,
         width: BASE_W,
-        height: BASE_H || undefined,
+        height: BASE_H || element.offsetHeight,
+        imageTimeout: 0,       // sem timeout para imagens base64 grandes
+        removeContainer: false,
       });
 
       document.head.removeChild(noShadowStyle);
       element.setAttribute('style', originalStyle || '');
       element.removeAttribute('data-format');
 
+      // Exportar como PNG com qualidade máxima
       const link = document.createElement('a');
-      link.download = `top10-${selectedClass}-${(selectedClass === 'Duplas' ? 'Mista' : selectedCategory)}-${imageFormat.id}.png`;
-      link.href = canvas.toDataURL('image/png');
+      link.download = `ranking-fsp-${selectedClass}-${(selectedClass === 'Duplas' ? 'Mista' : selectedCategory)}-${imageFormat.id}.png`;
+      link.href = canvas.toDataURL('image/png', 1.0);
       link.click();
       toast.success('Imagem gerada com sucesso!');
     } catch (error) {

@@ -2,31 +2,36 @@ import React, { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { isAuthenticated } from '../lib/api';
 import axios, { API } from '../lib/api';
+import { getCached, cachedGet } from '../lib/cache';
+
+const STATUS_URL = `${API}/auth/approval-status`;
+const TTL_APPROVAL = 300; // 5 minutos
 
 export const AdminGuard = ({ children }) => {
-  const [status, setStatus] = useState('loading'); // loading | approved | pending
+  // Inicializa do cache imediatamente — sem spinner se já verificou antes
+  const [status, setStatus] = useState(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return 'unauthenticated';
+    const cached = getCached(STATUS_URL);
+    if (cached) return cached.is_approved ? 'approved' : 'pending';
+    return 'loading';
+  });
 
   useEffect(() => {
-    // Garante que o token está no header ANTES de qualquer chamada
+    if (status !== 'loading') return; // cache resolveu — não precisa buscar
+
     const token = localStorage.getItem('token');
-    if (!token) {
-      setStatus('unauthenticated');
-      return;
-    }
+    if (!token) { setStatus('unauthenticated'); return; }
+
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
 
-    axios.get(`${API}/auth/approval-status`)
-      .then(res => {
-        setStatus(res.data.is_approved ? 'approved' : 'pending');
+    cachedGet(STATUS_URL, TTL_APPROVAL, axios)
+      .then(data => {
+        setStatus(data.is_approved ? 'approved' : 'pending');
       })
-      .catch((err) => {
-        // 401 = token inválido/expirado → mandar para login
-        // Qualquer outro erro → assumir pendente
-        if (err?.response?.status === 401) {
-          setStatus('unauthenticated');
-        } else {
-          setStatus('pending');
-        }
+      .catch(err => {
+        if (err?.response?.status === 401) setStatus('unauthenticated');
+        else setStatus('pending');
       });
   }, []);
 
@@ -36,6 +41,7 @@ export const AdminGuard = ({ children }) => {
       <p className="text-gray-400">Verificando acesso...</p>
     </div>
   );
+  if (status === 'unauthenticated') return <Navigate to="/login" replace />;
   if (status === 'pending') return <Navigate to="/pending" replace />;
   return children;
 };

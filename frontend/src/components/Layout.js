@@ -3,6 +3,7 @@ import axios, { API } from '../lib/api';
 import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { Trophy, Users, Calendar, Settings, LogOut, Shield, Menu, X, LayoutDashboard, FileText, Swords, Palette, UserCheck } from 'lucide-react';
 import { isAuthenticated, logout } from '../lib/api';
+import { getCached, cachedGet, TTL } from '../lib/cache';
 
 const Layout = () => {
   const location = useLocation();
@@ -10,21 +11,43 @@ const Layout = () => {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
 
+  // Inicializa tema do cache imediatamente — sem flash de tema padrão
   useEffect(() => {
-    axios.get(`${API}/theme`).then(res => {
-      document.documentElement.setAttribute('data-theme', res.data.theme || 'green');
-    }).catch(() => {});
+    const themeUrl = `${API}/theme`;
 
-    // Garante que o token está no header antes de buscar o status
-    const token = localStorage.getItem('token');
-    if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      axios.get(`${API}/auth/approval-status`).then(res => {
-        setIsOwner(res.data.is_owner || false);
-      }).catch(() => setIsOwner(false));
+    // 1. Aplicar tema do cache imediatamente (síncrono)
+    const cachedTheme = getCached(themeUrl);
+    if (cachedTheme) {
+      document.documentElement.setAttribute('data-theme', cachedTheme.theme || 'green');
     }
-  }, [location.pathname]); // Re-executa ao navegar para garantir estado atualizado
 
+    // 2. Buscar tema do servidor em background (só na primeira vez ou expirado)
+    cachedGet(themeUrl, TTL.THEME, axios).then(data => {
+      document.documentElement.setAttribute('data-theme', data.theme || 'green');
+    }).catch(() => {});
+  }, []); // roda UMA vez — não a cada navegação
+
+  // Verificar owner status — também com cache, não a cada clique
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+
+    const statusUrl = `${API}/auth/approval-status`;
+
+    // 1. Usar cache imediatamente se disponível
+    const cached = getCached(statusUrl);
+    if (cached) {
+      setIsOwner(cached.is_owner || false);
+      return;
+    }
+
+    // 2. Buscar do servidor e cachear por 5 minutos
+    cachedGet(statusUrl, 300, axios)
+      .then(res => setIsOwner(res.is_owner || false))
+      .catch(() => setIsOwner(false));
+  }, []); // roda UMA vez por sessão — não a cada navegação
 
   const isAuth = isAuthenticated();
   const isAdminPage = location.pathname.includes('/admin');

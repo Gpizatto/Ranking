@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import axios, { API } from "../lib/api";
-import { cachedGet, TTL } from "../lib/cache";
+import { cachedGet, getCached, TTL } from "../lib/cache";
 
 import { Users, Search, MapPin } from "lucide-react";
 import { Card, CardContent } from "../components/ui/card";
@@ -56,10 +56,18 @@ const Players = () => {
 
   const [players, setPlayers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(true);
+  // Inicializa com cache síncrono se disponível — página aparece instantânea
+  const [loading, setLoading] = useState(!getCached(`${API}/players`));
   const [selectedPlayer, setSelectedPlayer] = useState(null);
 
   useEffect(() => {
+    // Pré-popular do cache imediatamente (síncrono)
+    const cached = getCached(`${API}/players`);
+    if (cached) {
+      setPlayers(sortAlpha(cached));
+      setLoading(false);
+      return;
+    }
     fetchPlayers();
   }, []);
 

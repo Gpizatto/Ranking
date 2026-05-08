@@ -16,7 +16,21 @@
 const _store = {};
 
 /**
- * Busca dado do cache. Retorna null se não existir ou expirado.
+ * Busca dado do cache SINCRONAMENTE. Retorna null se não existir ou expirado.
+ * Use este para pré-popular o estado antes do fetch — sem await, sem travar a UI.
+ */
+export function getCached(url) {
+  const entry = _store[url];
+  if (!entry) return null;
+  if (Date.now() - entry.ts > entry.ttl * 1000) {
+    delete _store[url];
+    return null;
+  }
+  return entry.data;
+}
+
+/**
+ * Busca dado do cache internamente (privado).
  */
 function _get(key) {
   const entry = _store[key];

@@ -797,15 +797,26 @@ async def upload_photo(file: UploadFile = File(...), current_user: User = Depend
     if len(contents) > 5 * 1024 * 1024:
         raise HTTPException(status_code=400, detail="Imagem deve ter no maximo 5MB")
 
-    # Verificar se é realmente uma imagem válida (não apenas o MIME type)
+    # Validar conteúdo real e comprimir com Pillow
     try:
         from PIL import Image as PILImage
-        PILImage.open(BytesIO(contents)).verify()
+        img = PILImage.open(BytesIO(contents))
+        img.verify()
+        # Reabrir após verify() que fecha o buffer interno
+        img = PILImage.open(BytesIO(contents))
+        img = img.convert("RGB")
+        # Redimensionar mantendo proporção dentro de 400x600px
+        img.thumbnail((400, 600), PILImage.LANCZOS)
+        output = BytesIO()
+        img.save(output, format="JPEG", quality=90, optimize=True)
+        output.seek(0)
+        compressed = output.read()
+        logger.info(f"Foto comprimida: {len(contents) // 1024}KB -> {len(compressed) // 1024}KB")
     except Exception:
-        raise HTTPException(status_code=400, detail="Arquivo não é uma imagem válida")
+        raise HTTPException(status_code=400, detail="Arquivo nao e uma imagem valida")
 
-    base64_encoded = base64.b64encode(contents).decode('utf-8')
-    photo_url = f"data:{file.content_type};base64,{base64_encoded}"
+    base64_encoded = base64.b64encode(compressed).decode("utf-8")
+    photo_url = f"data:image/jpeg;base64,{base64_encoded}"
     return {"photo_url": photo_url}
 
 @api_router.get("/players/template")
@@ -2101,9 +2112,7 @@ async def import_matches_excel(
         raise HTTPException(status_code=500, detail=f"Erro ao processar Excel: {str(e)}")
 
 
-# Include router
-app.include_router(api_router)
-
+# CORS deve ser registrado antes das rotas
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
@@ -2111,6 +2120,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include router
+app.include_router(api_router)
 
 @app.on_event("startup")
 async def create_indexes():
@@ -2130,4 +2142,3 @@ async def create_indexes():
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
-    

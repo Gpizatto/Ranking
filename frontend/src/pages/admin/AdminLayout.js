@@ -5,40 +5,44 @@ import { toast } from 'sonner';
 
 const THEMES = [
   {
-    id: 'storm',
+    id: 'blue',  // Backend espera 'blue'
     name: 'Storm',
     description: 'Azul FSP evoluído (padrão)',
     accent: '#4aa3ff',
     accent2: '#22e1ff',
     bg: 'linear-gradient(135deg, #070d1a 0%, #0d2347 55%, #070d1a 100%)',
     preview: ['#070d1a', '#4aa3ff', '#22e1ff'],
+    fspTheme: 'storm',  // Tema FSP real
   },
   {
-    id: 'inferno',
+    id: 'red',  // Backend espera 'red'
     name: 'Inferno',
     description: 'Preto + magenta + lime',
     accent: '#ff2d6f',
     accent2: '#c6f432',
     bg: 'linear-gradient(135deg, #0a0a0c 0%, #1a0a14 55%, #0a0a0c 100%)',
     preview: ['#0a0a0c', '#ff2d6f', '#c6f432'],
+    fspTheme: 'inferno',
   },
   {
-    id: 'champion',
+    id: 'orange',  // Backend espera 'orange'
     name: 'Champion',
     description: 'Dourado premium',
     accent: '#d4a017',
     accent2: '#f5d36b',
     bg: 'linear-gradient(135deg, #0e0c08 0%, #231708 55%, #0e0c08 100%)',
     preview: ['#0e0c08', '#d4a017', '#f5d36b'],
+    fspTheme: 'champion',
   },
   {
-    id: 'glacier',
+    id: 'silver',  // Backend espera 'silver'
     name: 'Glacier',
     description: 'Claro / minimal',
     accent: '#2d8a3e',
     accent2: '#0d6e7b',
     bg: 'linear-gradient(135deg, #f4f1ea 0%, #eae6dc 55%, #f4f1ea 100%)',
     preview: ['#f4f1ea', '#2d8a3e', '#0d6e7b'],
+    fspTheme: 'glacier',
   },
 ];
 
@@ -48,19 +52,35 @@ const AdminLayout = () => {
 
   useEffect(() => {
     axios.get(`${API}/theme`).then(res => {
-      setCurrentTheme(res.data.theme || 'storm');
-    }).catch(() => {});
+      const backendTheme = res.data.theme || 'blue';
+      setCurrentTheme(backendTheme);
+      
+      // Mapeia o tema do backend para o fspTheme
+      const theme = THEMES.find(t => t.id === backendTheme);
+      const fspTheme = theme?.fspTheme || 'storm';
+      document.documentElement.setAttribute('data-theme', fspTheme);
+    }).catch(() => {
+      // Se falhar, usa storm como padrão
+      document.documentElement.setAttribute('data-theme', 'storm');
+    });
   }, []);
 
   const handleSelectTheme = async (themeId) => {
     setSaving(true);
     try {
-      await axios.put(`${API}/theme?theme=${themeId}`);
+      const response = await axios.put(`${API}/theme?theme=${themeId}`);
       setCurrentTheme(themeId);
-      document.documentElement.setAttribute('data-theme', themeId);
+      
+      // Encontra o tema e aplica o fspTheme correto
+      const theme = THEMES.find(t => t.id === themeId);
+      const fspTheme = theme?.fspTheme || themeId;
+      document.documentElement.setAttribute('data-theme', fspTheme);
+      
       toast.success('Tema aplicado com sucesso!');
     } catch (error) {
-      toast.error('Erro ao salvar tema');
+      console.error('Erro ao salvar tema:', error);
+      console.error('Response:', error.response?.data);
+      toast.error(error.response?.data?.detail || error.response?.data?.message || 'Erro ao salvar tema');
     } finally {
       setSaving(false);
     }

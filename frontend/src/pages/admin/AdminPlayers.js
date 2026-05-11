@@ -68,8 +68,8 @@ const PREVIEW_W = 150;
 const PREVIEW_H = 230;
 
 // Resolução real exportada
-const EXPORT_W = 400;
-const EXPORT_H = 600;
+const EXPORT_W = 800;
+const EXPORT_H = 1200;
 
   const drawCropCanvas = useCallback(() => {
   const canvas = cropCanvasRef.current;

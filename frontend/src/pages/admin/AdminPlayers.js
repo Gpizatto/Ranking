@@ -14,6 +14,72 @@ import { toast } from 'sonner';
 
 const sortAlpha = arr => [...arr].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
+// Cache de fotos em memória para evitar re-fetches
+const photoCache = {};
+
+// Card de jogador admin com foto lazy
+const AdminPlayerCard = React.memo(({ player, onEdit, onDelete }) => {
+  const [photoUrl, setPhotoUrl] = React.useState(photoCache[player.id] || null);
+  const cardRef = React.useRef(null);
+
+  React.useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      async (entries) => {
+        if (!entries[0].isIntersecting) return;
+        observer.disconnect();
+        if (photoCache[player.id]) { setPhotoUrl(photoCache[player.id]); return; }
+        try {
+          const res = await axios.get(`${API}/players/photo/${player.id}`);
+          photoCache[player.id] = res.data.photo_url;
+          setPhotoUrl(res.data.photo_url);
+        } catch { /* sem foto */ }
+      },
+      { rootMargin: '150px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [player.id]);
+
+  return (
+    <Card ref={cardRef} className="bg-slate-800/50 border-blue-500/20" data-testid={`player-admin-card-${player.id}`}>
+      <CardContent className="pt-6">
+        <div className="flex items-center space-x-4 mb-4">
+          <Avatar className="w-16 h-16">
+            <AvatarImage src={photoUrl || "/fsp.jpeg"} className="object-cover object-top" />
+            <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover object-top" /></AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
+            <h3 className="text-white font-semibold text-lg">{player.name}</h3>
+            {player.birth_date && (
+              <p className="text-gray-400 text-xs mt-0.5">
+                🎂 {new Date(player.birth_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                {' · '}
+                {(() => { const t = new Date(); const b = new Date(player.birth_date + 'T00:00:00'); return t.getFullYear() - b.getFullYear() - (t < new Date(t.getFullYear(), b.getMonth(), b.getDate()) ? 1 : 0); })()} anos
+              </p>
+            )}
+            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${player.is_federated !== false ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+              {player.is_federated !== false ? '✅ Federado' : '❌ Não Federado'}
+            </span>
+          </div>
+        </div>
+        {player.city && <p className="text-gray-400 text-sm">📍 {player.city}</p>}
+        {player.academy && <p className="text-gray-400 text-sm">🏫 {player.academy}</p>}
+        <div className="flex gap-2 mt-4">
+          <button onClick={() => onEdit(player)} className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2 px-3 rounded-md transition-colors">
+            ✏️ Editar
+          </button>
+          <button onClick={() => onDelete(player.id)} className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-2 px-3 rounded-md transition-colors">
+            🗑️ Excluir
+          </button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+});
+
+
 
 const AdminPlayers = () => {
   const [players, setPlayers] = useState([]);
@@ -68,8 +134,8 @@ const PREVIEW_W = 150;
 const PREVIEW_H = 230;
 
 // Resolução real exportada
-const EXPORT_W = 800;
-const EXPORT_H = 1200;
+const EXPORT_W = 400;
+const EXPORT_H = 600;
 
   const drawCropCanvas = useCallback(() => {
   const canvas = cropCanvasRef.current;
@@ -282,11 +348,20 @@ const cy = PREVIEW_H / 2;
     }
   };
 
-  const handleEdit = (player) => {
+  const handleEdit = async (player) => {
     setEditingPlayer(player);
+    // Busca foto do endpoint dedicado (não vem mais no /players)
+    let photoUrl = photoCache[player.id] || '';
+    if (!photoUrl) {
+      try {
+        const res = await axios.get(`${API}/players/photo/${player.id}`);
+        photoUrl = res.data.photo_url || '';
+        photoCache[player.id] = photoUrl;
+      } catch { photoUrl = ''; }
+    }
     setFormData({
       name: player.name,
-      photo_url: player.photo_url || '',
+      photo_url: photoUrl,
       city: player.city || '',
       academy: player.academy || '',
       coach: player.coach || '',
@@ -804,60 +879,12 @@ const cy = PREVIEW_H / 2;
                   <p className="text-gray-400 text-sm mb-3">{filtered.length} jogador{filtered.length !== 1 ? 'es' : ''} encontrado{filtered.length !== 1 ? 's' : ''}</p>
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="players-admin-grid">
                     {filtered.map((player) => (
-                      <Card key={player.id} className="bg-slate-800/50 border-blue-500/20" data-testid={`player-admin-card-${player.id}`}>
-                        <CardContent className="pt-6">
-                          <div className="flex items-center space-x-4 mb-4">
-                            {/* FIX: object-top para mostrar rosto */}
-                            <Avatar className="w-16 h-16">
-                              <AvatarImage src={player.photo_url || "/fsp.jpeg"} className="object-cover object-top" />
-                              <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover object-top" /></AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1">
-                              <h3 className="text-white font-semibold text-lg">{player.name}</h3>
-                              {player.birth_date && (
-                                <p className="text-gray-400 text-xs mt-0.5">
-                                  🎂 {new Date(player.birth_date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                                  {' · '}
-                                  {(() => { const t = new Date(); const b = new Date(player.birth_date + 'T00:00:00'); return t.getFullYear() - b.getFullYear() - (t < new Date(t.getFullYear(), b.getMonth(), b.getDate()) ? 1 : 0); })()} anos
-                                </p>
-                              )}
-                              <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${
-                                player.is_federated !== false
-                                  ? 'bg-green-500/20 text-green-400'
-                                  : 'bg-red-500/10 text-red-400'
-                              }`}>
-                                {player.is_federated !== false ? '✅ Federado' : '❌ Não Federado'}
-                              </span>
-                              {player.city && (
-                                <p className="text-gray-400 text-xs">📍 {player.city}</p>
-                              )}
-                              {player.academy && (
-                                <p className="text-gray-400 text-xs truncate">🏫 {player.academy}</p>
-                              )}
-                            </div>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={() => handleEdit(player)}
-                              size="sm"
-                              className="flex-1 bg-blue-500 hover:bg-blue-600"
-                              data-testid={`edit-player-${player.id}`}
-                            >
-                              <Edit className="w-3 h-3 mr-1" />
-                              Editar
-                            </Button>
-                            <Button
-                              onClick={() => handleDelete(player.id)}
-                              size="sm"
-                              className="flex-1 bg-red-500 hover:bg-red-600"
-                              data-testid={`delete-player-${player.id}`}
-                            >
-                              <Trash2 className="w-3 h-3 mr-1" />
-                              Excluir
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
+                      <AdminPlayerCard
+                        key={player.id}
+                        player={player}
+                        onEdit={handleEdit}
+                        onDelete={handleDelete}
+                      />
                     ))}
                   </div>
                 </>

@@ -12,11 +12,20 @@ import { toast } from 'sonner';
 import PlayerModal from '../components/PlayerModal';
 import html2canvas from 'html2canvas';
 import { POST_TEMPLATES, PALETTE_OPTIONS } from '../components/PostTemplates';
+// ⬇ Ajuste o import abaixo para o caminho real do seu AuthContext.
+// Se você guarda o user em localStorage, troque pela linha comentada logo abaixo.
+import { useAuth } from '../contexts/AuthContext';
+// const useAuth = () => { try { return { user: JSON.parse(localStorage.getItem('user')||'null') }; } catch { return { user: null }; } };
 
 const CLASSES = ['1ª', '2ª', '3ª', '4ª', '5ª', '6ª', 'Duplas'];
 const CATEGORIES = ['Feminina', 'Masculina'];
 
 const Rankings = () => {
+  // Apenas admin pode trocar paleta / template / formato da página.
+  // Usuário comum vê a página com a paleta/template padrão (ou a última salva pelo admin).
+  const { user } = useAuth() || {};
+  const isAdmin = !!(user && (user.role === 'admin' || user.is_admin === true));
+
   const [rankings, setRankings] = useState([]);
   const [selectedClass, setSelectedClass] = useState('1ª');
   const [selectedCategory, setSelectedCategory] = useState('Feminina');
@@ -88,8 +97,10 @@ const Rankings = () => {
     return ((p[0]?.[0]||'') + (p[p.length-1]?.[0]||'')).toUpperCase();
   };
 
+  // Aplica a paleta escolhida na própria página (não só no post)
+  // Cria/atualiza um wrapper com data-theme={theme}; assim a página inteira muda junto.
   return (
-    <div className="rk-root" style={{ background: 'var(--t-grad, var(--t-bg))', minHeight: '100%', padding: '32px 8px 60px' }}>
+    <div data-theme={theme} className="rk-root" style={{ background: 'var(--t-grad, var(--t-bg))', minHeight: '100%', padding: '32px 8px 60px' }}>
       <style>{`
         .rk-root { font-family: 'Space Grotesk', system-ui, sans-serif; color: var(--t-ink); }
         .rk-display { font-family: 'Anton', Impact, sans-serif; letter-spacing: 0.01em; line-height: 0.95; }
@@ -103,14 +114,9 @@ const Rankings = () => {
         .rk-row:hover { background: color-mix(in srgb, var(--t-accent) 8%, transparent); }
         .rk-row:last-child { border-bottom: none; }
         .rk-row .avatar { width: 38px; height: 38px; border-radius: 6px; background: var(--t-surface2); background-size: cover; background-position: top; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--t-sub); flex-shrink: 0; overflow: hidden; }
-        
-        /* Fix Dialog background */
-        [role="dialog"] { background: var(--t-surface) !important; }
-        [data-radix-dialog-content] { background: var(--t-surface) !important; }
-        
         @media (max-width: 900px) {
           .rk-hero { grid-template-columns: 1fr !important; }
-          .rk-hero .photo { width: 100% !important; height: 420px !important; }
+          .rk-hero .photo { width: 100% !important; height: 320px !important; }
           .rk-podium { grid-template-columns: 1fr !important; }
           .rk-row { grid-template-columns: 50px 1fr 100px; padding: 12px; }
           .rk-row .hide-mobile { display: none; }
@@ -126,14 +132,60 @@ const Rankings = () => {
               RANKINGS<br/><span style={{ color: 'var(--t-accent)' }}>OFICIAIS</span>
             </h1>
           </div>
-          <button onClick={() => setPostOpen(true)} style={{
-            background: 'var(--t-accent)', color: 'var(--t-bg)', border: 'none', padding: '16px 24px',
-            fontFamily: 'Anton, sans-serif', fontSize: 16, letterSpacing: '0.16em', cursor: 'pointer', borderRadius: 4,
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
-            <Download size={18} /> GERAR POST
-          </button>
+          {isAdmin && (
+            <button onClick={() => setPostOpen(true)} style={{
+              background: 'var(--t-accent)', color: 'var(--t-bg)', border: 'none', padding: '16px 24px',
+              fontFamily: 'Anton, sans-serif', fontSize: 16, letterSpacing: '0.16em', cursor: 'pointer', borderRadius: 4,
+              display: 'flex', alignItems: 'center', gap: 10,
+            }}>
+              <Download size={18} /> GERAR POST
+            </button>
+          )}
         </div>
+
+        {/* STYLE BAR — somente admin */}
+        {isAdmin && (
+        <div className="rk-card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 18, marginBottom: 14 }}>
+          <div className="rk-mono" style={{ fontSize: 10, color: 'var(--t-sub)' }}>PALETA</div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {PALETTE_OPTIONS.map(p => (
+              <button key={p.key} onClick={() => setTheme(p.key)} title={p.label} aria-label={p.label} style={{
+                width: 32, height: 32, borderRadius: 6, cursor: 'pointer', padding: 0, position: 'relative',
+                border: theme===p.key ? `2px solid ${p.swatch[1]}` : '1px solid var(--t-line)',
+                background: `linear-gradient(135deg, ${p.swatch[0]} 0% 50%, ${p.swatch[1]} 50% 100%)`,
+                outline: 'none', transition: 'transform 0.15s',
+                transform: theme===p.key ? 'scale(1.08)' : 'scale(1)',
+              }}>
+                {theme===p.key && <span style={{ position: 'absolute', inset: -5, borderRadius: 8, border: `1px solid ${p.swatch[1]}`, opacity: 0.6 }} />}
+              </button>
+            ))}
+          </div>
+
+          <div style={{ width: 1, height: 22, background: 'var(--t-line)' }}/>
+
+          <div className="rk-mono" style={{ fontSize: 10, color: 'var(--t-sub)' }}>TEMPLATE</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {Object.entries(POST_TEMPLATES).map(([k, v]) => (
+              <button key={k} className={`rk-chip ${template===k?'active':''}`} onClick={() => setTemplate(k)} style={{ fontSize: 12 }}>{v.label.toUpperCase()}</button>
+            ))}
+          </div>
+
+          <div style={{ width: 1, height: 22, background: 'var(--t-line)' }}/>
+
+          <div className="rk-mono" style={{ fontSize: 10, color: 'var(--t-sub)' }}>FORMATO</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button className={`rk-chip ${format==='feed'?'active':''}`} onClick={() => setFormat('feed')} style={{ fontSize: 12 }}>1:1 FEED</button>
+            <button className={`rk-chip ${format==='story'?'active':''}`} onClick={() => setFormat('story')} style={{ fontSize: 12 }}>9:16 STORY</button>
+          </div>
+
+          <div style={{ marginLeft: 'auto' }}>
+            <button onClick={() => setPostOpen(true)} className="rk-mono" style={{
+              background: 'transparent', color: 'var(--t-accent2)', border: `1px solid var(--t-accent2)`,
+              padding: '8px 14px', fontSize: 11, cursor: 'pointer', borderRadius: 4,
+            }}>PREVIEW DO POST →</button>
+          </div>
+        </div>
+        )}
 
         {/* FILTERS */}
         <div className="rk-card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginBottom: 28 }}>
@@ -164,7 +216,7 @@ const Rankings = () => {
             {/* HERO */}
             <div className="rk-card rk-hero" style={{ position: 'relative', padding: 24, marginBottom: 32, display: 'grid', gridTemplateColumns: '320px 1fr 320px', gap: 28, overflow: 'hidden' }} onClick={() => setSelectedPlayerId(champ.player_id)}>
               <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(115deg, transparent 40%, color-mix(in srgb, var(--t-accent) 12%, transparent) 55%, transparent 70%)`, pointerEvents: 'none' }}/>
-              <div className="photo" style={{ width: 320, height: 450, borderRadius: 12, border: '1px solid var(--t-line)', background: 'var(--t-surface2)', backgroundImage: champ.photo_url ? `url(${champ.photo_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'top', position: 'relative', overflow: 'hidden', cursor: 'pointer' }}>
+              <div className="photo" style={{ width: 320, height: 380, borderRadius: 12, border: '1px solid var(--t-line)', background: 'var(--t-surface2)', backgroundImage: champ.photo_url ? `url(${champ.photo_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'top', position: 'relative', overflow: 'hidden', cursor: 'pointer' }}>
                 {!champ.photo_url && <div className="rk-display" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 96, color: 'var(--t-line)' }}>{initials(champ.player_name)}</div>}
               </div>
 
@@ -350,14 +402,14 @@ const PodiumCard = ({ player, pos, onClick }) => {
     <div onClick={onClick} style={{
       position: 'relative', border: `2px solid ${medalVar}`, borderRadius: 12, overflow: 'hidden',
       background: 'color-mix(in srgb, var(--t-surface) 80%, transparent)',
-      height: isOne ? 420 : 380, marginTop: isOne ? 0 : 20, cursor: 'pointer',
+      height: isOne ? 320 : 280, marginTop: isOne ? 0 : 20, cursor: 'pointer',
     }}>
-      <div style={{ width: '100%', height: '75%', background: 'var(--t-surface2)', backgroundImage: player.photo_url ? `url(${player.photo_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'top', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: '100%', height: '62%', background: 'var(--t-surface2)', backgroundImage: player.photo_url ? `url(${player.photo_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'top', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {!player.photo_url && <div className="rk-display" style={{ fontSize: 72, color: 'var(--t-line)' }}>{initials}</div>}
         <div className="rk-display" style={{ position: 'absolute', top: 10, right: 10, width: 38, height: 38, borderRadius: 8, background: medalVar, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: '#1a1200' }}>{pos+1}</div>
       </div>
       <div style={{ padding: '12px 16px 14px' }}>
-        <div className="rk-display" style={{ fontSize: isOne ? 22 : 18, lineHeight: 1.1 }}>{player.player_name.toUpperCase()}</div>
+        <div className="rk-display" style={{ fontSize: isOne ? 24 : 20 }}>{player.player_name.toUpperCase()}</div>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 8 }}>
           <span className="rk-display" style={{ fontSize: 28, color: 'var(--t-accent)' }}>{player.total_points}</span>
           <span className="rk-mono" style={{ fontSize: 10, color: 'var(--t-sub)' }}>PTS · {player.results_count} TORN.{player.win_rate != null ? ` · ${player.win_rate}% VIT.` : ''}</span>

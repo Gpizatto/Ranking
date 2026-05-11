@@ -3,11 +3,7 @@ import axios, { API } from "../lib/api";
 import { cachedGet, getCached, TTL } from "../lib/cache";
 
 import { Users, Search, MapPin } from "lucide-react";
-import { Card, CardContent } from "../components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
-import { Input } from "../components/ui/input";
 import PlayerModal from "../components/PlayerModal";
-import { Badge } from "../components/ui/badge";
 import { toast } from "sonner";
 
 const sortAlpha = arr => [...arr].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
@@ -52,45 +48,91 @@ const PlayerCard = React.memo(({ player, onClick }) => {
     return () => observer.disconnect();
   }, [loadPhoto]);
 
+  const initials = player.name.trim().split(/\s+/).map(p => p[0] || '').filter((_, i, a) => i === 0 || i === a.length - 1).join('').toUpperCase();
+
   return (
-    <Card
+    <div
       ref={cardRef}
-      className="bg-slate-800/50 border-green-500/20 hover:border-green-400/40 transition-all cursor-pointer"
       onClick={() => onClick(player)}
+      style={{
+        background: 'color-mix(in srgb, var(--t-surface) 85%, transparent)',
+        border: '1px solid var(--t-line)',
+        borderRadius: 12,
+        padding: 18,
+        cursor: 'pointer',
+        transition: 'all 0.2s',
+      }}
+      onMouseEnter={(e) => e.currentTarget.style.borderColor = 'var(--t-accent)'}
+      onMouseLeave={(e) => e.currentTarget.style.borderColor = 'var(--t-line)'}
     >
-      <CardContent className="pt-6">
-        <div className="flex items-center space-x-4 mb-3">
-          <Avatar className="w-16 h-16">
-            <AvatarImage
-              src={photoUrl || "/fsp.jpeg"}
-              className="object-cover object-top"
-            />
-            <AvatarFallback>
-              <img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover object-top" />
-            </AvatarFallback>
-          </Avatar>
-
-          <div className="flex-1">
-            <h3 className="text-white font-semibold text-lg">
-              {player.name}
-            </h3>
-
-            {player.main_class && (
-              <Badge className="bg-blue-500 mt-1">
-                {player.main_class}
-              </Badge>
-            )}
-          </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 10 }}>
+        <div style={{
+          width: 64,
+          height: 64,
+          borderRadius: 8,
+          background: 'var(--t-surface2)',
+          backgroundImage: photoUrl ? `url(${photoUrl})` : 'none',
+          backgroundSize: 'cover',
+          backgroundPosition: 'top',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'JetBrains Mono, monospace',
+          fontSize: 14,
+          color: 'var(--t-sub)',
+          flexShrink: 0,
+          overflow: 'hidden',
+        }}>
+          {!photoUrl && initials}
         </div>
 
-        {player.city && (
-          <p className="text-gray-400 text-sm flex items-center">
-            <MapPin className="w-3 h-3 mr-1" />
-            {player.city}
-          </p>
-        )}
-      </CardContent>
-    </Card>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <h3 style={{
+            fontFamily: 'Anton, sans-serif',
+            fontSize: 18,
+            letterSpacing: '0.06em',
+            color: 'var(--t-ink)',
+            margin: 0,
+            marginBottom: 6,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
+            {player.name.toUpperCase()}
+          </h3>
+
+          {player.main_class && (
+            <span style={{
+              display: 'inline-block',
+              padding: '3px 10px',
+              background: 'var(--t-accent)',
+              color: 'var(--t-bg)',
+              borderRadius: 4,
+              fontFamily: 'Anton, sans-serif',
+              fontSize: 11,
+              letterSpacing: '0.12em',
+            }}>
+              {player.main_class}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {player.city && (
+        <p style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          fontFamily: 'Space Grotesk, sans-serif',
+          fontSize: 13,
+          color: 'var(--t-sub)',
+          margin: 0,
+        }}>
+          <MapPin size={14} />
+          {player.city}
+        </p>
+      )}
+    </div>
   );
 });
 
@@ -131,39 +173,103 @@ const Players = () => {
   const handlePlayerClick = (player) => { setSelectedPlayer(player); };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-4xl font-bold text-white mb-2">Jogadores</h1>
-        <p className="text-gray-400">Todos os atletas cadastrados</p>
+    <div style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--t-ink)' }}>
+      <style>{`
+        .players-root input::placeholder { color: var(--t-sub); opacity: 0.6; }
+      `}</style>
+
+      {/* Header */}
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+          <div style={{
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 11,
+            letterSpacing: '0.22em',
+            color: 'var(--t-sub)',
+          }}>
+            ● CADASTRADOS
+          </div>
+        </div>
+        <h1 style={{
+          fontFamily: 'Anton, sans-serif',
+          fontSize: 'clamp(48px, 8vw, 72px)',
+          letterSpacing: '0.02em',
+          lineHeight: 0.95,
+          margin: 0,
+        }}>
+          JOGADORES
+        </h1>
       </div>
 
-      <Card className="bg-slate-800/50 border-green-500/20">
-        <CardContent className="pt-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <Input
-              placeholder="Buscar jogador..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 bg-slate-700 border-slate-600 text-white"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      {/* Search */}
+      <div className="players-root" style={{
+        background: 'color-mix(in srgb, var(--t-surface) 85%, transparent)',
+        border: '1px solid var(--t-line)',
+        borderRadius: 12,
+        padding: 18,
+        marginBottom: 32,
+      }}>
+        <div style={{ position: 'relative' }}>
+          <Search
+            size={20}
+            style={{
+              position: 'absolute',
+              left: 14,
+              top: '50%',
+              transform: 'translateY(-50%)',
+              color: 'var(--t-sub)',
+            }}
+          />
+          <input
+            type="text"
+            placeholder="Buscar jogador..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '12px 14px 12px 44px',
+              background: 'var(--t-bg)',
+              border: '1px solid var(--t-line)',
+              borderRadius: 8,
+              fontFamily: 'Space Grotesk, sans-serif',
+              fontSize: 15,
+              color: 'var(--t-ink)',
+              outline: 'none',
+            }}
+            onFocus={(e) => e.target.style.borderColor = 'var(--t-accent)'}
+            onBlur={(e) => e.target.style.borderColor = 'var(--t-line)'}
+          />
+        </div>
+      </div>
 
-      {loading ? (
-        <div className="text-center py-12 text-gray-400">Carregando...</div>
-      ) : filteredPlayers.length === 0 ? (
-        <Card className="bg-slate-800/50 border-green-500/20">
-          <CardContent className="py-12">
-            <div className="text-center text-gray-400">
-              <Users className="w-16 h-16 mx-auto mb-4 opacity-50" />
-              <p>Nenhum jogador encontrado</p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Loading */}
+      {loading && (
+        <div style={{ textAlign: 'center', padding: 60, color: 'var(--t-sub)' }}>
+          Carregando...
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && filteredPlayers.length === 0 && (
+        <div style={{
+          background: 'color-mix(in srgb, var(--t-surface) 85%, transparent)',
+          border: '1px solid var(--t-line)',
+          borderRadius: 12,
+          padding: 48,
+          textAlign: 'center',
+        }}>
+          <Users size={64} style={{ color: 'var(--t-line)', marginBottom: 16 }} />
+          <p style={{ color: 'var(--t-sub)', margin: 0 }}>Nenhum jogador encontrado</p>
+        </div>
+      )}
+
+      {/* Grid */}
+      {!loading && filteredPlayers.length > 0 && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+          gap: 16,
+        }}>
           {filteredPlayers.map((player) => (
             <PlayerCard
               key={player.id}
@@ -174,7 +280,12 @@ const Players = () => {
         </div>
       )}
 
-      <PlayerModal playerId={selectedPlayer?.id} player={selectedPlayer} onClose={() => setSelectedPlayer(null)} />
+      {/* Modal */}
+      <PlayerModal 
+        playerId={selectedPlayer?.id} 
+        player={selectedPlayer} 
+        onClose={() => setSelectedPlayer(null)} 
+      />
     </div>
   );
 };

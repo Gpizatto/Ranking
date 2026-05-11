@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import axios, { API } from '../lib/api';
 import { cachedGet, getCached, TTL } from '../lib/cache';
 import { Calendar, MapPin, Trophy, CheckCircle, Clock, ChevronRight } from 'lucide-react';
-import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -70,88 +69,203 @@ const Tournaments = () => {
   };
 
   return (
-    <div className="space-y-8">
-
-      <div className="flex items-end justify-between">
+    <div style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--t-ink)' }}>
+      {/* Header com stats */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 32, gap: 24, flexWrap: 'wrap' }}>
         <div>
-          <h1 className="text-4xl font-bold text-white mb-2" data-testid="tournaments-title">Torneios</h1>
-          <p className="text-gray-400">Histórico completo de torneios disputados</p>
+          <div style={{
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 11,
+            letterSpacing: '0.22em',
+            color: 'var(--t-sub)',
+            marginBottom: 10,
+          }}>
+            ● HISTÓRICO COMPLETO
+          </div>
+          <h1 style={{
+            fontFamily: 'Anton, sans-serif',
+            fontSize: 'clamp(48px, 8vw, 72px)',
+            letterSpacing: '0.02em',
+            lineHeight: 0.95,
+            margin: 0,
+          }}>
+            TORNEIOS
+          </h1>
         </div>
-        <div className="flex gap-6 text-center">
-          <div>
-            <div className="text-3xl font-black text-white">{tournaments.length}</div>
-            <div className="text-xs text-gray-400 uppercase tracking-wide">Total</div>
+
+        <div style={{ display: 'flex', gap: 24 }}>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontFamily: 'Anton, sans-serif', fontSize: 36, color: 'var(--t-ink)' }}>
+              {tournaments.length}
+            </div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: '0.18em', color: 'var(--t-sub)' }}>
+              TOTAL
+            </div>
           </div>
-          <div>
-            <div className="text-3xl font-black text-green-400">{completed}</div>
-            <div className="text-xs text-gray-400 uppercase tracking-wide">Concluídos</div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontFamily: 'Anton, sans-serif', fontSize: 36, color: 'var(--t-accent2)' }}>
+              {completed}
+            </div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: '0.18em', color: 'var(--t-sub)' }}>
+              CONCLUÍDOS
+            </div>
           </div>
-          <div>
-            <div className="text-3xl font-black text-yellow-400">{ongoing}</div>
-            <div className="text-xs text-gray-400 uppercase tracking-wide">Em Andamento</div>
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ fontFamily: 'Anton, sans-serif', fontSize: 36, color: 'var(--t-gold)' }}>
+              {ongoing}
+            </div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: '0.18em', color: 'var(--t-sub)' }}>
+              EM ANDAMENTO
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="flex gap-2">
+      {/* Filtros */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 32, flexWrap: 'wrap' }}>
         {[
-          { key: 'all', label: 'Todos' },
-          { key: 'completed', label: 'Concluídos' },
-          { key: 'ongoing', label: 'Em Andamento' },
+          { key: 'all', label: 'TODOS' },
+          { key: 'completed', label: 'CONCLUÍDOS' },
+          { key: 'ongoing', label: 'EM ANDAMENTO' },
         ].map(f => (
           <button
             key={f.key}
             onClick={() => setFilter(f.key)}
-            className={`px-4 py-2 rounded-full text-sm font-semibold transition-all ${
-              filter === f.key ? 'bg-green-500 text-white' : 'bg-slate-700 text-gray-300 hover:bg-slate-600'
-            }`}
+            style={{
+              padding: '8px 18px',
+              fontFamily: 'Anton, sans-serif',
+              fontSize: 13,
+              letterSpacing: '0.14em',
+              border: `1px solid ${filter === f.key ? 'var(--t-accent)' : 'var(--t-line)'}`,
+              background: filter === f.key ? 'var(--t-accent)' : 'transparent',
+              color: filter === f.key ? 'var(--t-bg)' : 'var(--t-ink)',
+              borderRadius: 4,
+              cursor: 'pointer',
+              transition: 'all 0.15s',
+            }}
+            onMouseEnter={(e) => {
+              if (filter !== f.key) {
+                e.target.style.borderColor = 'var(--t-accent)';
+                e.target.style.color = 'var(--t-accent)';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (filter !== f.key) {
+                e.target.style.borderColor = 'var(--t-line)';
+                e.target.style.color = 'var(--t-ink)';
+              }
+            }}
           >
             {f.label}
           </button>
         ))}
       </div>
 
-      {loading ? (
-        <div className="text-center py-20 text-gray-400">Carregando...</div>
-      ) : filtered.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">
-          <Trophy className="w-16 h-16 mx-auto mb-4 opacity-30" />
-          <p>Nenhum torneio encontrado</p>
+      {/* Loading */}
+      {loading && (
+        <div style={{ textAlign: 'center', padding: 80, color: 'var(--t-sub)' }}>
+          Carregando...
         </div>
-      ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5" data-testid="tournaments-grid">
+      )}
+
+      {/* Empty */}
+      {!loading && filtered.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 80 }}>
+          <Trophy size={64} style={{ color: 'var(--t-line)', marginBottom: 16 }} />
+          <p style={{ color: 'var(--t-sub)', margin: 0 }}>Nenhum torneio encontrado</p>
+        </div>
+      )}
+
+      {/* Grid */}
+      {!loading && filtered.length > 0 && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+          gap: 18,
+        }} data-testid="tournaments-grid">
           {filtered.map((tournament) => (
-            <Link key={tournament.id} to={`/tournaments/${tournament.id}`}>
-              <div
-                className="group relative bg-slate-800/60 border border-slate-700 hover:border-green-500/50 rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 h-full"
-                data-testid={`tournament-card-${tournament.id}`}
-              >
-                <div className={`h-1.5 w-full ${tournament.is_completed ? 'bg-green-500' : 'bg-yellow-500'}`} />
-                <div className="p-5">
-                  <div className="flex items-start justify-between mb-4">
-                    <Badge className={`text-xs ${tournament.is_completed ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30'}`}>
-                      {tournament.is_completed
-                        ? <><CheckCircle className="w-3 h-3 mr-1 inline" />Concluído</>
-                        : <><Clock className="w-3 h-3 mr-1 inline" />Em andamento</>
-                      }
-                    </Badge>
-                    <ChevronRight className="w-4 h-4 text-gray-500 group-hover:text-green-400 transition-colors mt-0.5" />
+            <Link 
+              key={tournament.id} 
+              to={`/tournaments/${tournament.id}`}
+              style={{ textDecoration: 'none', color: 'inherit' }}
+              data-testid={`tournament-card-${tournament.id}`}
+            >
+              <div style={{
+                background: 'color-mix(in srgb, var(--t-surface) 85%, transparent)',
+                border: '1px solid var(--t-line)',
+                borderRadius: 12,
+                overflow: 'hidden',
+                transition: 'all 0.2s',
+                height: '100%',
+                cursor: 'pointer',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--t-accent)';
+                e.currentTarget.style.transform = 'translateY(-4px)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--t-line)';
+                e.currentTarget.style.transform = 'translateY(0)';
+              }}>
+                {/* Status bar */}
+                <div style={{
+                  height: 6,
+                  background: tournament.is_completed ? 'var(--t-accent2)' : 'var(--t-gold)',
+                }} />
+
+                <div style={{ padding: 20 }}>
+                  {/* Badge + Arrow */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+                    <span style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '4px 10px',
+                      background: tournament.is_completed 
+                        ? 'color-mix(in srgb, var(--t-accent2) 20%, transparent)' 
+                        : 'color-mix(in srgb, var(--t-gold) 20%, transparent)',
+                      color: tournament.is_completed ? 'var(--t-accent2)' : 'var(--t-gold)',
+                      border: `1px solid ${tournament.is_completed ? 'var(--t-accent2)' : 'var(--t-gold)'}`,
+                      borderRadius: 4,
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: 10,
+                      letterSpacing: '0.12em',
+                    }}>
+                      {tournament.is_completed ? <CheckCircle size={12} /> : <Clock size={12} />}
+                      {tournament.is_completed ? 'CONCLUÍDO' : 'EM ANDAMENTO'}
+                    </span>
+                    <ChevronRight size={18} style={{ color: 'var(--t-sub)' }} />
                   </div>
-                  <h3 className="text-white font-bold text-lg leading-tight mb-4 group-hover:text-green-400 transition-colors">
-                    {tournament.name}
+
+                  {/* Nome */}
+                  <h3 style={{
+                    fontFamily: 'Anton, sans-serif',
+                    fontSize: 20,
+                    letterSpacing: '0.04em',
+                    lineHeight: 1.2,
+                    color: 'var(--t-ink)',
+                    margin: '0 0 16px 0',
+                  }}>
+                    {tournament.name.toUpperCase()}
                   </h3>
-                  <div className="space-y-2">
-                    <div className="flex items-center text-gray-400 text-sm">
-                      <Calendar className="w-4 h-4 mr-2 flex-shrink-0 text-green-500/60" />
+
+                  {/* Data */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+                    <Calendar size={16} style={{ color: 'var(--t-accent)', flexShrink: 0 }} />
+                    <span style={{ fontSize: 14, color: 'var(--t-sub)' }}>
                       {formatDateRange(tournament)}
-                    </div>
-                    {tournament.location && (
-                      <div className="flex items-center text-gray-400 text-sm">
-                        <MapPin className="w-4 h-4 mr-2 flex-shrink-0 text-green-500/60" />
-                        {tournament.location}
-                      </div>
-                    )}
+                    </span>
                   </div>
+
+                  {/* Local */}
+                  {tournament.location && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <MapPin size={16} style={{ color: 'var(--t-accent)', flexShrink: 0 }} />
+                      <span style={{ fontSize: 14, color: 'var(--t-sub)' }}>
+                        {tournament.location}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
             </Link>

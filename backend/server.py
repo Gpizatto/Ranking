@@ -1129,6 +1129,47 @@ async def delete_tournament(tournament_id: str, current_user: User = Depends(get
     invalidate_rankings_cache()
     return {"message": "Tournament deleted"}
 
+@api_router.get("/admin/backup")
+async def export_backup(current_user: User = Depends(get_current_user)):
+    """Exporta todos os dados do banco em JSON para backup manual."""
+    import json as _json
+
+    players = await db.players.find({}, {"_id": 0}).to_list(100000)
+    tournaments = await db.tournaments.find({}, {"_id": 0}).to_list(100000)
+    results = await db.results.find({}, {"_id": 0}).to_list(100000)
+    matches = await db.matches.find({}, {"_id": 0}).to_list(100000)
+    ranking_config = await db.ranking_config.find_one({}, {"_id": 0})
+
+    backup_data = {
+        "exported_at": datetime.now(timezone.utc).isoformat(),
+        "players": players,
+        "tournaments": tournaments,
+        "results": results,
+        "matches": matches,
+        "ranking_config": ranking_config,
+        "counts": {
+            "players": len(players),
+            "tournaments": len(tournaments),
+            "results": len(results),
+            "matches": len(matches),
+        }
+    }
+
+    json_bytes = _json.dumps(backup_data, default=str, ensure_ascii=False, indent=2).encode("utf-8")
+    filename = f"squashrank_backup_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.json"
+
+    logger.info(
+        f"Backup exportado por {current_user.username}: "
+        f"{len(players)} jogadores, {len(tournaments)} torneios, "
+        f"{len(results)} resultados, {len(matches)} partidas."
+    )
+
+    return StreamingResponse(
+        iter([json_bytes]),
+        media_type="application/json",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
+
 @api_router.get("/tournaments/{tournament_id}/matches")
 async def get_tournament_matches(tournament_id: str, category: Optional[str] = None):
     tournament = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
@@ -1477,6 +1518,14 @@ async def update_ranking_config(config_data: RankingConfigUpdate, current_user: 
         {"id": config.id},
         {"$set": updated_data}
     )
+
+    # Recalcular pontos de todos os resultados existentes com a nova tabela
+    new_points_table = config_data.points_table if config_data.points_table else {}
+    all_results = await db.results.find({}, {"_id": 0, "id": 1, "placement": 1}).to_list(100000)
+    for r in all_results:
+        new_points = new_points_table.get(str(r['placement']), 0.0)
+        await db.results.update_one({"id": r['id']}, {"$set": {"points": new_points}})
+    logger.info(f"Recalculados pontos de {len(all_results)} resultados após mudança na tabela de pontuação.")
 
     config_doc = await db.ranking_config.find_one({"id": config.id}, {"_id": 0})
     if isinstance(config_doc.get('updated_at'), str):

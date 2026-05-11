@@ -137,7 +137,7 @@ export const PostUltimate = ({ players, theme, format, classLabel, categoryLabel
           <div style={{ position:'absolute', inset:0, background:`linear-gradient(115deg, transparent 35%, ${alpha(palette.accent, 0.16)} 50%, transparent 65%)`, pointerEvents:'none' }}/>
           <div style={{ position:'absolute', top:8, right:18, fontFamily:'Anton, sans-serif', fontSize:220, lineHeight:1, color: alpha(palette.accent, 0.10), letterSpacing:'-0.03em' }}>01</div>
 
-          <Photo player={champ} palette={palette} big style={{ width: 380, height: 460, borderRadius: 14, border: `1px solid ${palette.line}` }} />
+          <Photo player={champ} palette={palette} big style={{ width: 380, height: 520, borderRadius: 14, border: `1px solid ${palette.line}` }} />
 
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}>
             <div>
@@ -179,7 +179,7 @@ const Stat = ({ palette, label, value, big }) => (
 
 const MiniCard = ({ player, pos, palette, compact }) => (
   <div style={{ background: palette.surface, border: `1px solid ${palette.line}`, borderRadius: 12, overflow: 'hidden', position: 'relative', height: compact ? 200 : 240 }}>
-    <Photo player={player} palette={palette} style={{ position: 'absolute', inset: 0, width: '100%', height: '70%' }} />
+    <Photo player={player} palette={palette} style={{ position: 'absolute', inset: 0, width: '100%', height: '80%' }} />
     <div style={{ position: 'absolute', top: 8, left: 8, background: palette.bg, color: palette.ink, fontFamily: 'Anton, sans-serif', fontSize: 18, width: 32, height: 32, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${palette.line}` }}>{pos}</div>
     <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 12, background: alpha(palette.bg, 0.94), borderTop: `1px solid ${palette.line}` }}>
       <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, lineHeight: 1.1, color: palette.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{player.player_name}</div>
@@ -256,12 +256,12 @@ export const PostEditorial = ({ players, theme, format, classLabel, categoryLabe
         <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:11, letterSpacing:'0.28em', color:palette.sub }}>VOL. {new Date().getFullYear()}</div>
       </div>
 
-      <div style={{ fontFamily:'Anton, sans-serif', fontSize: isFeed?240:360, lineHeight:0.88, letterSpacing:'-0.02em', padding:'40px 60px 0' }}>
-        O REI<br/><span style={{ color:palette.accent }}>DO COURT</span>
+      <div style={{ fontFamily:'Anton, sans-serif', fontSize: isFeed?180:280, lineHeight:0.88, letterSpacing:'-0.02em', padding:'40px 60px 0' }}>
+        MELHOR DO<br/>PARANÁ<br/><span style={{ color:palette.accent }}>NA {classLabel.toUpperCase()}</span>
       </div>
 
       <div style={{ position:'relative', margin:'20px 60px 0', display:'grid', gridTemplateColumns:'1fr 1.2fr', gap:36, alignItems:'end' }}>
-        <Photo player={champ} palette={palette} big style={{ width:'100%', height: isFeed?380:560, border:`1px solid ${palette.line}` }} />
+        <Photo player={champ} palette={palette} big style={{ width:'100%', height: isFeed?480:680, border:`1px solid ${palette.line}` }} />
         <div style={{ position:'relative' }}>
           <div style={{ position:'absolute', top: isFeed?-120:-180, left:-20, fontFamily:'Anton, sans-serif', fontSize: isFeed?320:480, color:palette.accent, lineHeight:0.85, letterSpacing:'-0.05em' }}>01</div>
           <div style={{ position:'relative', paddingTop: isFeed?220:320 }}>
@@ -326,7 +326,7 @@ export const PostPodium = ({ players, theme, format, classLabel, categoryLabel, 
             const medal = palette.podium[realIdx];
             return (
               <div key={p.player_id} style={{ display:'flex', flexDirection:'column' }}>
-                <Photo player={p} palette={palette} style={{ width:'100%', height: isFeed?220:320, border:`2px solid ${medal}`, borderBottom:'none' }} />
+                <Photo player={p} palette={palette} style={{ width:'100%', height: isFeed?280:400, border:`2px solid ${medal}`, borderBottom:'none' }} />
                 <div style={{ background: realIdx===0 ? `linear-gradient(180deg, ${alpha(medal,0.25)} 0%, ${palette.surface} 60%)` : palette.surface, border:`2px solid ${medal}`, borderTop:'none', padding:'14px 16px', height: heights[idx], display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
                   <div style={{ fontFamily:'Anton, sans-serif', fontSize: realIdx===0?140:100, lineHeight:0.85, color:medal, letterSpacing:'-0.03em' }}>{realIdx+1}</div>
                   <div>

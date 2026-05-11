@@ -1,67 +1,54 @@
 import React, { useState, useEffect } from 'react';
 import axios, { API } from '../../lib/api';
 import { Palette, Check } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
 import { toast } from 'sonner';
 
 const THEMES = [
   {
-    id: 'green',
-    name: 'Verde Escuro',
-    description: 'Tema padrão',
-    accent: '#22c55e',
-    bg: 'linear-gradient(135deg, #0f172a, #1e293b)',
-    preview: ['#0f172a', '#22c55e', '#4ade80'],
+    id: 'storm',
+    name: 'Storm',
+    description: 'Azul FSP evoluído (padrão)',
+    accent: '#4aa3ff',
+    accent2: '#22e1ff',
+    bg: 'linear-gradient(135deg, #070d1a 0%, #0d2347 55%, #070d1a 100%)',
+    preview: ['#070d1a', '#4aa3ff', '#22e1ff'],
   },
   {
-    id: 'blue',
-    name: 'Azul Royal',
-    description: 'Azul profissional',
-    accent: '#3b82f6',
-    bg: 'linear-gradient(135deg, #0c1a2e, #0f2847)',
-    preview: ['#0c1a2e', '#3b82f6', '#60a5fa'],
+    id: 'inferno',
+    name: 'Inferno',
+    description: 'Preto + magenta + lime',
+    accent: '#ff2d6f',
+    accent2: '#c6f432',
+    bg: 'linear-gradient(135deg, #0a0a0c 0%, #1a0a14 55%, #0a0a0c 100%)',
+    preview: ['#0a0a0c', '#ff2d6f', '#c6f432'],
   },
   {
-    id: 'purple',
-    name: 'Roxo',
-    description: 'Elegante e moderno',
-    accent: '#a855f7',
-    bg: 'linear-gradient(135deg, #130d1f, #1e1035)',
-    preview: ['#130d1f', '#a855f7', '#c084fc'],
+    id: 'champion',
+    name: 'Champion',
+    description: 'Dourado premium',
+    accent: '#d4a017',
+    accent2: '#f5d36b',
+    bg: 'linear-gradient(135deg, #0e0c08 0%, #231708 55%, #0e0c08 100%)',
+    preview: ['#0e0c08', '#d4a017', '#f5d36b'],
   },
   {
-    id: 'red',
-    name: 'Vermelho / Vinho',
-    description: 'Forte e marcante',
-    accent: '#ef4444',
-    bg: 'linear-gradient(135deg, #1a0a0a, #2d1010)',
-    preview: ['#1a0a0a', '#ef4444', '#f87171'],
-  },
-  {
-    id: 'orange',
-    name: 'Laranja',
-    description: 'Energético e vibrante',
-    accent: '#f97316',
-    bg: 'linear-gradient(135deg, #1a0f00, #2d1a00)',
-    preview: ['#1a0f00', '#f97316', '#fb923c'],
-  },
-  {
-    id: 'silver',
-    name: 'Cinza / Prata',
-    description: 'Neutro e sofisticado',
-    accent: '#94a3b8',
-    bg: 'linear-gradient(135deg, #0d0f12, #1a1f27)',
-    preview: ['#0d0f12', '#94a3b8', '#cbd5e1'],
+    id: 'glacier',
+    name: 'Glacier',
+    description: 'Claro / minimal',
+    accent: '#2d8a3e',
+    accent2: '#0d6e7b',
+    bg: 'linear-gradient(135deg, #f4f1ea 0%, #eae6dc 55%, #f4f1ea 100%)',
+    preview: ['#f4f1ea', '#2d8a3e', '#0d6e7b'],
   },
 ];
 
 const AdminLayout = () => {
-  const [currentTheme, setCurrentTheme] = useState('green');
+  const [currentTheme, setCurrentTheme] = useState('storm');
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     axios.get(`${API}/theme`).then(res => {
-      setCurrentTheme(res.data.theme || 'green');
+      setCurrentTheme(res.data.theme || 'storm');
     }).catch(() => {});
   }, []);
 
@@ -80,84 +67,185 @@ const AdminLayout = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2 flex items-center gap-3">
-          <Palette className="w-8 h-8" style={{ color: 'var(--accent)' }} />
-          Layout & Cores
+    <div style={{ fontFamily: 'Space Grotesk, sans-serif', color: 'var(--t-ink)' }}>
+      {/* Header */}
+      <div style={{ marginBottom: 32 }}>
+        <h1 style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 16,
+          fontFamily: 'Anton, sans-serif',
+          fontSize: 'clamp(32px, 6vw, 48px)',
+          letterSpacing: '0.04em',
+          margin: '0 0 12px 0',
+        }}>
+          <Palette size={36} style={{ color: 'var(--t-accent)' }} />
+          LAYOUT & PALETAS
         </h1>
-        <p className="text-gray-400 text-sm">Escolha o tema de cores do sistema. A mudança é aplicada para todos os visitantes.</p>
+        <p style={{
+          fontFamily: 'Space Grotesk, sans-serif',
+          fontSize: 15,
+          color: 'var(--t-sub)',
+          margin: 0,
+        }}>
+          Escolha a paleta de cores do sistema. A mudança é aplicada para todos os visitantes.
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Grid de temas */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: 18,
+        marginBottom: 32,
+      }}>
         {THEMES.map((theme) => {
           const isActive = currentTheme === theme.id;
           return (
-            <Card
+            <div
               key={theme.id}
               onClick={() => !saving && handleSelectTheme(theme.id)}
-              className={`cursor-pointer transition-all duration-200 overflow-hidden border-2 ${
-                isActive
-                  ? 'border-white/40 scale-[1.02] shadow-xl'
-                  : 'border-slate-700 hover:border-slate-500 hover:scale-[1.01]'
-              }`}
-              style={{ background: theme.bg }}
+              style={{
+                background: theme.bg,
+                border: `2px solid ${isActive ? 'var(--t-accent)' : 'var(--t-line)'}`,
+                borderRadius: 12,
+                overflow: 'hidden',
+                cursor: saving ? 'wait' : 'pointer',
+                transition: 'all 0.2s',
+                transform: isActive ? 'scale(1.02)' : 'scale(1)',
+              }}
+              onMouseEnter={(e) => {
+                if (!isActive) e.currentTarget.style.borderColor = 'var(--t-sub)';
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive) e.currentTarget.style.borderColor = 'var(--t-line)';
+              }}
             >
-              {/* Color strip preview */}
-              <div className="flex h-3">
+              {/* Color strip */}
+              <div style={{ display: 'flex', height: 12 }}>
                 {theme.preview.map((color, i) => (
-                  <div key={i} className="flex-1" style={{ backgroundColor: color }} />
+                  <div key={i} style={{ flex: 1, background: color }} />
                 ))}
               </div>
 
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center justify-between mb-3">
-                  <div
-                    className="w-10 h-10 rounded-full flex items-center justify-center"
-                    style={{ backgroundColor: theme.accent }}
-                  >
-                    {isActive && <Check className="w-5 h-5 text-white font-bold" />}
+              <div style={{ padding: 20 }}>
+                {/* Check badge */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+                  <div style={{
+                    width: 40,
+                    height: 40,
+                    borderRadius: '50%',
+                    background: theme.accent,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}>
+                    {isActive && <Check size={20} style={{ color: '#fff', strokeWidth: 3 }} />}
                   </div>
                   {isActive && (
-                    <span className="text-xs font-semibold px-2 py-1 rounded-full bg-white/20 text-white">
-                      Ativo
+                    <span style={{
+                      fontFamily: 'Anton, sans-serif',
+                      fontSize: 11,
+                      letterSpacing: '0.14em',
+                      padding: '4px 10px',
+                      borderRadius: 4,
+                      background: 'rgba(255,255,255,0.2)',
+                      color: '#fff',
+                    }}>
+                      ATIVO
                     </span>
                   )}
                 </div>
-                <h3 className="text-white font-bold text-lg">{theme.name}</h3>
-                <p className="text-gray-400 text-sm mt-0.5">{theme.description}</p>
 
-                {/* Mini UI preview */}
-                <div className="mt-4 space-y-1.5">
-                  <div className="h-2 rounded-full w-3/4 opacity-30" style={{ backgroundColor: theme.accent }} />
-                  <div className="h-2 rounded-full w-1/2 bg-white/10" />
-                  <div className="mt-2 flex gap-1.5">
-                    <div className="h-5 w-12 rounded text-xs flex items-center justify-center text-white font-semibold text-[10px]"
-                      style={{ backgroundColor: theme.accent }}>
-                      Botão
+                {/* Nome */}
+                <h3 style={{
+                  fontFamily: 'Anton, sans-serif',
+                  fontSize: 22,
+                  letterSpacing: '0.08em',
+                  color: '#fff',
+                  margin: '0 0 4px 0',
+                }}>
+                  {theme.name.toUpperCase()}
+                </h3>
+                <p style={{
+                  fontFamily: 'Space Grotesk, sans-serif',
+                  fontSize: 13,
+                  color: 'rgba(255,255,255,0.6)',
+                  margin: '0 0 16px 0',
+                }}>
+                  {theme.description}
+                </p>
+
+                {/* Mini preview */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ height: 8, borderRadius: 4, width: '75%', background: theme.accent, opacity: 0.4 }} />
+                  <div style={{ height: 8, borderRadius: 4, width: '50%', background: 'rgba(255,255,255,0.1)' }} />
+                  <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+                    <div style={{
+                      height: 24,
+                      padding: '0 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 4,
+                      background: theme.accent,
+                      fontFamily: 'Anton, sans-serif',
+                      fontSize: 10,
+                      letterSpacing: '0.12em',
+                      color: '#fff',
+                    }}>
+                      BOTÃO
                     </div>
-                    <div className="h-5 w-16 rounded bg-white/10 text-[10px] text-gray-400 flex items-center justify-center">
+                    <div style={{
+                      height: 24,
+                      padding: '0 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 4,
+                      background: 'rgba(255,255,255,0.1)',
+                      fontFamily: 'Space Grotesk, sans-serif',
+                      fontSize: 10,
+                      color: 'rgba(255,255,255,0.5)',
+                    }}>
                       Cancelar
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           );
         })}
       </div>
 
-      <Card className="bg-slate-800/50 border-slate-700">
-        <CardHeader>
-          <CardTitle className="text-white text-sm">ℹ️ Como funciona</CardTitle>
-        </CardHeader>
-        <CardContent className="text-gray-400 text-sm space-y-1">
-          <p>• O tema é salvo no banco de dados e aplicado para todos os visitantes do site.</p>
-          <p>• A cor de destaque afeta botões, bordas, links ativos e elementos de navegação.</p>
-          <p>• O fundo escuro muda de tom junto com a cor escolhida.</p>
-          <p>• A mudança é aplicada imediatamente, sem precisar recarregar a página.</p>
-        </CardContent>
-      </Card>
+      {/* Info card */}
+      <div style={{
+        background: 'color-mix(in srgb, var(--t-surface) 85%, transparent)',
+        border: '1px solid var(--t-line)',
+        borderRadius: 12,
+        padding: 24,
+      }}>
+        <h3 style={{
+          fontFamily: 'Anton, sans-serif',
+          fontSize: 16,
+          letterSpacing: '0.08em',
+          color: 'var(--t-ink)',
+          margin: '0 0 16px 0',
+        }}>
+          ℹ️ COMO FUNCIONA
+        </h3>
+        <div style={{
+          fontFamily: 'Space Grotesk, sans-serif',
+          fontSize: 14,
+          lineHeight: 1.6,
+          color: 'var(--t-sub)',
+        }}>
+          <p style={{ margin: '0 0 8px 0' }}>• O tema é salvo no banco de dados e aplicado para todos os visitantes do site.</p>
+          <p style={{ margin: '0 0 8px 0' }}>• As cores de destaque afetam botões, bordas, links ativos e elementos de navegação.</p>
+          <p style={{ margin: '0 0 8px 0' }}>• O fundo escuro muda de tom junto com a paleta escolhida.</p>
+          <p style={{ margin: 0 }}>• A mudança é aplicada imediatamente, sem precisar recarregar a página.</p>
+        </div>
+      </div>
     </div>
   );
 };

@@ -257,6 +257,7 @@ class Tournament(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
     date: datetime
+    end_date: Optional[datetime] = None
     location: Optional[str] = None
     is_completed: bool = False
     bracket_link: Optional[str] = None
@@ -267,6 +268,7 @@ class Tournament(BaseModel):
 class TournamentCreate(BaseModel):
     name: str
     date: datetime
+    end_date: Optional[datetime] = None
     location: Optional[str] = None
     is_completed: bool = False
     bracket_link: Optional[str] = None
@@ -1064,6 +1066,8 @@ async def get_tournaments():
     for tournament in tournaments:
         if isinstance(tournament.get('date'), str):
             tournament['date'] = datetime.fromisoformat(tournament['date'])
+        if isinstance(tournament.get('end_date'), str):
+            tournament['end_date'] = datetime.fromisoformat(tournament['end_date'])
         if isinstance(tournament.get('created_at'), str):
             tournament['created_at'] = datetime.fromisoformat(tournament['created_at'])
     return tournaments
@@ -1105,6 +1109,8 @@ async def create_tournament(tournament_data: TournamentCreate, current_user: Use
     tournament = Tournament(**tournament_data.model_dump())
     doc = tournament.model_dump()
     doc['date'] = doc['date'].isoformat()
+    if doc.get('end_date'):
+        doc['end_date'] = doc['end_date'].isoformat()
     doc['created_at'] = doc['created_at'].isoformat()
     await db.tournaments.insert_one(doc)
     return tournament
@@ -1113,6 +1119,8 @@ async def create_tournament(tournament_data: TournamentCreate, current_user: Use
 async def update_tournament(tournament_id: str, tournament_data: TournamentCreate, current_user: User = Depends(get_current_user)):
     updated_data = tournament_data.model_dump()
     updated_data['date'] = updated_data['date'].isoformat()
+    if updated_data.get('end_date'):
+        updated_data['end_date'] = updated_data['end_date'].isoformat()
     result = await db.tournaments.update_one({"id": tournament_id}, {"$set": updated_data})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Tournament not found")
@@ -1120,6 +1128,8 @@ async def update_tournament(tournament_id: str, tournament_data: TournamentCreat
     tournament_doc = await db.tournaments.find_one({"id": tournament_id}, {"_id": 0})
     if isinstance(tournament_doc.get('date'), str):
         tournament_doc['date'] = datetime.fromisoformat(tournament_doc['date'])
+    if isinstance(tournament_doc.get('end_date'), str):
+        tournament_doc['end_date'] = datetime.fromisoformat(tournament_doc['end_date'])
     if isinstance(tournament_doc.get('created_at'), str):
         tournament_doc['created_at'] = datetime.fromisoformat(tournament_doc['created_at'])
     return Tournament(**tournament_doc)
@@ -2120,3 +2130,4 @@ async def create_indexes():
 @app.on_event("shutdown")
 async def shutdown_db_client():
     client.close()
+    

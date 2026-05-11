@@ -18,28 +18,58 @@ const alpha = (c, a) => {
   return `rgba(${r},${g},${b},${a})`;
 };
 
+const PALETTE_DATA = {
+  storm: {
+    bg: '#070d1a', surface: '#0d1a30', surface2: '#13243f',
+    line: 'rgba(120,170,255,0.14)', ink: '#ffffff', sub: '#9bb6dd',
+    accent: '#4aa3ff', accent2: '#22e1ff', gold: '#f5b400',
+    podium: ['#f5b400', '#cdd5e0', '#cd7f32'],
+    grad: 'linear-gradient(135deg,#070d1a 0%,#0d2347 55%,#070d1a 100%)',
+  },
+  inferno: {
+    bg: '#0a0a0c', surface: '#141418', surface2: '#1f1f24',
+    line: 'rgba(255,255,255,0.08)', ink: '#ffffff', sub: '#9aa0aa',
+    accent: '#ff2d6f', accent2: '#c6f432', gold: '#c6f432',
+    podium: ['#c6f432', '#cdd5e0', '#ff8a3d'],
+    grad: 'linear-gradient(135deg,#0a0a0c 0%,#1a0a14 55%,#0a0a0c 100%)',
+  },
+  champion: {
+    bg: '#0e0c08', surface: '#181410', surface2: '#23190f',
+    line: 'rgba(212,160,23,0.18)', ink: '#f5ecd6', sub: '#b8a982',
+    accent: '#d4a017', accent2: '#f5d36b', gold: '#d4a017',
+    podium: ['#f5d36b', '#cdd5e0', '#cd7f32'],
+    grad: 'linear-gradient(135deg,#0e0c08 0%,#231708 55%,#0e0c08 100%)',
+  },
+  glacier: {
+    bg: '#f4f1ea', surface: '#ffffff', surface2: '#ecebe2',
+    line: 'rgba(13,20,24,0.12)', ink: '#0d1418', sub: '#5b6168',
+    accent: '#2d8a3e', accent2: '#0d6e7b', gold: '#b8870e',
+    podium: ['#b8870e', '#7d8590', '#a85d2d'],
+    grad: 'linear-gradient(135deg,#f4f1ea 0%,#eae6dc 55%,#f4f1ea 100%)',
+  },
+};
+
 const getTokens = (theme) => {
-  // Lê os CSS vars do data-theme atual (definidos em index.css)
-  if (typeof document === 'undefined') return {};
+  // Primeiro tenta usar as paletas hardcoded
+  if (PALETTE_DATA[theme]) {
+    return PALETTE_DATA[theme];
+  }
+  
+  // Fallback: tenta ler do CSS
+  if (typeof document === 'undefined') return PALETTE_DATA.storm;
   const el = document.querySelector(`[data-theme="${theme}"]`) || document.documentElement;
   const cs = getComputedStyle(el);
   const get = (k) => cs.getPropertyValue(k).trim();
+  
+  const bg = get('--t-bg');
+  if (!bg) return PALETTE_DATA.storm; // Se não encontrou, usa storm
+  
   return {
-    bg: get('--t-bg') || '#070d1a',
-    surface: get('--t-surface') || '#0d1a30',
-    surface2: get('--t-surface2') || '#13243f',
-    line: get('--t-line') || 'rgba(255,255,255,0.12)',
-    ink: get('--t-ink') || '#ffffff',
-    sub: get('--t-sub') || '#9bb6dd',
-    accent: get('--t-accent') || '#4aa3ff',
-    accent2: get('--t-accent2') || '#22e1ff',
-    gold: get('--t-gold') || '#f5b400',
-    podium: [
-      get('--t-podium-1') || '#f5b400',
-      get('--t-podium-2') || '#cdd5e0',
-      get('--t-podium-3') || '#cd7f32',
-    ],
-    grad: get('--t-grad') || 'linear-gradient(135deg,#070d1a 0%,#0d2347 55%,#070d1a 100%)',
+    bg, surface: get('--t-surface'), surface2: get('--t-surface2'),
+    line: get('--t-line'), ink: get('--t-ink'), sub: get('--t-sub'),
+    accent: get('--t-accent'), accent2: get('--t-accent2'), gold: get('--t-gold'),
+    podium: [get('--t-podium-1'), get('--t-podium-2'), get('--t-podium-3')],
+    grad: get('--t-grad'),
   };
 };
 
@@ -48,24 +78,27 @@ const initials = (name='') => {
   return ((parts[0]?.[0]||'') + (parts[parts.length-1]?.[0]||'')).toUpperCase();
 };
 
-const Photo = ({ player, palette, style, big }) => (
-  <div style={{
-    ...style,
-    background: palette.surface2,
-    backgroundImage: player.photo_url ? `url(${player.photo_url})` : 'none',
-    backgroundSize: 'cover',
-    backgroundPosition: 'top center',
-    overflow: 'hidden',
-    position: 'relative',
-    display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-  }}>
-    {!player.photo_url && (
-      <div style={{ fontFamily: 'Anton, sans-serif', fontSize: big ? 96 : 48, color: alpha(palette.ink, 0.25), letterSpacing: '0.02em' }}>
-        {initials(player.player_name)}
-      </div>
-    )}
-  </div>
-);
+const Photo = ({ player, palette, style, big }) => {
+  const photoUrl = player?.photo_url || player?.photoUrl;
+  return (
+    <div style={{
+      ...style,
+      background: palette.surface2,
+      backgroundImage: photoUrl ? `url(${photoUrl})` : 'none',
+      backgroundSize: 'cover',
+      backgroundPosition: 'top center',
+      overflow: 'hidden',
+      position: 'relative',
+      display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+    }}>
+      {!photoUrl && (
+        <div style={{ fontFamily: 'Anton, sans-serif', fontSize: big ? 96 : 48, color: alpha(palette.ink, 0.25), letterSpacing: '0.02em' }}>
+          {initials(player?.player_name || player?.name || '')}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const Trend = ({ value, palette, size=12 }) => {
   if (value == null || value === 0) return <span style={{ color: palette.sub, fontSize: size }}>—</span>;

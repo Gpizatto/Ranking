@@ -86,7 +86,7 @@ const Photo = ({ player, palette, style, big }) => {
       background: palette.surface2,
       backgroundImage: photoUrl ? `url(${photoUrl})` : 'none',
       backgroundSize: 'cover',
-      backgroundPosition: 'top center',
+      backgroundPosition: 'center center',
       overflow: 'hidden',
       position: 'relative',
       display: 'flex', alignItems: 'flex-end', justifyContent: 'center',

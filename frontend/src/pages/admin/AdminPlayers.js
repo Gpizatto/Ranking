@@ -63,28 +63,52 @@ const AdminPlayers = () => {
     }
   };
 
-  const CROP_W = 150;
-  const CROP_H = 230;
+// Preview visual pequeno
+const PREVIEW_W = 150;
+const PREVIEW_H = 230;
+
+// Resolução real exportada
+const EXPORT_W = 400;
+const EXPORT_H = 600;
 
   const drawCropCanvas = useCallback(() => {
-    const canvas = cropCanvasRef.current;
-    if (!canvas) return;
-    const s = cropStateRef.current;
-    if (!s.img) return;
-    const ctx = canvas.getContext('2d');
-    ctx.clearRect(0, 0, CROP_W, CROP_H);
-    const w = s.img.naturalWidth * s.zoom;
-    const h = s.img.naturalHeight * s.zoom;
-    ctx.drawImage(s.img, s.x, s.y, w, h);
-    // grade
-    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-    ctx.lineWidth = 1;
-    [CROP_W/3, CROP_W*2/3].forEach(x => { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,CROP_H); ctx.stroke(); });
-    [CROP_H/3, CROP_H*2/3].forEach(y => { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(CROP_W,y); ctx.stroke(); });
-    ctx.strokeStyle = '#22c55e';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(1, 1, CROP_W-2, CROP_H-2);
-  }, []);
+  const canvas = cropCanvasRef.current;
+  if (!canvas) return;
+
+  const s = cropStateRef.current;
+  if (!s.img) return;
+
+  const ctx = canvas.getContext('2d');
+
+  ctx.clearRect(0, 0, PREVIEW_W, PREVIEW_H);
+
+  const w = s.img.naturalWidth * s.zoom;
+  const h = s.img.naturalHeight * s.zoom;
+
+  ctx.drawImage(s.img, s.x, s.y, w, h);
+
+  // grade
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.lineWidth = 1;
+
+  [PREVIEW_W / 3, PREVIEW_W * 2 / 3].forEach(x => {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, PREVIEW_H);
+    ctx.stroke();
+  });
+
+  [PREVIEW_H / 3, PREVIEW_H * 2 / 3].forEach(y => {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(PREVIEW_W, y);
+    ctx.stroke();
+  });
+
+  ctx.strokeStyle = '#22c55e';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(1, 1, PREVIEW_W - 2, PREVIEW_H - 2);
+}, []);
 
   // Inicializa canvas com eventos nativos quando modal abre
   useEffect(() => {
@@ -140,11 +164,14 @@ const AdminPlayers = () => {
     reader.onload = (ev) => {
       const img = new Image();
       img.onload = () => {
-        const scale = Math.max(CROP_W / img.naturalWidth, CROP_H / img.naturalHeight);
+        const scale = Math.max(
+  PREVIEW_W / img.naturalWidth,
+  PREVIEW_H / img.naturalHeight
+);
         const s = cropStateRef.current;
         s.img = img; s.imgSrc = ev.target.result; s.zoom = scale;
-        s.x = (CROP_W - img.naturalWidth * scale) / 2;
-        s.y = (CROP_H - img.naturalHeight * scale) / 2;
+        s.x = (PREVIEW_W - img.naturalWidth * scale) / 2;
+s.y = (PREVIEW_H - img.naturalHeight * scale) / 2;
         s.dragging = false;
         setCropZoomDisplay(Math.round(scale * 100));
         // Fecha o Dialog do jogador para o overlay não bloquear o crop
@@ -164,7 +191,8 @@ const AdminPlayers = () => {
     const s = cropStateRef.current;
     const newZoom = val / 100;
     // Zoom centrado no canvas
-    const cx = CROP_W / 2, cy = CROP_H / 2;
+  const cx = PREVIEW_W / 2;
+const cy = PREVIEW_H / 2;
     s.x = cx - (cx - s.x) * (newZoom / s.zoom);
     s.y = cy - (cy - s.y) * (newZoom / s.zoom);
     s.zoom = newZoom;
@@ -172,31 +200,68 @@ const AdminPlayers = () => {
     drawCropCanvas();
   }, [drawCropCanvas]);
 
-  // FIX: Usar PNG lossless em vez de JPEG comprimido para preservar qualidade original
-  const uploadCroppedPhoto = useCallback(async () => {
-    const canvas = document.createElement('canvas');
-    canvas.width = CROP_W; canvas.height = CROP_H;
-    const ctx = canvas.getContext('2d');
-    const s = cropStateRef.current;
-    ctx.drawImage(s.img, s.x, s.y, s.img.naturalWidth * s.zoom, s.img.naturalHeight * s.zoom);
-    canvas.toBlob(async (blob) => {
-      setUploading(true);
-      setCropModal(false);
-      // Reabre o Dialog do jogador após fechar o crop
-      setTimeout(() => setDialogOpen(true), 100);
-      try {
-        const formDataUpload = new FormData();
-        // PNG preserva qualidade sem compressão com perdas
-        formDataUpload.append('file', blob, 'photo.png');
-        const response = await axios.post(`${API}/players/upload-photo`, formDataUpload, { headers: { 'Content-Type': 'multipart/form-data' } });
-        setFormData(prev => ({ ...prev, photo_url: response.data.photo_url }));
-        toast.success('Foto carregada com sucesso!');
-      } catch { toast.error('Erro ao fazer upload da foto'); }
-      finally { setUploading(false); }
-    // PNG lossless — sem parâmetro de qualidade (ignorado para PNG)
-    }, 'image/png');
-  }, []);
+ const uploadCroppedPhoto = useCallback(async () => {
+  const exportCanvas = document.createElement('canvas');
 
+  exportCanvas.width = EXPORT_W;
+  exportCanvas.height = EXPORT_H;
+
+  const ctx = exportCanvas.getContext('2d');
+
+  const s = cropStateRef.current;
+
+  // escala entre preview e exportação
+  const scaleX = EXPORT_W / PREVIEW_W;
+  const scaleY = EXPORT_H / PREVIEW_H;
+
+  ctx.drawImage(
+    s.img,
+    s.x * scaleX,
+    s.y * scaleY,
+    s.img.naturalWidth * s.zoom * scaleX,
+    s.img.naturalHeight * s.zoom * scaleY
+  );
+
+  exportCanvas.toBlob(async (blob) => {
+    if (!blob) {
+      toast.error('Erro ao processar imagem');
+      return;
+    }
+
+    setUploading(true);
+    setCropModal(false);
+
+    setTimeout(() => setDialogOpen(true), 100);
+
+    try {
+      const formDataUpload = new FormData();
+
+      formDataUpload.append('file', blob, 'photo.png');
+
+      const response = await axios.post(
+        `${API}/players/upload-photo`,
+        formDataUpload,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        }
+      );
+
+      setFormData(prev => ({
+        ...prev,
+        photo_url: response.data.photo_url
+      }));
+
+      toast.success('Foto carregada com sucesso!');
+    } catch {
+      toast.error('Erro ao fazer upload da foto');
+    } finally {
+      setUploading(false);
+    }
+  }, 'image/png');
+}, []);
+  
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -908,8 +973,8 @@ const AdminPlayers = () => {
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '12px' }}>
               <canvas
                 ref={cropCanvasRef}
-                width={150}
-                height={230}
+                width={PREVIEW_W}
+height={PREVIEW_H}
                 style={{ borderRadius: '6px', cursor: 'grab', display: 'block', touchAction: 'none' }}
               />
             </div>

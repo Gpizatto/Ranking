@@ -144,6 +144,8 @@ const Players = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [loading, setLoading] = useState(() => !getCached(`${API}/players`));
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [displayCount, setDisplayCount] = useState(15); // Começa mostrando apenas 15
+  const loadMoreRef = useRef(null);
 
   useEffect(() => {
     if (players.length > 0) return;
@@ -161,14 +163,45 @@ const Players = () => {
     }
   };
 
+  // Filtro instantâneo - busca em TODOS os jogadores
   const filteredPlayers = useMemo(() => {
-    if (!searchTerm) return players.slice(0, 50);
-    return players
-      .filter((p) =>
-        p.name.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-      .slice(0, 50);
+    if (!searchTerm) return players;
+    return players.filter((p) =>
+      p.name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
   }, [searchTerm, players]);
+
+  // Players visíveis - apenas os primeiros displayCount
+  const visiblePlayers = useMemo(() => {
+    return filteredPlayers.slice(0, displayCount);
+  }, [filteredPlayers, displayCount]);
+
+  const hasMore = filteredPlayers.length > displayCount;
+
+  // Infinite scroll - Observer para o último elemento
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading) {
+          // Carregar mais 15
+          setDisplayCount(prev => prev + 15);
+        }
+      },
+      { rootMargin: '100px' }
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) observer.observe(currentRef);
+
+    return () => {
+      if (currentRef) observer.unobserve(currentRef);
+    };
+  }, [hasMore, loading]);
+
+  // Resetar displayCount quando o filtro muda
+  useEffect(() => {
+    setDisplayCount(15);
+  }, [searchTerm]);
 
   const handlePlayerClick = (player) => { setSelectedPlayer(player); };
 
@@ -187,7 +220,7 @@ const Players = () => {
             letterSpacing: '0.22em',
             color: 'var(--t-sub)',
           }}>
-            ● CADASTRADOS
+            ● {players.length} CADASTRADOS
           </div>
         </div>
         <h1 style={{
@@ -240,6 +273,17 @@ const Players = () => {
             onBlur={(e) => e.target.style.borderColor = 'var(--t-line)'}
           />
         </div>
+        {searchTerm && (
+          <div style={{
+            marginTop: 10,
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: 11,
+            letterSpacing: '0.18em',
+            color: 'var(--t-sub)',
+          }}>
+            {filteredPlayers.length} RESULTADO{filteredPlayers.length !== 1 ? 'S' : ''}
+          </div>
+        )}
       </div>
 
       {/* Loading */}
@@ -259,25 +303,60 @@ const Players = () => {
           textAlign: 'center',
         }}>
           <Users size={64} style={{ color: 'var(--t-line)', marginBottom: 16 }} />
-          <p style={{ color: 'var(--t-sub)', margin: 0 }}>Nenhum jogador encontrado</p>
+          <p style={{ color: 'var(--t-sub)', margin: 0 }}>
+            {searchTerm ? `Nenhum jogador encontrado para "${searchTerm}"` : 'Nenhum jogador encontrado'}
+          </p>
         </div>
       )}
 
       {/* Grid */}
-      {!loading && filteredPlayers.length > 0 && (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-          gap: 16,
-        }}>
-          {filteredPlayers.map((player) => (
-            <PlayerCard
-              key={player.id}
-              player={player}
-              onClick={handlePlayerClick}
-            />
-          ))}
-        </div>
+      {!loading && visiblePlayers.length > 0 && (
+        <>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+            gap: 16,
+          }}>
+            {visiblePlayers.map((player) => (
+              <PlayerCard
+                key={player.id}
+                player={player}
+                onClick={handlePlayerClick}
+              />
+            ))}
+          </div>
+
+          {/* Load more trigger */}
+          {hasMore && (
+            <div
+              ref={loadMoreRef}
+              style={{
+                padding: 40,
+                textAlign: 'center',
+                fontFamily: 'JetBrains Mono, monospace',
+                fontSize: 11,
+                letterSpacing: '0.18em',
+                color: 'var(--t-sub)',
+              }}
+            >
+              Carregando mais jogadores...
+            </div>
+          )}
+
+          {/* Footer info */}
+          {!hasMore && visiblePlayers.length > 15 && (
+            <div style={{
+              padding: 40,
+              textAlign: 'center',
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: 11,
+              letterSpacing: '0.18em',
+              color: 'var(--t-sub)',
+            }}>
+              ✓ TODOS OS {filteredPlayers.length} JOGADORES CARREGADOS
+            </div>
+          )}
+        </>
       )}
 
       {/* Modal */}

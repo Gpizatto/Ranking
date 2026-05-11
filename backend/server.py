@@ -805,10 +805,10 @@ async def upload_photo(file: UploadFile = File(...), current_user: User = Depend
         # Reabrir após verify() que fecha o buffer interno
         img = PILImage.open(BytesIO(contents))
         img = img.convert("RGB")
-        # Redimensionar mantendo proporção dentro de 400x600px
-        img.thumbnail((400, 600), PILImage.LANCZOS)
+        # Redimensionar mantendo proporção dentro de 800x1200px
+        img.thumbnail((800, 1200), PILImage.LANCZOS)
         output = BytesIO()
-        img.save(output, format="JPEG", quality=90, optimize=True)
+        img.save(output, format="JPEG", quality=95, optimize=True)
         output.seek(0)
         compressed = output.read()
         logger.info(f"Foto comprimida: {len(contents) // 1024}KB -> {len(compressed) // 1024}KB")

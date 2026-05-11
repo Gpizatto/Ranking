@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import axios, { API } from "../lib/api";
 import { cachedGet, getCached, TTL } from "../lib/cache";
 
@@ -12,19 +12,62 @@ import { toast } from "sonner";
 
 const sortAlpha = arr => [...arr].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
+// Cache de fotos em memória para evitar re-fetches na mesma sessão
+const photoCache = {};
 
 const PlayerCard = React.memo(({ player, onClick }) => {
+  const [photoUrl, setPhotoUrl] = useState(photoCache[player.id] || null);
+  const cardRef = useRef(null);
+
+  const loadPhoto = useCallback(async () => {
+    if (photoCache[player.id]) {
+      setPhotoUrl(photoCache[player.id]);
+      return;
+    }
+    try {
+      const res = await axios.get(`${API}/players/photo/${player.id}`);
+      const url = res.data.photo_url;
+      photoCache[player.id] = url;
+      setPhotoUrl(url);
+    } catch {
+      // sem foto — mantém fallback
+    }
+  }, [player.id]);
+
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+
+    // Carregar foto apenas quando o card entrar na viewport
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          loadPhoto();
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "150px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadPhoto]);
+
   return (
     <Card
+      ref={cardRef}
       className="bg-slate-800/50 border-green-500/20 hover:border-green-400/40 transition-all cursor-pointer"
       onClick={() => onClick(player)}
     >
       <CardContent className="pt-6">
         <div className="flex items-center space-x-4 mb-3">
-          {/* FIX: object-top para mostrar rosto e não o corpo */}
           <Avatar className="w-16 h-16">
-            <AvatarImage src={player.photo_url || "/fsp.jpeg"} loading="lazy" className="object-cover object-top" />
-            <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover object-top" /></AvatarFallback>
+            <AvatarImage
+              src={photoUrl || "/fsp.jpeg"}
+              className="object-cover object-top"
+            />
+            <AvatarFallback>
+              <img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover object-top" />
+            </AvatarFallback>
           </Avatar>
 
           <div className="flex-1">
@@ -52,9 +95,6 @@ const PlayerCard = React.memo(({ player, onClick }) => {
 });
 
 const Players = () => {
-
-
-  // Inicializa direto do cache no primeiro render — sem ciclo extra
   const [players, setPlayers] = useState(() => {
     const cached = getCached(`${API}/players`);
     return cached ? sortAlpha(cached) : [];
@@ -64,7 +104,7 @@ const Players = () => {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
 
   useEffect(() => {
-    if (players.length > 0) return; // já populado pelo cache no useState
+    if (players.length > 0) return;
     fetchPlayers();
   }, []);
 
@@ -81,7 +121,6 @@ const Players = () => {
 
   const filteredPlayers = useMemo(() => {
     if (!searchTerm) return players.slice(0, 50);
-
     return players
       .filter((p) =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -93,23 +132,15 @@ const Players = () => {
 
   return (
     <div className="space-y-6">
-
       <div>
-        <h1 className="text-4xl font-bold text-white mb-2">
-          Jogadores
-        </h1>
-
-        <p className="text-gray-400">
-          Todos os atletas cadastrados
-        </p>
+        <h1 className="text-4xl font-bold text-white mb-2">Jogadores</h1>
+        <p className="text-gray-400">Todos os atletas cadastrados</p>
       </div>
 
       <Card className="bg-slate-800/50 border-green-500/20">
         <CardContent className="pt-6">
-
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-
             <Input
               placeholder="Buscar jogador..."
               value={searchTerm}
@@ -117,28 +148,22 @@ const Players = () => {
               className="pl-10 bg-slate-700 border-slate-600 text-white"
             />
           </div>
-
         </CardContent>
       </Card>
 
       {loading ? (
-        <div className="text-center py-12 text-gray-400">
-          Carregando...
-        </div>
+        <div className="text-center py-12 text-gray-400">Carregando...</div>
       ) : filteredPlayers.length === 0 ? (
         <Card className="bg-slate-800/50 border-green-500/20">
           <CardContent className="py-12">
-
             <div className="text-center text-gray-400">
               <Users className="w-16 h-16 mx-auto mb-4 opacity-50" />
               <p>Nenhum jogador encontrado</p>
             </div>
-
           </CardContent>
         </Card>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-
           {filteredPlayers.map((player) => (
             <PlayerCard
               key={player.id}
@@ -146,7 +171,6 @@ const Players = () => {
               onClick={handlePlayerClick}
             />
           ))}
-
         </div>
       )}
 

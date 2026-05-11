@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import axios from '../../lib/api';
 import { API } from '../../lib/api';
@@ -18,7 +18,7 @@ const sortAlpha = arr => [...arr].sort((a, b) => a.name.localeCompare(b.name, 'p
 const AdminPlayers = () => {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [displayCount, setDisplayCount] = useState(15); // Lazy loading - começa com 15
+  const [displayCount, setDisplayCount] = useState(15);
   const loadMoreRef = useRef(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState(null);
@@ -412,6 +412,49 @@ const cy = PREVIEW_H / 2;
     toast.success('Foto do Drive vinculada!');
   };
 
+  // Calcular players filtrados com useMemo
+  const filtered = useMemo(() => {
+    return players.filter(p => {
+      const nameOk = !filters.name || p.name.toLowerCase().includes(filters.name.toLowerCase());
+      const federatedOk = !filters.federated || String(p.is_federated !== false) === filters.federated;
+      const cityOk = !filters.city || (p.city || '').toLowerCase().includes(filters.city.toLowerCase());
+      const academyOk = !filters.academy || (p.academy || '').toLowerCase().includes(filters.academy.toLowerCase());
+      return nameOk && federatedOk && cityOk && academyOk;
+    });
+  }, [players, filters.name, filters.federated, filters.city, filters.academy]);
+
+  const visiblePlayers = useMemo(() => {
+    return filtered.slice(0, displayCount);
+  }, [filtered, displayCount]);
+
+  const hasMore = filtered.length > displayCount;
+
+  // Infinite scroll observer
+  useEffect(() => {
+    if (!hasMore || loading) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setDisplayCount(prev => prev + 15);
+        }
+      },
+      { rootMargin: '100px' }
+    );
+
+    const currentRef = loadMoreRef.current;
+    if (currentRef) observer.observe(currentRef);
+
+    return () => {
+      if (currentRef) observer.unobserve(currentRef);
+    };
+  }, [hasMore, loading]);
+
+  // Resetar displayCount quando filtros mudam
+  useEffect(() => {
+    setDisplayCount(15);
+  }, [filters.name, filters.federated, filters.city, filters.academy]);
+
   return (
     <>
     <div className="space-y-6">
@@ -779,60 +822,20 @@ const cy = PREVIEW_H / 2;
             </div>
 
             {/* Grid de jogadores filtrado */}
-            {(() => {
-              const filtered = players.filter(p => {
-                const nameOk = !filters.name || p.name.toLowerCase().includes(filters.name.toLowerCase());
-                const federatedOk = !filters.federated || String(p.is_federated !== false) === filters.federated;
-                const cityOk = !filters.city || (p.city || '').toLowerCase().includes(filters.city.toLowerCase());
-                const academyOk = !filters.academy || (p.academy || '').toLowerCase().includes(filters.academy.toLowerCase());
-                return nameOk && federatedOk && cityOk && academyOk;
-              });
-
-              // Lazy loading - Infinite scroll observer
-              useEffect(() => {
-                const observer = new IntersectionObserver(
-                  (entries) => {
-                    if (entries[0].isIntersecting && filtered.length > displayCount && !loading) {
-                      setDisplayCount(prev => prev + 15);
-                    }
-                  },
-                  { rootMargin: '100px' }
-                );
-
-                const currentRef = loadMoreRef.current;
-                if (currentRef) observer.observe(currentRef);
-
-                return () => {
-                  if (currentRef) observer.unobserve(currentRef);
-                };
-              }, [filtered.length, displayCount, loading]);
-
-              // Resetar displayCount quando filtros mudam
-              useEffect(() => {
-                setDisplayCount(15);
-              }, [filters.name, filters.federated, filters.city, filters.academy]);
-
-              const visiblePlayers = filtered.slice(0, displayCount);
-              const hasMore = filtered.length > displayCount;
-
-              if (filtered.length === 0) {
-                return (
-                  <Card className="bg-slate-800/50 border-blue-500/20">
-                    <CardContent className="py-12">
-                      <div className="text-center text-gray-400">
-                        <Users className="w-16 h-16 mx-auto mb-4 opacity-50" />
-                        <p>{players.length === 0 ? 'Nenhum jogador cadastrado' : 'Nenhum jogador encontrado com esses filtros'}</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              }
-
-              return (
-                <>
-                  <p className="text-gray-400 text-sm mb-3">{filtered.length} jogador{filtered.length !== 1 ? 'es' : ''} encontrado{filtered.length !== 1 ? 's' : ''}</p>
-                  <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="players-admin-grid">
-                    {visiblePlayers.map((player) => (
+            {filtered.length === 0 ? (
+              <Card className="bg-slate-800/50 border-blue-500/20">
+                <CardContent className="py-12">
+                  <div className="text-center text-gray-400">
+                    <Users className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                    <p>{players.length === 0 ? 'Nenhum jogador cadastrado' : 'Nenhum jogador encontrado com esses filtros'}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <>
+                <p className="text-gray-400 text-sm mb-3">{filtered.length} jogador{filtered.length !== 1 ? 'es' : ''} encontrado{filtered.length !== 1 ? 's' : ''}</p>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="players-admin-grid">
+                  {visiblePlayers.map((player) => (
                       <Card key={player.id} className="bg-slate-800/50 border-blue-500/20" data-testid={`player-admin-card-${player.id}`}>
                         <CardContent className="pt-6">
                           <div className="flex items-center space-x-4 mb-4">
@@ -907,8 +910,8 @@ const cy = PREVIEW_H / 2;
                     </div>
                   )}
                 </>
-              );
-            })()}
+              )
+            }
           </div>
         </div>
       )}

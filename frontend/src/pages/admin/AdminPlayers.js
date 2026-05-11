@@ -14,69 +14,12 @@ import { toast } from 'sonner';
 
 const sortAlpha = arr => [...arr].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 
-// Cache de fotos em memória para evitar re-fetches
-const photoCache = {};
-
-// Card de jogador admin com foto lazy
-const AdminPlayerCard = React.memo(({ player, onEdit, onDelete }) => {
-  // Usa photo_url que já vem no player (endpoint /players retorna a foto)
-  // photoCache serve como fallback para foto atualizada após upload
-  const [photoUrl, setPhotoUrl] = React.useState(
-    photoCache[player.id] || player.photo_url || null
-  );
-  const cardRef = React.useRef(null);
-
-  React.useEffect(() => {
-    // Atualiza se o cache tiver uma foto mais recente (ex: após upload)
-    if (photoCache[player.id] && photoCache[player.id] !== photoUrl) {
-      setPhotoUrl(photoCache[player.id]);
-    } else if (player.photo_url && !photoUrl) {
-      setPhotoUrl(player.photo_url);
-    }
-  }, [player.id, player.photo_url]);
-
-  return (
-    <Card ref={cardRef} className="bg-slate-800/50 border-blue-500/20" data-testid={`player-admin-card-${player.id}`}>
-      <CardContent className="pt-6">
-        <div className="flex items-center space-x-4 mb-4">
-          <Avatar className="w-16 h-16">
-            <AvatarImage src={photoUrl || "/fsp.jpeg"} className="object-cover object-top" />
-            <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover object-top" /></AvatarFallback>
-          </Avatar>
-          <div className="flex-1">
-            <h3 className="text-white font-semibold text-lg">{player.name}</h3>
-            {player.birth_date && (
-              <p className="text-gray-400 text-xs mt-0.5">
-                🎂 {new Date(player.birth_date + 'T00:00:00').toLocaleDateString('pt-BR')}
-                {' · '}
-                {(() => { const t = new Date(); const b = new Date(player.birth_date + 'T00:00:00'); return t.getFullYear() - b.getFullYear() - (t < new Date(t.getFullYear(), b.getMonth(), b.getDate()) ? 1 : 0); })()} anos
-              </p>
-            )}
-            <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${player.is_federated !== false ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-              {player.is_federated !== false ? '✅ Federado' : '❌ Não Federado'}
-            </span>
-          </div>
-        </div>
-        {player.city && <p className="text-gray-400 text-sm">📍 {player.city}</p>}
-        {player.academy && <p className="text-gray-400 text-sm">🏫 {player.academy}</p>}
-        <div className="flex gap-2 mt-4">
-          <button onClick={() => onEdit(player)} className="flex-1 flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2 px-3 rounded-md transition-colors">
-            ✏️ Editar
-          </button>
-          <button onClick={() => onDelete(player.id)} className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold py-2 px-3 rounded-md transition-colors">
-            🗑️ Excluir
-          </button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-});
-
-
 
 const AdminPlayers = () => {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [displayCount, setDisplayCount] = useState(15); // Lazy loading - começa com 15
+  const loadMoreRef = useRef(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [formData, setFormData] = useState({
@@ -343,11 +286,9 @@ const cy = PREVIEW_H / 2;
 
   const handleEdit = (player) => {
     setEditingPlayer(player);
-    // photo_url já vem no player do endpoint /players
-    const photoUrl = photoCache[player.id] || player.photo_url || '';
     setFormData({
       name: player.name,
-      photo_url: photoUrl,
+      photo_url: player.photo_url || '',
       city: player.city || '',
       academy: player.academy || '',
       coach: player.coach || '',
@@ -356,20 +297,6 @@ const cy = PREVIEW_H / 2;
       is_federated: player.is_federated !== undefined ? player.is_federated : true
     });
     setDialogOpen(true);
-  };
-
-  const migratePhotos = async () => {
-    if (!window.confirm('Isso vai re-processar todas as fotos existentes para maior resolução. Pode demorar alguns segundos. Continuar?')) return;
-    try {
-      toast.loading('Migrando fotos...');
-      const res = await axios.post(`${API}/admin/migrate-photos`);
-      toast.dismiss();
-      toast.success(`Fotos migradas: ${res.data.updated} atualizadas, ${res.data.skipped} já ok, ${res.data.errors} erros`);
-      fetchPlayers();
-    } catch (err) {
-      toast.dismiss();
-      toast.error('Erro ao migrar fotos');
-    }
   };
 
   const handleDelete = async (id) => {
@@ -532,13 +459,6 @@ const cy = PREVIEW_H / 2;
             onChange={handleImportExcel}
             className="hidden"
           />
-          <Button
-            onClick={migratePhotos}
-            className="bg-indigo-600 hover:bg-indigo-700 text-white"
-            title="Melhorar resolução de todas as fotos existentes"
-          >
-            🖼️ <span className="hidden sm:inline ml-1">Melhorar Fotos</span>
-          </Button>
           
           <Dialog open={dialogOpen} onOpenChange={(open) => {
             setDialogOpen(open);
@@ -559,10 +479,10 @@ const cy = PREVIEW_H / 2;
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="flex flex-col items-center gap-3">
                 <div className="relative">
-                  {/* FIX: object-top para mostrar rosto e não o corpo */}
+                  {/* FIX: object-center para mostrar rosto e não o corpo */}
                   <Avatar className="w-24 h-24">
-                    <AvatarImage src={formData.photo_url || "/fsp.jpeg"} className="object-cover object-top" />
-                    <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover object-top" /></AvatarFallback>
+                    <AvatarImage src={formData.photo_url || "/fsp.jpeg"} className="object-cover object-center" />
+                    <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover object-center" /></AvatarFallback>
                   </Avatar>
                 </div>
                 <div className="flex gap-2">
@@ -868,6 +788,33 @@ const cy = PREVIEW_H / 2;
                 return nameOk && federatedOk && cityOk && academyOk;
               });
 
+              // Lazy loading - Infinite scroll observer
+              useEffect(() => {
+                const observer = new IntersectionObserver(
+                  (entries) => {
+                    if (entries[0].isIntersecting && filtered.length > displayCount && !loading) {
+                      setDisplayCount(prev => prev + 15);
+                    }
+                  },
+                  { rootMargin: '100px' }
+                );
+
+                const currentRef = loadMoreRef.current;
+                if (currentRef) observer.observe(currentRef);
+
+                return () => {
+                  if (currentRef) observer.unobserve(currentRef);
+                };
+              }, [filtered.length, displayCount, loading]);
+
+              // Resetar displayCount quando filtros mudam
+              useEffect(() => {
+                setDisplayCount(15);
+              }, [filters.name, filters.federated, filters.city, filters.academy]);
+
+              const visiblePlayers = filtered.slice(0, displayCount);
+              const hasMore = filtered.length > displayCount;
+
               if (filtered.length === 0) {
                 return (
                   <Card className="bg-slate-800/50 border-blue-500/20">
@@ -885,15 +832,80 @@ const cy = PREVIEW_H / 2;
                 <>
                   <p className="text-gray-400 text-sm mb-3">{filtered.length} jogador{filtered.length !== 1 ? 'es' : ''} encontrado{filtered.length !== 1 ? 's' : ''}</p>
                   <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4" data-testid="players-admin-grid">
-                    {filtered.map((player) => (
-                      <AdminPlayerCard
-                        key={player.id}
-                        player={player}
-                        onEdit={handleEdit}
-                        onDelete={handleDelete}
-                      />
+                    {visiblePlayers.map((player) => (
+                      <Card key={player.id} className="bg-slate-800/50 border-blue-500/20" data-testid={`player-admin-card-${player.id}`}>
+                        <CardContent className="pt-6">
+                          <div className="flex items-center space-x-4 mb-4">
+                            {/* FIX: object-center para mostrar rosto */}
+                            <Avatar className="w-16 h-16">
+                              <AvatarImage src={player.photo_url || "/fsp.jpeg"} className="object-cover object-center" />
+                              <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover object-center" /></AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1">
+                              <h3 className="text-white font-semibold text-lg">{player.name}</h3>
+                              {player.birth_date && (
+                                <p className="text-gray-400 text-xs mt-0.5">
+                                  🎂 {new Date(player.birth_date + 'T00:00:00').toLocaleDateString('pt-BR')}
+                                  {' · '}
+                                  {(() => { const t = new Date(); const b = new Date(player.birth_date + 'T00:00:00'); return t.getFullYear() - b.getFullYear() - (t < new Date(t.getFullYear(), b.getMonth(), b.getDate()) ? 1 : 0); })()} anos
+                                </p>
+                              )}
+                              <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full mt-1 ${
+                                player.is_federated !== false
+                                  ? 'bg-green-500/20 text-green-400'
+                                  : 'bg-red-500/10 text-red-400'
+                              }`}>
+                                {player.is_federated !== false ? '✅ Federado' : '❌ Não Federado'}
+                              </span>
+                              {player.city && (
+                                <p className="text-gray-400 text-xs">📍 {player.city}</p>
+                              )}
+                              {player.academy && (
+                                <p className="text-gray-400 text-xs truncate">🏫 {player.academy}</p>
+                              )}
+                            </div>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={() => handleEdit(player)}
+                              size="sm"
+                              className="flex-1 bg-blue-500 hover:bg-blue-600"
+                              data-testid={`edit-player-${player.id}`}
+                            >
+                              <Edit className="w-3 h-3 mr-1" />
+                              Editar
+                            </Button>
+                            <Button
+                              onClick={() => handleDelete(player.id)}
+                              size="sm"
+                              className="flex-1 bg-red-500 hover:bg-red-600"
+                              data-testid={`delete-player-${player.id}`}
+                            >
+                              <Trash2 className="w-3 h-3 mr-1" />
+                              Excluir
+                            </Button>
+                          </div>
+                        </CardContent>
+                      </Card>
                     ))}
                   </div>
+
+                  {/* Load more trigger */}
+                  {hasMore && (
+                    <div
+                      ref={loadMoreRef}
+                      className="text-center py-8 text-gray-400 text-sm"
+                    >
+                      Carregando mais jogadores...
+                    </div>
+                  )}
+
+                  {/* Footer info */}
+                  {!hasMore && visiblePlayers.length > 15 && (
+                    <div className="text-center py-8 text-gray-400 text-sm">
+                      ✓ TODOS OS {filtered.length} JOGADORES CARREGADOS
+                    </div>
+                  )}
                 </>
               );
             })()}

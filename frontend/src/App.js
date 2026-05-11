@@ -50,7 +50,7 @@ function App() {
   usePrefetch();
 
   return (
-    <div className="App">
+    <div className="App" data-theme="storm">
       <Toaster position="top-right" richColors />
       <HashRouter>
         <Routes>

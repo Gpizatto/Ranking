@@ -105,15 +105,18 @@ const Rankings = () => {
         .rk-row .avatar { width: 38px; height: 38px; border-radius: 6px; background: var(--t-surface2); background-size: cover; background-position: top; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--t-sub); flex-shrink: 0; overflow: hidden; }
         
         /* Fix Dialog background */
-        [role="dialog"] { background: var(--t-surface) !important; color: var(--t-ink) !important; }
-        [data-radix-dialog-content] { background: var(--t-surface) !important; }
+        [role="dialog"] { background: #0d1a30 !important; color: #ffffff !important; }
+        [data-radix-dialog-content] { background: #0d1a30 !important; color: #ffffff !important; }
         
         /* Dialog overlay escuro */
-        [data-radix-dialog-overlay] { background: rgba(0,0,0,0.8) !important; }
+        [data-radix-dialog-overlay] { background: rgba(0,0,0,0.85) !important; }
         
-        /* Força tema escuro nos controles do modal */
+        /* Força fundo escuro e texto branco em TODOS os controles do modal */
+        .max-w-6xl { background: #0d1a30 !important; color: #ffffff !important; }
+        .max-w-6xl * { color: #ffffff !important; }
         .max-w-6xl input[type="checkbox"] { accent-color: var(--t-accent); }
-        .max-w-6xl label { color: var(--t-ink) !important; }
+        .max-w-6xl label { color: #ffffff !important; }
+        .max-w-6xl button { color: var(--t-ink) !important; }
         
         @media (max-width: 900px) {
           .rk-hero { grid-template-columns: 1fr !important; }
@@ -249,7 +252,7 @@ const Rankings = () => {
 
       {/* POST GENERATOR MODAL */}
       <Dialog open={postOpen} onOpenChange={setPostOpen}>
-        <DialogContent className="max-w-6xl" style={{ background: 'var(--t-surface)', border: '1px solid var(--t-line)', color: 'var(--t-ink)', maxHeight: '90vh', overflow: 'auto' }}>
+        <DialogContent className="max-w-6xl" style={{ background: '#0d1a30 !important', border: '1px solid var(--t-line)', color: '#ffffff', maxHeight: '90vh', overflow: 'auto' }}>
           <DialogHeader>
             <DialogTitle className="rk-display" style={{ fontSize: 28, letterSpacing: '0.08em' }}>GERAR POST DO RANKING</DialogTitle>
           </DialogHeader>

@@ -14,16 +14,28 @@ const Layout = () => {
   // Inicializa tema do cache imediatamente — sem flash de tema padrão
   useEffect(() => {
     const themeUrl = `${API}/theme`;
+    
+    // Mapeamento: backend theme ID -> FSP theme
+    const themeMap = {
+      'blue': 'storm',
+      'red': 'inferno',
+      'orange': 'champion',
+      'silver': 'glacier',
+      'green': 'storm',  // fallback
+      'purple': 'storm',  // fallback
+    };
 
     // 1. Aplicar tema do cache imediatamente (síncrono)
     const cachedTheme = getCached(themeUrl);
     if (cachedTheme) {
-      document.documentElement.setAttribute('data-theme', cachedTheme.theme || 'storm');
+      const fspTheme = themeMap[cachedTheme.theme] || 'storm';
+      document.documentElement.setAttribute('data-theme', fspTheme);
     }
 
     // 2. Buscar tema do servidor em background (só na primeira vez ou expirado)
     cachedGet(themeUrl, TTL.THEME, axios).then(data => {
-      document.documentElement.setAttribute('data-theme', data.theme || 'storm');
+      const fspTheme = themeMap[data.theme] || 'storm';
+      document.documentElement.setAttribute('data-theme', fspTheme);
     }).catch(() => {});
   }, []); // roda UMA vez — não a cada navegação
 

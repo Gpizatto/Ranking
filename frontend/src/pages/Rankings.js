@@ -101,6 +101,7 @@ const Rankings = () => {
         .rk-stat-row { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 14px; background: color-mix(in srgb, var(--t-bg) 50%, transparent); border: 1px solid var(--t-line); border-radius: 8px; }
         .rk-row { display: grid; grid-template-columns: 70px 1fr 160px 70px 90px 60px 110px; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--t-line); cursor: pointer; transition: background 0.15s; }
         .rk-row:hover { background: color-mix(in srgb, var(--t-accent) 8%, transparent); }
+        .rk-row:hover .rk-hover-tooltip { opacity: 1; }
         .rk-row:last-child { border-bottom: none; }
         .rk-row .avatar { width: 38px; height: 38px; border-radius: 6px; background: var(--t-surface2); background-size: cover; background-position: top; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--t-sub); flex-shrink: 0; overflow: hidden; }
         
@@ -229,7 +230,7 @@ const Rankings = () => {
                   <span>POS</span><span>JOGADOR</span><span>CIDADE / CLUBE</span><span style={{ textAlign: 'center' }}>TEND</span><span style={{ textAlign: 'center' }}>% VIT</span><span style={{ textAlign: 'center' }}>TORN</span><span style={{ textAlign: 'right' }}>PONTOS</span>
                 </div>
                 {rest.map((p, i) => (
-                  <div key={p.player_id} className="rk-row" onClick={() => setSelectedPlayerId(p.player_id)}>
+                  <div key={p.player_id} className="rk-row" onClick={() => setSelectedPlayerId(p.player_id)} style={{ position: 'relative' }}>
                     <span className="rk-display" style={{ fontSize: 24, color: 'var(--t-sub)' }}>{String(p.rank).padStart(2,'0')}</span>
                     <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
                       <span className="avatar" style={{ backgroundImage: p.photo_url ? `url(${p.photo_url})` : 'none' }}>
@@ -242,6 +243,43 @@ const Rankings = () => {
                     <span className="rk-mono hide-mobile" style={{ textAlign: 'center', fontSize: 13, color: p.win_rate >= 70 ? 'var(--t-accent2)' : 'var(--t-ink)' }}>{p.win_rate != null ? `${p.win_rate}%` : '—'}</span>
                     <span className="rk-mono hide-mobile" style={{ textAlign: 'center', fontSize: 13, color: 'var(--t-sub)' }}>{p.results_count}</span>
                     <span className="rk-display" style={{ textAlign: 'right', fontSize: 26, color: 'var(--t-accent)' }}>{p.total_points}</span>
+                    
+                    {/* Hover tooltip com último confronto */}
+                    {p.last_match && (
+                      <div className="rk-hover-tooltip" style={{
+                        position: 'absolute',
+                        right: 0,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'var(--t-surface2)',
+                        border: '1px solid var(--t-line)',
+                        borderRadius: 8,
+                        padding: '8px 14px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        opacity: 0,
+                        pointerEvents: 'none',
+                        transition: 'opacity 0.2s',
+                        zIndex: 10,
+                        whiteSpace: 'nowrap',
+                      }}>
+                        <span className="rk-mono" style={{ fontSize: 9, color: 'var(--t-sub)' }}>ÚLT. PARTIDA</span>
+                        <span style={{ fontSize: 13, fontWeight: 600 }}>vs {p.last_match.opponent_name}</span>
+                        <span className="rk-mono" style={{ fontSize: 12 }}>{p.last_match.score_formatted}</span>
+                        <span style={{
+                          padding: '2px 8px',
+                          background: p.last_match.result === 'Win' ? 'var(--t-accent2)' : '#ff5577',
+                          color: 'var(--t-bg)',
+                          borderRadius: 3,
+                          fontFamily: 'Anton, sans-serif',
+                          fontSize: 11,
+                          letterSpacing: '0.1em',
+                        }}>
+                          {p.last_match.result === 'Win' ? 'V' : 'D'}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>

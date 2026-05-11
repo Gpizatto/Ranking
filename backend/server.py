@@ -1616,7 +1616,7 @@ async def get_rankings(class_category: Optional[str] = None, gender_category: Op
     players_list, matches_list = await asyncio.gather(
         db.players.find(
             {"id": {"$in": player_ids}},
-            {"_id": 0, "id": 1, "photo_url": 1, "is_federated": 1}
+            {"_id": 0, "id": 1, "is_federated": 1}
         ).to_list(10000),
         db.matches.find(
             {"$or": [{"player1_id": {"$in": player_ids}}, {"player2_id": {"$in": player_ids}}]},
@@ -1733,7 +1733,6 @@ async def get_rankings(class_category: Optional[str] = None, gender_category: Op
         rankings.append({
             'player_id': pid,
             'player_name': data_p['player_name'],
-            'photo_url': player.get('photo_url'),
             'total_points': round(total_points, 2),
             'results_count': len(points_list),
             'is_federated': is_federated,

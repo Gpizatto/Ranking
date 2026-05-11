@@ -285,21 +285,16 @@ code {
 [data-theme] ::-webkit-scrollbar-thumb:hover {
   background: var(--t-500-30) !important;
 }
- /* ============================================================
-   PALETAS FSP — adicione ao final do seu src/index.css
-   ============================================================ */
+/* ========================================
+   PALETAS FSP — Adicionar ao final do index.css
+   ======================================== */
 
-/* Tokens compartilhados (consumidos via Tailwind text-fsp-accent, bg-fsp-bg etc) */
-[data-theme="storm"], [data-theme="inferno"], [data-theme="champion"], [data-theme="glacier"] {
-  --radius: 0.5rem;
-}
-
-/* ---------- STORM (azul FSP evoluído) ---------- */
+/* Storm (Azul FSP evoluído) */
 [data-theme="storm"] {
   --t-bg: #070d1a;
   --t-surface: #0d1a30;
   --t-surface2: #13243f;
-  --t-line: rgba(120,170,255,0.14);
+  --t-line: rgba(120, 170, 255, 0.14);
   --t-ink: #ffffff;
   --t-sub: #9bb6dd;
   --t-accent: #4aa3ff;
@@ -308,19 +303,25 @@ code {
   --t-podium-1: #f5b400;
   --t-podium-2: #cdd5e0;
   --t-podium-3: #cd7f32;
-  --t-grad: linear-gradient(135deg,#070d1a 0%,#0d2347 55%,#070d1a 100%);
-  /* Compat com seu sistema [data-theme] existente */
-  --t-500: #4aa3ff; --t-600: #2f8def; --t-400: #7ec0ff;
-  --t-500-20: rgba(74,163,255,0.2); --t-500-30: rgba(74,163,255,0.3);
-  --t-bg-from: #070d1a; --t-bg-via: #0d2347; --t-bg-to: #070d1a;
+  --t-grad: linear-gradient(135deg, #070d1a 0%, #0d2347 55%, #070d1a 100%);
+  
+  /* Compatibilidade com sistema antigo */
+  --t-500: #4aa3ff;
+  --t-600: #3b8fe6;
+  --t-400: #6ab8ff;
+  --t-500-20: rgba(74, 163, 255, 0.2);
+  --t-500-30: rgba(74, 163, 255, 0.3);
+  --t-bg-from: #070d1a;
+  --t-bg-via: #0d2347;
+  --t-bg-to: #070d1a;
 }
 
-/* ---------- INFERNO (preto + magenta + lime) ---------- */
+/* Inferno (Preto + magenta + lime) */
 [data-theme="inferno"] {
   --t-bg: #0a0a0c;
   --t-surface: #141418;
   --t-surface2: #1f1f24;
-  --t-line: rgba(255,255,255,0.08);
+  --t-line: rgba(255, 255, 255, 0.08);
   --t-ink: #ffffff;
   --t-sub: #9aa0aa;
   --t-accent: #ff2d6f;
@@ -329,18 +330,25 @@ code {
   --t-podium-1: #c6f432;
   --t-podium-2: #cdd5e0;
   --t-podium-3: #ff8a3d;
-  --t-grad: linear-gradient(135deg,#0a0a0c 0%,#1a0a14 55%,#0a0a0c 100%);
-  --t-500: #ff2d6f; --t-600: #e0265e; --t-400: #ff6e9c;
-  --t-500-20: rgba(255,45,111,0.2); --t-500-30: rgba(255,45,111,0.3);
-  --t-bg-from: #0a0a0c; --t-bg-via: #1a0a14; --t-bg-to: #0a0a0c;
+  --t-grad: linear-gradient(135deg, #0a0a0c 0%, #1a0a14 55%, #0a0a0c 100%);
+  
+  /* Compatibilidade com sistema antigo */
+  --t-500: #ff2d6f;
+  --t-600: #e61a5a;
+  --t-400: #ff5d8e;
+  --t-500-20: rgba(255, 45, 111, 0.2);
+  --t-500-30: rgba(255, 45, 111, 0.3);
+  --t-bg-from: #0a0a0c;
+  --t-bg-via: #1a0a14;
+  --t-bg-to: #0a0a0c;
 }
 
-/* ---------- CHAMPION (dourado premium) ---------- */
+/* Champion (Dourado premium) */
 [data-theme="champion"] {
   --t-bg: #0e0c08;
   --t-surface: #181410;
   --t-surface2: #23190f;
-  --t-line: rgba(212,160,23,0.18);
+  --t-line: rgba(212, 160, 23, 0.18);
   --t-ink: #f5ecd6;
   --t-sub: #b8a982;
   --t-accent: #d4a017;
@@ -349,18 +357,25 @@ code {
   --t-podium-1: #f5d36b;
   --t-podium-2: #cdd5e0;
   --t-podium-3: #cd7f32;
-  --t-grad: linear-gradient(135deg,#0e0c08 0%,#231708 55%,#0e0c08 100%);
-  --t-500: #d4a017; --t-600: #b88a13; --t-400: #f5d36b;
-  --t-500-20: rgba(212,160,23,0.2); --t-500-30: rgba(212,160,23,0.3);
-  --t-bg-from: #0e0c08; --t-bg-via: #231708; --t-bg-to: #0e0c08;
+  --t-grad: linear-gradient(135deg, #0e0c08 0%, #231708 55%, #0e0c08 100%);
+  
+  /* Compatibilidade com sistema antigo */
+  --t-500: #d4a017;
+  --t-600: #b88a13;
+  --t-400: #f5d36b;
+  --t-500-20: rgba(212, 160, 23, 0.2);
+  --t-500-30: rgba(212, 160, 23, 0.3);
+  --t-bg-from: #0e0c08;
+  --t-bg-via: #231708;
+  --t-bg-to: #0e0c08;
 }
 
-/* ---------- GLACIER (claro/minimal) ---------- */
+/* Glacier (Claro / minimal) */
 [data-theme="glacier"] {
   --t-bg: #f4f1ea;
   --t-surface: #ffffff;
   --t-surface2: #ecebe2;
-  --t-line: rgba(13,20,24,0.12);
+  --t-line: rgba(13, 20, 24, 0.12);
   --t-ink: #0d1418;
   --t-sub: #5b6168;
   --t-accent: #2d8a3e;
@@ -369,97 +384,35 @@ code {
   --t-podium-1: #b8870e;
   --t-podium-2: #7d8590;
   --t-podium-3: #a85d2d;
-  --t-grad: linear-gradient(135deg,#f4f1ea 0%,#eae6dc 55%,#f4f1ea 100%);
-  --t-500: #2d8a3e; --t-600: #226b30; --t-400: #5cb46b;
-  --t-500-20: rgba(45,138,62,0.2); --t-500-30: rgba(45,138,62,0.3);
-  --t-bg-from: #f4f1ea; --t-bg-via: #eae6dc; --t-bg-to: #f4f1ea;
-}
-/* ============================================================
-   PALETAS FSP — adicione ao final do seu src/index.css
-   ============================================================ */
-
-/* Tokens compartilhados (consumidos via Tailwind text-fsp-accent, bg-fsp-bg etc) */
-[data-theme="storm"], [data-theme="inferno"], [data-theme="champion"], [data-theme="glacier"] {
-  --radius: 0.5rem;
-}
-
-/* ---------- STORM (azul FSP evoluído) ---------- */
-[data-theme="storm"] {
-  --t-bg: #070d1a;
-  --t-surface: #0d1a30;
-  --t-surface2: #13243f;
-  --t-line: rgba(120,170,255,0.14);
-  --t-ink: #ffffff;
-  --t-sub: #9bb6dd;
-  --t-accent: #4aa3ff;
-  --t-accent2: #22e1ff;
-  --t-gold: #f5b400;
-  --t-podium-1: #f5b400;
-  --t-podium-2: #cdd5e0;
-  --t-podium-3: #cd7f32;
-  --t-grad: linear-gradient(135deg,#070d1a 0%,#0d2347 55%,#070d1a 100%);
-  /* Compat com seu sistema [data-theme] existente */
-  --t-500: #4aa3ff; --t-600: #2f8def; --t-400: #7ec0ff;
-  --t-500-20: rgba(74,163,255,0.2); --t-500-30: rgba(74,163,255,0.3);
-  --t-bg-from: #070d1a; --t-bg-via: #0d2347; --t-bg-to: #070d1a;
+  --t-grad: linear-gradient(135deg, #f4f1ea 0%, #eae6dc 55%, #f4f1ea 100%);
+  
+  /* Compatibilidade com sistema antigo */
+  --t-500: #2d8a3e;
+  --t-600: #257332;
+  --t-400: #3fa855;
+  --t-500-20: rgba(45, 138, 62, 0.2);
+  --t-500-30: rgba(45, 138, 62, 0.3);
+  --t-bg-from: #f4f1ea;
+  --t-bg-via: #eae6dc;
+  --t-bg-to: #f4f1ea;
 }
 
-/* ---------- INFERNO (preto + magenta + lime) ---------- */
-[data-theme="inferno"] {
-  --t-bg: #0a0a0c;
-  --t-surface: #141418;
-  --t-surface2: #1f1f24;
-  --t-line: rgba(255,255,255,0.08);
-  --t-ink: #ffffff;
-  --t-sub: #9aa0aa;
-  --t-accent: #ff2d6f;
-  --t-accent2: #c6f432;
-  --t-gold: #c6f432;
-  --t-podium-1: #c6f432;
-  --t-podium-2: #cdd5e0;
-  --t-podium-3: #ff8a3d;
-  --t-grad: linear-gradient(135deg,#0a0a0c 0%,#1a0a14 55%,#0a0a0c 100%);
-  --t-500: #ff2d6f; --t-600: #e0265e; --t-400: #ff6e9c;
-  --t-500-20: rgba(255,45,111,0.2); --t-500-30: rgba(255,45,111,0.3);
-  --t-bg-from: #0a0a0c; --t-bg-via: #1a0a14; --t-bg-to: #0a0a0c;
+/* Sobrescreve backgrounds para todos os temas FSP */
+[data-theme="storm"] body,
+[data-theme="inferno"] body,
+[data-theme="champion"] body,
+[data-theme="glacier"] body {
+  background: var(--t-grad) !important;
+  color: var(--t-ink);
 }
 
-/* ---------- CHAMPION (dourado premium) ---------- */
-[data-theme="champion"] {
-  --t-bg: #0e0c08;
-  --t-surface: #181410;
-  --t-surface2: #23190f;
-  --t-line: rgba(212,160,23,0.18);
-  --t-ink: #f5ecd6;
-  --t-sub: #b8a982;
-  --t-accent: #d4a017;
-  --t-accent2: #f5d36b;
-  --t-gold: #d4a017;
-  --t-podium-1: #f5d36b;
-  --t-podium-2: #cdd5e0;
-  --t-podium-3: #cd7f32;
-  --t-grad: linear-gradient(135deg,#0e0c08 0%,#231708 55%,#0e0c08 100%);
-  --t-500: #d4a017; --t-600: #b88a13; --t-400: #f5d36b;
-  --t-500-20: rgba(212,160,23,0.2); --t-500-30: rgba(212,160,23,0.3);
-  --t-bg-from: #0e0c08; --t-bg-via: #231708; --t-bg-to: #0e0c08;
-}
-
-/* ---------- GLACIER (claro/minimal) ---------- */
-[data-theme="glacier"] {
-  --t-bg: #f4f1ea;
-  --t-surface: #ffffff;
-  --t-surface2: #ecebe2;
-  --t-line: rgba(13,20,24,0.12);
-  --t-ink: #0d1418;
-  --t-sub: #5b6168;
-  --t-accent: #2d8a3e;
-  --t-accent2: #0d6e7b;
-  --t-gold: #b8870e;
-  --t-podium-1: #b8870e;
-  --t-podium-2: #7d8590;
-  --t-podium-3: #a85d2d;
-  --t-grad: linear-gradient(135deg,#f4f1ea 0%,#eae6dc 55%,#f4f1ea 100%);
-  --t-500: #2d8a3e; --t-600: #226b30; --t-400: #5cb46b;
-  --t-500-20: rgba(45,138,62,0.2); --t-500-30: rgba(45,138,62,0.3);
-  --t-bg-from: #f4f1ea; --t-bg-via: #eae6dc; --t-bg-to: #f4f1ea;
+[data-theme="storm"] .min-h-screen,
+[data-theme="inferno"] .min-h-screen,
+[data-theme="champion"] .min-h-screen,
+[data-theme="glacier"] .min-h-screen,
+[data-theme="storm"] .App,
+[data-theme="inferno"] .App,
+[data-theme="champion"] .App,
+[data-theme="glacier"] .App {
+  background: var(--t-grad) !important;
 }

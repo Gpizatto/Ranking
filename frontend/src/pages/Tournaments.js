@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios, { API } from '../lib/api';
 import { cachedGet, getCached, TTL } from '../lib/cache';
-import { Calendar, MapPin, Trophy, CheckCircle, Clock, Users, ChevronRight } from 'lucide-react';
+import { Calendar, MapPin, Trophy, CheckCircle, Clock, ChevronRight } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -52,6 +52,22 @@ const Tournaments = () => {
 
   const completed = tournaments.filter(t => t.is_completed).length;
   const ongoing = tournaments.filter(t => !t.is_completed).length;
+
+  const formatDateRange = (tournament) => {
+    const start = format(new Date(tournament.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+    if (!tournament.end_date) return start;
+    const startD = new Date(tournament.date);
+    const endD = new Date(tournament.end_date);
+    // Mesmo mês e ano: "12 a 14 de março de 2025"
+    if (
+      startD.getMonth() === endD.getMonth() &&
+      startD.getFullYear() === endD.getFullYear()
+    ) {
+      return `${format(startD, 'dd')} a ${format(endD, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}`;
+    }
+    // Meses diferentes: "28 de fevereiro a 2 de março de 2025"
+    return `${format(startD, "dd 'de' MMMM", { locale: ptBR })} a ${format(endD, "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}`;
+  };
 
   return (
     <div className="space-y-8">
@@ -127,7 +143,7 @@ const Tournaments = () => {
                   <div className="space-y-2">
                     <div className="flex items-center text-gray-400 text-sm">
                       <Calendar className="w-4 h-4 mr-2 flex-shrink-0 text-green-500/60" />
-                      {format(new Date(tournament.date), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
+                      {formatDateRange(tournament)}
                     </div>
                     {tournament.location && (
                       <div className="flex items-center text-gray-400 text-sm">

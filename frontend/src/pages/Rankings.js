@@ -175,7 +175,7 @@ const Rankings = () => {
             {/* HERO */}
             <div className="rk-card rk-hero" style={{ position: 'relative', padding: 24, marginBottom: 32, display: 'grid', gridTemplateColumns: '320px 1fr 320px', gap: 28, overflow: 'hidden' }} onClick={() => setSelectedPlayerId(champ.player_id)}>
               <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(115deg, transparent 40%, color-mix(in srgb, var(--t-accent) 12%, transparent) 55%, transparent 70%)`, pointerEvents: 'none' }}/>
-              <div className="photo" style={{ width: 320, height: 450, borderRadius: 12, border: '1px solid var(--t-line)', background: 'var(--t-surface2)', backgroundImage: champ.photo_url ? `url(${champ.photo_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'top', position: 'relative', overflow: 'hidden', cursor: 'pointer' }}>
+              <div className="photo" style={{ width: 320, height: 450, borderRadius: 12, border: '1px solid var(--t-line)', background: 'var(--t-surface2)', backgroundImage: champ.photo_url ? `url(${champ.photo_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative', overflow: 'hidden', cursor: 'pointer' }}>
                 {!champ.photo_url && <div className="rk-display" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 96, color: 'var(--t-line)' }}>{initials(champ.player_name)}</div>}
               </div>
 
@@ -400,7 +400,7 @@ const PodiumCard = ({ player, pos, onClick }) => {
       background: 'color-mix(in srgb, var(--t-surface) 80%, transparent)',
       height: isOne ? 420 : 380, marginTop: isOne ? 0 : 20, cursor: 'pointer',
     }}>
-      <div style={{ width: '100%', height: '75%', background: 'var(--t-surface2)', backgroundImage: player.photo_url ? `url(${player.photo_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'top', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: '100%', height: '75%', background: 'var(--t-surface2)', backgroundImage: player.photo_url ? `url(${player.photo_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         {!player.photo_url && <div className="rk-display" style={{ fontSize: 72, color: 'var(--t-line)' }}>{initials}</div>}
         <div className="rk-display" style={{ position: 'absolute', top: 10, right: 10, width: 38, height: 38, borderRadius: 8, background: medalVar, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: '#1a1200' }}>{pos+1}</div>
       </div>

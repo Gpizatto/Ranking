@@ -150,13 +150,13 @@ export const PostUltimate = ({ players, theme, format, classLabel, categoryLabel
         <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
           <FSPMark palette={palette} size={56} logoSrc={logoSrc} />
           <div>
-            <div style={{ fontFamily: 'Anton, sans-serif', fontSize: 34, letterSpacing: '0.12em', lineHeight: 1 }}>RANKING FSP</div>
+            <div style={{ fontFamily: 'Anton, sans-serif', fontSize: 34, letterSpacing: '0.12em', lineHeight: 1, color: palette.ink }}>RANKING FSP</div>
             <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, letterSpacing: '0.32em', color: palette.sub, marginTop: 6 }}>FEDERAÇÃO DE SQUASH DO PARANÁ</div>
           </div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, letterSpacing: '0.28em', color: palette.sub }}>{classLabel.toUpperCase()} CLASSE · {categoryLabel.toUpperCase()}</div>
-          <div style={{ fontFamily: 'Anton, sans-serif', fontSize: 28, letterSpacing: '0.08em', marginTop: 6 }}>{monthLabel}</div>
+          <div style={{ fontFamily: 'Anton, sans-serif', fontSize: 28, letterSpacing: '0.08em', marginTop: 6, color: palette.ink }}>{monthLabel}</div>
         </div>
       </div>
 
@@ -175,10 +175,10 @@ export const PostUltimate = ({ players, theme, format, classLabel, categoryLabel
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                <span style={{ background: palette.podium[0], color: '#1a1200', padding: '4px 12px', fontFamily: 'Anton, sans-serif', fontSize: 16, letterSpacing: '0.18em', borderRadius: 4 }}>CAMPEÃO</span>
+                <span style={{ background: palette.podium[0], color: palette.bg, padding: '4px 12px', fontFamily: 'Anton, sans-serif', fontSize: 16, letterSpacing: '0.18em', borderRadius: 4 }}>CAMPEÃO</span>
                 <Trend value={champ.position_change} palette={palette} size={14} />
               </div>
-              <div style={{ fontFamily: 'Anton, sans-serif', fontSize: 64, lineHeight: 0.95 }}>
+              <div style={{ fontFamily: 'Anton, sans-serif', fontSize: 64, lineHeight: 0.95, color: palette.ink }}>
                 {champ.player_name.split(' ')[0].toUpperCase()}<br/>
                 <span style={{ color: palette.accent }}>{champ.player_name.split(' ').slice(1).join(' ').toUpperCase()}</span>
               </div>
@@ -239,7 +239,7 @@ export const PostStadium = ({ players, theme, format, classLabel, categoryLabel,
       <div style={{ padding:'52px 60px 0', display:'flex', justifyContent:'space-between', alignItems:'center', position:'relative', zIndex:2 }}>
         <div>
           <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:12, letterSpacing:'0.32em', color:palette.accent2, marginBottom:8 }}>● AO VIVO · {monthLabel}</div>
-          <div style={{ fontFamily:'Anton, sans-serif', fontSize:92, lineHeight:0.9 }}>
+          <div style={{ fontFamily:'Anton, sans-serif', fontSize:92, lineHeight:0.9, color:palette.ink }}>
             TOP {showSecondHalf ? 10 : 5}<br/><span style={{ color:palette.accent }}>SQUASH PR</span>
           </div>
           <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:14, letterSpacing:'0.3em', color:palette.sub, marginTop:14 }}>
@@ -284,12 +284,12 @@ export const PostEditorial = ({ players, theme, format, classLabel, categoryLabe
   return (
     <div style={{ width: W, height: H, background: palette.bg, position: 'relative', overflow: 'hidden', fontFamily: 'Space Grotesk, sans-serif', color: palette.ink }}>
       <div style={{ padding:'40px 60px', borderBottom:`2px solid ${palette.line}`, display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
-        <div style={{ fontFamily:'Anton, sans-serif', fontSize:28, letterSpacing:'0.18em' }}>F · S · P</div>
+        <div style={{ fontFamily:'Anton, sans-serif', fontSize:28, letterSpacing:'0.18em', color:palette.ink }}>F · S · P</div>
         <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:11, letterSpacing:'0.28em', color:palette.sub }}>EDIÇÃO MENSAL · {monthLabel} · {classLabel.toUpperCase()} {categoryLabel.toUpperCase()}</div>
         <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:11, letterSpacing:'0.28em', color:palette.sub }}>VOL. {new Date().getFullYear()}</div>
       </div>
 
-      <div style={{ fontFamily:'Anton, sans-serif', fontSize: isFeed?180:280, lineHeight:0.88, letterSpacing:'-0.02em', padding:'40px 60px 0' }}>
+      <div style={{ fontFamily:'Anton, sans-serif', fontSize: isFeed?180:280, lineHeight:0.88, letterSpacing:'-0.02em', padding:'40px 60px 0', color:palette.ink }}>
         MELHOR DO<br/>PARANÁ<br/><span style={{ color:palette.accent }}>NA {classLabel.toUpperCase()}</span>
       </div>
 
@@ -298,7 +298,7 @@ export const PostEditorial = ({ players, theme, format, classLabel, categoryLabe
         <div style={{ position:'relative' }}>
           <div style={{ position:'absolute', top: isFeed?-120:-180, left:-20, fontFamily:'Anton, sans-serif', fontSize: isFeed?320:480, color:palette.accent, lineHeight:0.85, letterSpacing:'-0.05em' }}>01</div>
           <div style={{ position:'relative', paddingTop: isFeed?220:320 }}>
-            <div style={{ fontFamily:'Anton, sans-serif', fontSize: isFeed?56:76, lineHeight:0.95 }}>{champ.player_name.toUpperCase()}</div>
+            <div style={{ fontFamily:'Anton, sans-serif', fontSize: isFeed?56:76, lineHeight:0.95, color:palette.ink }}>{champ.player_name.toUpperCase()}</div>
             <div style={{ display:'flex', gap:24, marginTop:16, fontFamily:'JetBrains Mono, monospace', fontSize:12, letterSpacing:'0.18em', color:palette.sub }}>
               <span><b style={{ color:palette.accent, fontSize:22, fontFamily:'Anton, sans-serif' }}>{champ.total_points}</b> PTS</span>
               <span><b style={{ color:palette.ink, fontSize:22, fontFamily:'Anton, sans-serif' }}>{champ.results_count}</b> TORN.</span>
@@ -347,7 +347,7 @@ export const PostPodium = ({ players, theme, format, classLabel, categoryLabel, 
         <FSPMark palette={palette} size={64} logoSrc={logoSrc} />
         <div style={{ textAlign:'center' }}>
           <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:12, letterSpacing:'0.32em', color:palette.sub }}>PÓDIO OFICIAL</div>
-          <div style={{ fontFamily:'Anton, sans-serif', fontSize:52, letterSpacing:'0.04em', marginTop:6 }}>{classLabel.toUpperCase()} <span style={{ color:palette.accent }}>{categoryLabel.toUpperCase()}</span></div>
+          <div style={{ fontFamily:'Anton, sans-serif', fontSize:52, letterSpacing:'0.04em', marginTop:6, color:palette.ink }}>{classLabel.toUpperCase()} <span style={{ color:palette.accent }}>{categoryLabel.toUpperCase()}</span></div>
         </div>
         <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:12, letterSpacing:'0.28em', color:palette.sub, textAlign:'right' }}>{monthLabel}<br/>RANKING FSP</div>
       </div>
@@ -363,7 +363,7 @@ export const PostPodium = ({ players, theme, format, classLabel, categoryLabel, 
                 <div style={{ background: realIdx===0 ? `linear-gradient(180deg, ${alpha(medal,0.25)} 0%, ${palette.surface} 60%)` : palette.surface, border:`2px solid ${medal}`, borderTop:'none', padding:'14px 16px', height: heights[idx], display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
                   <div style={{ fontFamily:'Anton, sans-serif', fontSize: realIdx===0?140:100, lineHeight:0.85, color:medal, letterSpacing:'-0.03em' }}>{realIdx+1}</div>
                   <div>
-                    <div style={{ fontFamily:'Anton, sans-serif', fontSize: realIdx===0?32:24, lineHeight:1 }}>{p.player_name.toUpperCase()}</div>
+                    <div style={{ fontFamily:'Anton, sans-serif', fontSize: realIdx===0?32:24, lineHeight:1, color:palette.ink }}>{p.player_name.toUpperCase()}</div>
                     <div style={{ display:'flex', alignItems:'baseline', gap:6, marginTop:10 }}>
                       <span style={{ fontFamily:'Anton, sans-serif', fontSize: realIdx===0?36:28, color:palette.accent, lineHeight:1 }}>{p.total_points}</span>
                       <span style={{ fontFamily:'JetBrains Mono, monospace', fontSize:10, letterSpacing:'0.2em', color:palette.sub }}>PTS</span>

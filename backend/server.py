@@ -673,7 +673,7 @@ async def get_player_photo(player_id: str):
 
 @api_router.get("/players", response_model=List[Player])
 async def get_players():
-    players = await db.players.find({}, {"_id": 0, "photo_url": 0}).sort("name", 1).to_list(1000)
+    players = await db.players.find({}, {"_id": 0}).sort("name", 1).to_list(1000)
     for player in players:
         if isinstance(player.get('created_at'), str):
             player['created_at'] = datetime.fromisoformat(player['created_at'])
@@ -813,9 +813,9 @@ async def upload_photo(file: UploadFile = File(...), current_user: User = Depend
         img = PILImage.open(BytesIO(contents))
         img = img.convert("RGB")
         # Redimensionar mantendo proporção dentro de 400x600px
-        img.thumbnail((400, 600), PILImage.LANCZOS)
+        img.thumbnail((800, 1200), PILImage.LANCZOS)
         output = BytesIO()
-        img.save(output, format="JPEG", quality=90, optimize=True)
+        img.save(output, format="JPEG", quality=95, optimize=True)
         output.seek(0)
         compressed = output.read()
         logger.info(f"Foto comprimida: {len(contents) // 1024}KB -> {len(compressed) // 1024}KB")
@@ -1616,7 +1616,7 @@ async def get_rankings(class_category: Optional[str] = None, gender_category: Op
     players_list, matches_list = await asyncio.gather(
         db.players.find(
             {"id": {"$in": player_ids}},
-            {"_id": 0, "id": 1, "is_federated": 1}
+            {"_id": 0, "id": 1, "photo_url": 1, "is_federated": 1}
         ).to_list(10000),
         db.matches.find(
             {"$or": [{"player1_id": {"$in": player_ids}}, {"player2_id": {"$in": player_ids}}]},
@@ -1733,6 +1733,7 @@ async def get_rankings(class_category: Optional[str] = None, gender_category: Op
         rankings.append({
             'player_id': pid,
             'player_name': data_p['player_name'],
+            'photo_url': player.get('photo_url'),
             'total_points': round(total_points, 2),
             'results_count': len(points_list),
             'is_federated': is_federated,
@@ -1759,6 +1760,55 @@ async def get_rankings(class_category: Optional[str] = None, gender_category: Op
     _cache_set(class_category, gender_category, rankings)
 
     return rankings
+
+
+@api_router.post("/admin/migrate-photos")
+async def migrate_photos(current_user: User = Depends(get_current_user)):
+    """Re-processa todas as fotos existentes para 800x1200px e quality=95."""
+    if not current_user.is_admin:
+        raise HTTPException(status_code=403, detail="Acesso negado")
+
+    from PIL import Image as PILImage
+    players = await db.players.find({"photo_url": {"$exists": True, "$ne": None, "$ne": ""}}, {"_id": 0, "id": 1, "photo_url": 1}).to_list(10000)
+
+    updated = 0
+    skipped = 0
+    errors = 0
+
+    for player in players:
+        photo_url = player.get("photo_url", "")
+        if not photo_url or not photo_url.startswith("data:image"):
+            skipped += 1
+            continue
+        try:
+            # Decodifica base64
+            header, b64data = photo_url.split(",", 1)
+            img_bytes = base64.b64decode(b64data)
+
+            # Verifica se já está em resolução suficiente
+            img_check = PILImage.open(BytesIO(img_bytes))
+            w, h = img_check.size
+            if w >= 750 and h >= 1100:
+                skipped += 1
+                continue  # já está em boa resolução
+
+            # Re-processa com qualidade maior
+            img = PILImage.open(BytesIO(img_bytes)).convert("RGB")
+            img.thumbnail((800, 1200), PILImage.LANCZOS)
+            output = BytesIO()
+            img.save(output, format="JPEG", quality=95, optimize=True)
+            output.seek(0)
+            new_b64 = base64.b64encode(output.read()).decode("utf-8")
+            new_url = f"data:image/jpeg;base64,{new_b64}"
+
+            await db.players.update_one({"id": player["id"]}, {"$set": {"photo_url": new_url}})
+            updated += 1
+        except Exception as e:
+            logger.error(f"Erro ao migrar foto do jogador {player['id']}: {e}")
+            errors += 1
+
+    invalidate_rankings_cache()
+    return {"updated": updated, "skipped": skipped, "errors": errors, "total": len(players)}
 
 
 # Import from image

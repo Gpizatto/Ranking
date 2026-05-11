@@ -1,398 +1,378 @@
-// frontend/src/pages/Rankings.js
-// Redesign completo: sport-card aesthetic + 4 templates de post
-// Mantém: cache, PlayerModal, toast, html2canvas, axios
+// frontend/src/components/PostTemplates.js
+// 4 templates de post para redes sociais (Feed 1080x1080 e Story 1080x1920)
+// Consome dados na shape do backend:
+//   { player_id, player_name, photo_url, total_points, results_count, win_rate, position_change, last_match }
+// e tokens via CSS vars (data-theme="storm|inferno|champion|glacier")
 
-import React, { useState, useEffect, useRef } from 'react';
-import axios from '../lib/api';
-import { API } from '../lib/api';
-import { cachedGet, getCached, TTL } from '../lib/cache';
-import { Download, X } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { toast } from 'sonner';
-import PlayerModal from '../components/PlayerModal';
-import html2canvas from 'html2canvas';
-import { POST_TEMPLATES, PALETTE_OPTIONS } from '../components/PostTemplates';
+import React from 'react';
 
-const CLASSES = ['1ª', '2ª', '3ª', '4ª', '5ª', '6ª', 'Duplas'];
-const CATEGORIES = ['Feminina', 'Masculina'];
+// Util: hex/rgb → rgba(...) com alpha
+const alpha = (c, a) => {
+  if (!c) return `rgba(0,0,0,${a})`;
+  if (c.startsWith('rgba') || c.startsWith('rgb')) return c;
+  const h = c.replace('#','');
+  const full = h.length === 3 ? h.split('').map(x=>x+x).join('') : h.padEnd(6,'0');
+  const r = parseInt(full.slice(0,2),16);
+  const g = parseInt(full.slice(2,4),16);
+  const b = parseInt(full.slice(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+};
 
-const Rankings = () => {
-  const [rankings, setRankings] = useState([]);
-  const [selectedClass, setSelectedClass] = useState('1ª');
-  const [selectedCategory, setSelectedCategory] = useState('Feminina');
-  const [loading, setLoading] = useState(false);
-  const [selectedPlayerId, setSelectedPlayerId] = useState(null);
-
-  // Estado do gerador de post
-  const [postOpen, setPostOpen] = useState(false);
-  const [template, setTemplate] = useState(() => localStorage.getItem('fsp_post_template') || 'ultimate');
-  const [format, setFormat] = useState(() => localStorage.getItem('fsp_post_format') || 'feed');
-  const [theme, setTheme] = useState(() => localStorage.getItem('fsp_post_theme') || 'storm');
-  const [showSecondHalf, setShowSecondHalf] = useState(true);
-  const [exporting, setExporting] = useState(false);
-  const exportRef = useRef(null);
-
-  useEffect(() => { localStorage.setItem('fsp_post_template', template); }, [template]);
-  useEffect(() => { localStorage.setItem('fsp_post_format', format); }, [format]);
-  useEffect(() => { localStorage.setItem('fsp_post_theme', theme); }, [theme]);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    const fetchRankings = async () => {
-      const effectiveCategory = selectedClass === 'Duplas' ? 'Mista' : selectedCategory;
-      const url = `${API}/rankings?class_category=${selectedClass}&gender_category=${effectiveCategory}`;
-      const cached = getCached(url);
-      if (cached) { setRankings(cached); setLoading(false); return; }
-      setLoading(true);
-      try {
-        const data = await cachedGet(url, TTL.RANKINGS, axios);
-        if (!controller.signal.aborted) setRankings(data);
-      } catch (error) {
-        if (axios.isCancel?.(error) || error.name === 'CanceledError' || error.name === 'AbortError') return;
-        toast.error('Erro ao carregar rankings');
-      } finally {
-        if (!controller.signal.aborted) setLoading(false);
-      }
-    };
-    fetchRankings();
-    return () => controller.abort();
-  }, [selectedClass, selectedCategory]);
-
-  const champ = rankings[0];
-  const top3 = rankings.slice(0, 3);
-  const rest = rankings.slice(3);
-  const categoryLabel = selectedClass === 'Duplas' ? 'Mista' : selectedCategory;
-  const monthLabel = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
-  const Template = POST_TEMPLATES[template].Component;
-
-  const handleExport = async () => {
-    const el = exportRef.current;
-    if (!el) return;
-    setExporting(true);
-    try {
-      const canvas = await html2canvas(el, { scale: 2, backgroundColor: null, useCORS: true, allowTaint: true, logging: false, imageTimeout: 0 });
-      const a = document.createElement('a');
-      a.download = `ranking-fsp-${selectedClass}-${categoryLabel}-${template}-${format}.png`;
-      a.href = canvas.toDataURL('image/png', 1.0);
-      a.click();
-      toast.success('Imagem gerada!');
-    } catch (e) {
-      toast.error('Erro ao gerar imagem: ' + e.message);
-    } finally {
-      setExporting(false);
-    }
+const getTokens = (theme) => {
+  // Lê os CSS vars do data-theme atual (definidos em index.css)
+  if (typeof document === 'undefined') return {};
+  const el = document.querySelector(`[data-theme="${theme}"]`) || document.documentElement;
+  const cs = getComputedStyle(el);
+  const get = (k) => cs.getPropertyValue(k).trim();
+  return {
+    bg: get('--t-bg') || '#070d1a',
+    surface: get('--t-surface') || '#0d1a30',
+    surface2: get('--t-surface2') || '#13243f',
+    line: get('--t-line') || 'rgba(255,255,255,0.12)',
+    ink: get('--t-ink') || '#ffffff',
+    sub: get('--t-sub') || '#9bb6dd',
+    accent: get('--t-accent') || '#4aa3ff',
+    accent2: get('--t-accent2') || '#22e1ff',
+    gold: get('--t-gold') || '#f5b400',
+    podium: [
+      get('--t-podium-1') || '#f5b400',
+      get('--t-podium-2') || '#cdd5e0',
+      get('--t-podium-3') || '#cd7f32',
+    ],
+    grad: get('--t-grad') || 'linear-gradient(135deg,#070d1a 0%,#0d2347 55%,#070d1a 100%)',
   };
+};
 
-  const initials = (n='') => {
-    const p = n.trim().split(/\s+/);
-    return ((p[0]?.[0]||'') + (p[p.length-1]?.[0]||'')).toUpperCase();
-  };
+const initials = (name='') => {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0]||'') + (parts[parts.length-1]?.[0]||'')).toUpperCase();
+};
+
+const Photo = ({ player, palette, style, big }) => (
+  <div style={{
+    ...style,
+    background: palette.surface2,
+    backgroundImage: player.photo_url ? `url(${player.photo_url})` : 'none',
+    backgroundSize: 'cover',
+    backgroundPosition: 'top center',
+    overflow: 'hidden',
+    position: 'relative',
+    display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+  }}>
+    {!player.photo_url && (
+      <div style={{ fontFamily: 'Anton, sans-serif', fontSize: big ? 96 : 48, color: alpha(palette.ink, 0.25), letterSpacing: '0.02em' }}>
+        {initials(player.player_name)}
+      </div>
+    )}
+  </div>
+);
+
+const Trend = ({ value, palette, size=12 }) => {
+  if (value == null || value === 0) return <span style={{ color: palette.sub, fontSize: size }}>—</span>;
+  const up = value > 0;
+  return <span style={{ color: up ? palette.accent2 : '#ff5577', fontFamily: 'JetBrains Mono, monospace', fontSize: size, fontWeight: 700 }}>
+    {up ? '▲' : '▼'}{Math.abs(value)}
+  </span>;
+};
+
+const Footer = ({ palette }) => (
+  <div style={{
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    padding: '20px 60px', borderTop: `1px solid ${palette.line}`,
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.28em', color: palette.sub,
+  }}>
+    <span>FEDERACAOSQUASHPR.COM.BR</span>
+    <span>@FSP.SQUASH</span>
+    <span>#RANKINGFSP</span>
+  </div>
+);
+
+const FSPMark = ({ palette, size=56, logoSrc }) => (
+  logoSrc ? (
+    <img src={logoSrc} alt="FSP" style={{ width: size, height: size, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+  ) : (
+    <div style={{
+      width: size, height: size, borderRadius: 8, background: palette.accent,
+      display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+    }}>
+      <span style={{ fontFamily: 'Anton, sans-serif', color: palette.bg, fontSize: size*0.42, letterSpacing: '0.04em', lineHeight: 1 }}>FSP</span>
+    </div>
+  )
+);
+
+// ─────────────────────────────────────────────
+export const PostUltimate = ({ players, theme, format, classLabel, categoryLabel, showSecondHalf, monthLabel, logoSrc }) => {
+  const palette = getTokens(theme);
+  const isFeed = format === 'feed';
+  const W = 1080, H = isFeed ? 1080 : 1920;
+  const champ = players[0]; if (!champ) return null;
+  const rest = players.slice(1, showSecondHalf ? 10 : 5);
 
   return (
-    <div className="rk-root" style={{ background: 'var(--t-grad, var(--t-bg))', minHeight: '100%', padding: '32px 8px 60px' }}>
-      <style>{`
-        .rk-root { font-family: 'Space Grotesk', system-ui, sans-serif; color: var(--t-ink); }
-        .rk-display { font-family: 'Anton', Impact, sans-serif; letter-spacing: 0.01em; line-height: 0.95; }
-        .rk-mono { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.22em; }
-        .rk-card { background: color-mix(in srgb, var(--t-surface) 85%, transparent); border: 1px solid var(--t-line); border-radius: 14px; }
-        .rk-chip { padding: 6px 14px; font-family: 'Anton', sans-serif; font-size: 14px; letter-spacing: 0.08em; border: 1px solid var(--t-line); border-radius: 4px; background: transparent; color: var(--t-ink); cursor: pointer; transition: all 0.15s; }
-        .rk-chip:hover { border-color: var(--t-accent); }
-        .rk-chip.active { background: var(--t-accent); color: var(--t-bg); border-color: var(--t-accent); }
-        .rk-stat-row { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 14px; background: color-mix(in srgb, var(--t-bg) 50%, transparent); border: 1px solid var(--t-line); border-radius: 8px; }
-        .rk-row { display: grid; grid-template-columns: 70px 1fr 160px 70px 90px 60px 110px; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--t-line); cursor: pointer; transition: background 0.15s; }
-        .rk-row:hover { background: color-mix(in srgb, var(--t-accent) 8%, transparent); }
-        .rk-row:last-child { border-bottom: none; }
-        .rk-row .avatar { width: 38px; height: 38px; border-radius: 6px; background: var(--t-surface2); background-size: cover; background-position: top; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--t-sub); flex-shrink: 0; overflow: hidden; }
-        @media (max-width: 900px) {
-          .rk-hero { grid-template-columns: 1fr !important; }
-          .rk-hero .photo { width: 100% !important; height: 320px !important; }
-          .rk-podium { grid-template-columns: 1fr !important; }
-          .rk-row { grid-template-columns: 50px 1fr 100px; padding: 12px; }
-          .rk-row .hide-mobile { display: none; }
-        }
-      `}</style>
+    <div style={{ width: W, height: H, background: palette.bg, position: 'relative', overflow: 'hidden', fontFamily: 'Space Grotesk, sans-serif', color: palette.ink }}>
+      <div style={{ position:'absolute', right:-40, top:-80, fontFamily:'Anton, sans-serif', fontSize: isFeed?720:900, lineHeight:1, color: palette.accent, opacity:0.06, letterSpacing:'-0.04em' }}>01</div>
 
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px' }}>
-        {/* TITLE */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 28, gap: 16, flexWrap: 'wrap' }}>
+      <div style={{ padding: '52px 60px 0', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+          <FSPMark palette={palette} size={56} logoSrc={logoSrc} />
           <div>
-            <div className="rk-mono" style={{ fontSize: 11, color: 'var(--t-sub)', marginBottom: 10 }}>● TEMPORADA ATIVA · {monthLabel}</div>
-            <h1 className="rk-display" style={{ fontSize: 'clamp(48px, 8vw, 80px)', margin: 0 }}>
-              RANKINGS<br/><span style={{ color: 'var(--t-accent)' }}>OFICIAIS</span>
-            </h1>
+            <div style={{ fontFamily: 'Anton, sans-serif', fontSize: 34, letterSpacing: '0.12em', lineHeight: 1 }}>RANKING FSP</div>
+            <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, letterSpacing: '0.32em', color: palette.sub, marginTop: 6 }}>FEDERAÇÃO DE SQUASH DO PARANÁ</div>
           </div>
-          <button onClick={() => setPostOpen(true)} style={{
-            background: 'var(--t-accent)', color: 'var(--t-bg)', border: 'none', padding: '16px 24px',
-            fontFamily: 'Anton, sans-serif', fontSize: 16, letterSpacing: '0.16em', cursor: 'pointer', borderRadius: 4,
-            display: 'flex', alignItems: 'center', gap: 10,
-          }}>
-            <Download size={18} /> GERAR POST
-          </button>
         </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 12, letterSpacing: '0.28em', color: palette.sub }}>{classLabel.toUpperCase()} CLASSE · {categoryLabel.toUpperCase()}</div>
+          <div style={{ fontFamily: 'Anton, sans-serif', fontSize: 28, letterSpacing: '0.08em', marginTop: 6 }}>{monthLabel}</div>
+        </div>
+      </div>
 
-        {/* FILTERS */}
-        <div className="rk-card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginBottom: 28 }}>
-          <div className="rk-mono" style={{ fontSize: 10, color: 'var(--t-sub)' }}>CLASSE</div>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {CLASSES.map(cls => (
-              <button key={cls} className={`rk-chip ${selectedClass===cls?'active':''}`} onClick={() => setSelectedClass(cls)}>{cls}</button>
+      <div style={{ padding: isFeed ? '36px 60px 0' : '60px 60px 0' }}>
+        <div style={{
+          position: 'relative',
+          background: `linear-gradient(135deg, ${palette.surface2} 0%, ${palette.surface} 100%)`,
+          border: `1px solid ${palette.line}`, borderRadius: 20, padding: 28,
+          display: 'grid', gridTemplateColumns: '380px 1fr', gap: 28, overflow: 'hidden',
+        }}>
+          <div style={{ position:'absolute', inset:0, background:`linear-gradient(115deg, transparent 35%, ${alpha(palette.accent, 0.16)} 50%, transparent 65%)`, pointerEvents:'none' }}/>
+          <div style={{ position:'absolute', top:8, right:18, fontFamily:'Anton, sans-serif', fontSize:220, lineHeight:1, color: alpha(palette.accent, 0.10), letterSpacing:'-0.03em' }}>01</div>
+
+          <Photo player={champ} palette={palette} big style={{ width: 380, height: 460, borderRadius: 14, border: `1px solid ${palette.line}` }} />
+
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                <span style={{ background: palette.podium[0], color: '#1a1200', padding: '4px 12px', fontFamily: 'Anton, sans-serif', fontSize: 16, letterSpacing: '0.18em', borderRadius: 4 }}>CAMPEÃO</span>
+                <Trend value={champ.position_change} palette={palette} size={14} />
+              </div>
+              <div style={{ fontFamily: 'Anton, sans-serif', fontSize: 64, lineHeight: 0.95 }}>
+                {champ.player_name.split(' ')[0].toUpperCase()}<br/>
+                <span style={{ color: palette.accent }}>{champ.player_name.split(' ').slice(1).join(' ').toUpperCase()}</span>
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16, marginTop: 22 }}>
+              <Stat palette={palette} label="PONTOS" value={champ.total_points} big />
+              <Stat palette={palette} label="TORNEIOS" value={champ.results_count} />
+              <Stat palette={palette} label="% VITÓRIAS" value={champ.win_rate != null ? `${champ.win_rate}%` : '—'} />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding: isFeed ? '24px 60px 0' : '40px 60px 0' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${isFeed ? 4 : 3}, 1fr)`, gap: 14 }}>
+          {rest.map((p, i) => <MiniCard key={p.player_id} player={p} pos={i+2} palette={palette} compact={isFeed} />)}
+        </div>
+      </div>
+
+      <Footer palette={palette} />
+    </div>
+  );
+};
+
+const Stat = ({ palette, label, value, big }) => (
+  <div style={{ borderTop: `1px solid ${palette.line}`, paddingTop: 10 }}>
+    <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.22em', color: palette.sub }}>{label}</div>
+    <div style={{ fontFamily: 'Anton, sans-serif', fontSize: big ? 56 : 38, lineHeight: 1, marginTop: 6, color: big ? palette.accent : palette.ink }}>{value}</div>
+  </div>
+);
+
+const MiniCard = ({ player, pos, palette, compact }) => (
+  <div style={{ background: palette.surface, border: `1px solid ${palette.line}`, borderRadius: 12, overflow: 'hidden', position: 'relative', height: compact ? 200 : 240 }}>
+    <Photo player={player} palette={palette} style={{ position: 'absolute', inset: 0, width: '100%', height: '70%' }} />
+    <div style={{ position: 'absolute', top: 8, left: 8, background: palette.bg, color: palette.ink, fontFamily: 'Anton, sans-serif', fontSize: 18, width: 32, height: 32, borderRadius: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${palette.line}` }}>{pos}</div>
+    <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: 12, background: alpha(palette.bg, 0.94), borderTop: `1px solid ${palette.line}` }}>
+      <div style={{ fontFamily: 'Space Grotesk, sans-serif', fontWeight: 700, fontSize: 14, lineHeight: 1.1, color: palette.ink, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{player.player_name}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 4 }}>
+        <span style={{ fontFamily: 'Anton, sans-serif', fontSize: 22, color: palette.accent, lineHeight: 1 }}>{player.total_points}</span>
+        <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: '0.18em', color: palette.sub }}>PTS</span>
+      </div>
+    </div>
+  </div>
+);
+
+// ─────────────────────────────────────────────
+export const PostStadium = ({ players, theme, format, classLabel, categoryLabel, showSecondHalf, monthLabel, logoSrc }) => {
+  const palette = getTokens(theme);
+  const isFeed = format === 'feed';
+  const W = 1080, H = isFeed ? 1080 : 1920;
+  const top = players.slice(0, showSecondHalf ? 10 : 5);
+
+  return (
+    <div style={{ width: W, height: H, background: palette.bg, position: 'relative', overflow: 'hidden', fontFamily: 'Space Grotesk, sans-serif', color: palette.ink }}>
+      <div style={{ position:'absolute', inset:0, background:`repeating-linear-gradient(115deg, ${alpha(palette.accent, 0.04)} 0 2px, transparent 2px 18px)` }}/>
+      <div style={{ position:'absolute', inset:0, background:`radial-gradient(circle at 30% 20%, ${alpha(palette.accent, 0.18)} 0%, transparent 45%), radial-gradient(circle at 80% 90%, ${alpha(palette.accent2, 0.12)} 0%, transparent 50%)` }}/>
+
+      <div style={{ padding:'52px 60px 0', display:'flex', justifyContent:'space-between', alignItems:'center', position:'relative', zIndex:2 }}>
+        <div>
+          <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:12, letterSpacing:'0.32em', color:palette.accent2, marginBottom:8 }}>● AO VIVO · {monthLabel}</div>
+          <div style={{ fontFamily:'Anton, sans-serif', fontSize:92, lineHeight:0.9 }}>
+            TOP {showSecondHalf ? 10 : 5}<br/><span style={{ color:palette.accent }}>SQUASH PR</span>
+          </div>
+          <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:14, letterSpacing:'0.3em', color:palette.sub, marginTop:14 }}>
+            {classLabel.toUpperCase()} CLASSE · {categoryLabel.toUpperCase()}
+          </div>
+        </div>
+        <FSPMark palette={palette} size={80} logoSrc={logoSrc} />
+      </div>
+
+      <div style={{ position:'absolute', top: isFeed?360:480, left:0, right:0, bottom:120, padding:'0 60px', zIndex:2, display:'flex', flexDirection:'column', gap:8 }}>
+        {top.map((p, i) => (
+          <div key={p.player_id} style={{
+            position:'relative', height: top.length<=5 ? (isFeed?80:130) : (isFeed?50:105),
+            background: i===0 ? `linear-gradient(90deg, ${palette.accent} 0%, ${alpha(palette.accent,0)} 100%)` : palette.surface,
+            border: `1px solid ${palette.line}`,
+            clipPath: 'polygon(0 0, calc(100% - 30px) 0, 100% 100%, 30px 100%)',
+            display:'flex', alignItems:'center', padding:'0 60px 0 40px', gap:24,
+          }}>
+            <div style={{ fontFamily:'Anton, sans-serif', fontSize: top.length<=5?56:36, color: i===0?palette.bg:(i<3?palette.podium[i]:palette.ink), lineHeight:1, minWidth:70 }}>{String(i+1).padStart(2,'0')}</div>
+            <div style={{ flex:1, fontFamily:'Anton, sans-serif', fontSize: top.length<=5?38:26, color: i===0?palette.bg:palette.ink, lineHeight:1 }}>{p.player_name.toUpperCase()}</div>
+            <div style={{ minWidth:130, textAlign:'right' }}>
+              <div style={{ fontFamily:'Anton, sans-serif', fontSize: top.length<=5?44:32, color: i===0?palette.bg:palette.accent, lineHeight:1 }}>{p.total_points}</div>
+              <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:10, letterSpacing:'0.24em', color: i===0?alpha(palette.bg,0.7):palette.sub }}>PONTOS</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Footer palette={palette} />
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+export const PostEditorial = ({ players, theme, format, classLabel, categoryLabel, showSecondHalf, monthLabel }) => {
+  const palette = getTokens(theme);
+  const isFeed = format === 'feed';
+  const W = 1080, H = isFeed ? 1080 : 1920;
+  const champ = players[0]; if (!champ) return null;
+  const list = players.slice(1, showSecondHalf ? 10 : 5);
+
+  return (
+    <div style={{ width: W, height: H, background: palette.bg, position: 'relative', overflow: 'hidden', fontFamily: 'Space Grotesk, sans-serif', color: palette.ink }}>
+      <div style={{ padding:'40px 60px', borderBottom:`2px solid ${palette.line}`, display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
+        <div style={{ fontFamily:'Anton, sans-serif', fontSize:28, letterSpacing:'0.18em' }}>F · S · P</div>
+        <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:11, letterSpacing:'0.28em', color:palette.sub }}>EDIÇÃO MENSAL · {monthLabel} · {classLabel.toUpperCase()} {categoryLabel.toUpperCase()}</div>
+        <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:11, letterSpacing:'0.28em', color:palette.sub }}>VOL. {new Date().getFullYear()}</div>
+      </div>
+
+      <div style={{ fontFamily:'Anton, sans-serif', fontSize: isFeed?240:360, lineHeight:0.88, letterSpacing:'-0.02em', padding:'40px 60px 0' }}>
+        O REI<br/><span style={{ color:palette.accent }}>DO COURT</span>
+      </div>
+
+      <div style={{ position:'relative', margin:'20px 60px 0', display:'grid', gridTemplateColumns:'1fr 1.2fr', gap:36, alignItems:'end' }}>
+        <Photo player={champ} palette={palette} big style={{ width:'100%', height: isFeed?380:560, border:`1px solid ${palette.line}` }} />
+        <div style={{ position:'relative' }}>
+          <div style={{ position:'absolute', top: isFeed?-120:-180, left:-20, fontFamily:'Anton, sans-serif', fontSize: isFeed?320:480, color:palette.accent, lineHeight:0.85, letterSpacing:'-0.05em' }}>01</div>
+          <div style={{ position:'relative', paddingTop: isFeed?220:320 }}>
+            <div style={{ fontFamily:'Anton, sans-serif', fontSize: isFeed?56:76, lineHeight:0.95 }}>{champ.player_name.toUpperCase()}</div>
+            <div style={{ display:'flex', gap:24, marginTop:16, fontFamily:'JetBrains Mono, monospace', fontSize:12, letterSpacing:'0.18em', color:palette.sub }}>
+              <span><b style={{ color:palette.accent, fontSize:22, fontFamily:'Anton, sans-serif' }}>{champ.total_points}</b> PTS</span>
+              <span><b style={{ color:palette.ink, fontSize:22, fontFamily:'Anton, sans-serif' }}>{champ.results_count}</b> TORN.</span>
+              {champ.win_rate != null && <span><b style={{ color:palette.ink, fontSize:22, fontFamily:'Anton, sans-serif' }}>{champ.win_rate}%</b> VIT.</span>}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ padding:'40px 60px 0' }}>
+        <div style={{ borderTop:`1px solid ${palette.line}`, borderBottom:`1px solid ${palette.line}`, padding:'10px 0', marginBottom:18 }}>
+          <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:11, letterSpacing:'0.32em', color:palette.sub, display:'flex', justifyContent:'space-between' }}>
+            <span>NESTA EDIÇÃO</span><span>PERSEGUIDORES</span>
+          </div>
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns: showSecondHalf?'repeat(3,1fr)':'repeat(2,1fr)', gap:'4px 36px' }}>
+          {list.map((p, i) => (
+            <div key={p.player_id} style={{ display:'flex', alignItems:'baseline', gap:14, padding:'10px 0', borderBottom:`1px dashed ${palette.line}` }}>
+              <span style={{ fontFamily:'Anton, sans-serif', fontSize:28, color: i<2?palette.podium[i+1]:palette.sub, lineHeight:1, minWidth:42 }}>{String(i+2).padStart(2,'0')}</span>
+              <span style={{ flex:1, fontFamily:'Space Grotesk, sans-serif', fontWeight:600, fontSize:16, color:palette.ink, whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' }}>{p.player_name}</span>
+              <span style={{ fontFamily:'Anton, sans-serif', fontSize:22, color:palette.accent }}>{p.total_points}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Footer palette={palette} />
+    </div>
+  );
+};
+
+// ─────────────────────────────────────────────
+export const PostPodium = ({ players, theme, format, classLabel, categoryLabel, showSecondHalf, monthLabel, logoSrc }) => {
+  const palette = getTokens(theme);
+  const isFeed = format === 'feed';
+  const W = 1080, H = isFeed ? 1080 : 1920;
+  const podium = players.slice(0, 3);
+  if (podium.length < 3) return null;
+  const order = [podium[1], podium[0], podium[2]];
+  const heights = [isFeed?260:380, isFeed?340:500, isFeed?220:320];
+  const list = players.slice(3, showSecondHalf ? 10 : 5);
+
+  return (
+    <div style={{ width: W, height: H, background: palette.grad, position: 'relative', overflow: 'hidden', fontFamily: 'Space Grotesk, sans-serif', color: palette.ink }}>
+      <div style={{ padding:'50px 60px 0', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <FSPMark palette={palette} size={64} logoSrc={logoSrc} />
+        <div style={{ textAlign:'center' }}>
+          <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:12, letterSpacing:'0.32em', color:palette.sub }}>PÓDIO OFICIAL</div>
+          <div style={{ fontFamily:'Anton, sans-serif', fontSize:52, letterSpacing:'0.04em', marginTop:6 }}>{classLabel.toUpperCase()} <span style={{ color:palette.accent }}>{categoryLabel.toUpperCase()}</span></div>
+        </div>
+        <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:12, letterSpacing:'0.28em', color:palette.sub, textAlign:'right' }}>{monthLabel}<br/>RANKING FSP</div>
+      </div>
+
+      <div style={{ marginTop: isFeed?30:70, padding:'0 60px' }}>
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1.15fr 1fr', gap:14, alignItems:'end' }}>
+          {order.map((p, idx) => {
+            const realIdx = idx===0?1:idx===1?0:2;
+            const medal = palette.podium[realIdx];
+            return (
+              <div key={p.player_id} style={{ display:'flex', flexDirection:'column' }}>
+                <Photo player={p} palette={palette} style={{ width:'100%', height: isFeed?220:320, border:`2px solid ${medal}`, borderBottom:'none' }} />
+                <div style={{ background: realIdx===0 ? `linear-gradient(180deg, ${alpha(medal,0.25)} 0%, ${palette.surface} 60%)` : palette.surface, border:`2px solid ${medal}`, borderTop:'none', padding:'14px 16px', height: heights[idx], display:'flex', flexDirection:'column', justifyContent:'space-between' }}>
+                  <div style={{ fontFamily:'Anton, sans-serif', fontSize: realIdx===0?140:100, lineHeight:0.85, color:medal, letterSpacing:'-0.03em' }}>{realIdx+1}</div>
+                  <div>
+                    <div style={{ fontFamily:'Anton, sans-serif', fontSize: realIdx===0?32:24, lineHeight:1 }}>{p.player_name.toUpperCase()}</div>
+                    <div style={{ display:'flex', alignItems:'baseline', gap:6, marginTop:10 }}>
+                      <span style={{ fontFamily:'Anton, sans-serif', fontSize: realIdx===0?36:28, color:palette.accent, lineHeight:1 }}>{p.total_points}</span>
+                      <span style={{ fontFamily:'JetBrains Mono, monospace', fontSize:10, letterSpacing:'0.2em', color:palette.sub }}>PTS</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {list.length > 0 && (
+        <div style={{ padding: isFeed?'24px 60px 0':'50px 60px 0' }}>
+          <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:11, letterSpacing:'0.32em', color:palette.sub, marginBottom:10 }}>PERSEGUIDORES</div>
+          <div style={{ border:`1px solid ${palette.line}`, borderRadius:8, overflow:'hidden' }}>
+            {list.map((p, i) => (
+              <div key={p.player_id} style={{ display:'grid', gridTemplateColumns:'60px 1fr 90px', alignItems:'center', gap:16, padding:'12px 18px', background: i%2?'transparent':alpha(palette.surface,0.6), borderBottom: i===list.length-1?'none':`1px solid ${palette.line}` }}>
+                <span style={{ fontFamily:'Anton, sans-serif', fontSize:28, color:palette.sub, lineHeight:1 }}>{String(i+4).padStart(2,'0')}</span>
+                <span style={{ fontFamily:'Space Grotesk, sans-serif', fontWeight:700, fontSize:18, color:palette.ink }}>{p.player_name}</span>
+                <span style={{ fontFamily:'Anton, sans-serif', fontSize:24, color:palette.accent, textAlign:'right' }}>{p.total_points}</span>
+              </div>
             ))}
           </div>
-          <div style={{ width: 1, height: 20, background: 'var(--t-line)' }}/>
-          <div className="rk-mono" style={{ fontSize: 10, color: 'var(--t-sub)' }}>CATEGORIA</div>
-          {selectedClass === 'Duplas' ? (
-            <div className="rk-mono" style={{ padding: '6px 12px', fontSize: 11, color: 'var(--t-accent2)', border: '1px solid var(--t-line)', borderRadius: 4 }}>MISTA</div>
-          ) : (
-            <div style={{ display: 'flex', gap: 6 }}>
-              {CATEGORIES.map(cat => (
-                <button key={cat} className={`rk-chip ${selectedCategory===cat?'active':''}`} onClick={() => setSelectedCategory(cat)}>{cat}</button>
-              ))}
-            </div>
-          )}
         </div>
+      )}
 
-        {loading && <div style={{ textAlign: 'center', padding: 60, color: 'var(--t-sub)' }}>Carregando...</div>}
-        {!loading && rankings.length === 0 && <div style={{ textAlign: 'center', padding: 60, color: 'var(--t-sub)' }}>Nenhum resultado encontrado</div>}
-
-        {!loading && champ && (
-          <>
-            {/* HERO */}
-            <div className="rk-card rk-hero" style={{ position: 'relative', padding: 24, marginBottom: 32, display: 'grid', gridTemplateColumns: '320px 1fr 320px', gap: 28, overflow: 'hidden' }} onClick={() => setSelectedPlayerId(champ.player_id)}>
-              <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(115deg, transparent 40%, color-mix(in srgb, var(--t-accent) 12%, transparent) 55%, transparent 70%)`, pointerEvents: 'none' }}/>
-              <div className="photo" style={{ width: 320, height: 380, borderRadius: 12, border: '1px solid var(--t-line)', background: 'var(--t-surface2)', backgroundImage: champ.photo_url ? `url(${champ.photo_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'top', position: 'relative', overflow: 'hidden', cursor: 'pointer' }}>
-                {!champ.photo_url && <div className="rk-display" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 96, color: 'var(--t-line)' }}>{initials(champ.player_name)}</div>}
-              </div>
-
-              <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-                <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                    <span className="rk-display" style={{ background: 'var(--t-podium-1)', color: '#1a1200', padding: '4px 12px', fontSize: 14, letterSpacing: '0.18em', borderRadius: 4 }}>LÍDER ATUAL</span>
-                    <Trend value={champ.position_change} />
-                  </div>
-                  <div className="rk-display" style={{ fontSize: 'clamp(40px, 5vw, 64px)' }}>
-                    {champ.player_name.split(' ')[0].toUpperCase()}<br/>
-                    <span style={{ color: 'var(--t-accent)' }}>{champ.player_name.split(' ').slice(1).join(' ').toUpperCase()}</span>
-                  </div>
-                </div>
-                {champ.last_match && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', padding: 14, background: 'color-mix(in srgb, var(--t-bg) 50%, transparent)', border: '1px solid var(--t-line)', borderRadius: 8, marginTop: 16 }}>
-                    <div className="rk-mono" style={{ fontSize: 10, color: 'var(--t-sub)' }}>ÚLT. PARTIDA</div>
-                    <div className="rk-display" style={{ fontSize: 18 }}>vs {champ.last_match.opponent_name}</div>
-                    <div className="rk-mono" style={{ fontSize: 16, color: 'var(--t-ink)' }}>{champ.last_match.score_formatted}</div>
-                    <div className="rk-display" style={{ padding: '3px 10px', background: champ.last_match.result === 'Win' ? 'var(--t-accent2)' : '#ff5577', color: 'var(--t-bg)', fontSize: 12, letterSpacing: '0.18em', borderRadius: 4 }}>{champ.last_match.result === 'Win' ? 'V' : 'D'}</div>
-                  </div>
-                )}
-              </div>
-
-              <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <StatRow label="PONTOS" value={champ.total_points} big accent />
-                <StatRow label="TORNEIOS" value={champ.results_count} />
-                {champ.win_rate != null && <StatRow label="% VITÓRIAS" value={`${champ.win_rate}%`} />}
-                <StatRow label="VARIAÇÃO" value={champ.position_change > 0 ? `+${champ.position_change}` : (champ.position_change || 0)} />
-              </div>
-            </div>
-
-            {/* PODIUM */}
-            {top3.length === 3 && (
-              <div style={{ marginBottom: 32 }}>
-                <SectionHeader label="PÓDIO" sub="Top 3 da classe" />
-                <div className="rk-podium" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-                  {top3.map((p, i) => <PodiumCard key={p.player_id} player={p} pos={i} onClick={() => setSelectedPlayerId(p.player_id)} />)}
-                </div>
-              </div>
-            )}
-
-            {/* RANKING COMPLETO */}
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
-                <SectionHeader label="RANKING COMPLETO" sub={`${rankings.length} JOGADORES`} inline />
-                <div className="rk-mono" style={{ fontSize: 11, color: 'var(--t-sub)' }}>{selectedClass.toUpperCase()} · {categoryLabel.toUpperCase()}</div>
-              </div>
-
-              <div className="rk-card" style={{ overflow: 'hidden' }}>
-                <div className="rk-row rk-mono hide-mobile" style={{ padding: '12px 20px', fontSize: 10, color: 'var(--t-sub)', cursor: 'default', borderBottom: '1px solid var(--t-line)' }}>
-                  <span>POS</span><span>JOGADOR</span><span>CIDADE / CLUBE</span><span style={{ textAlign: 'center' }}>TEND</span><span style={{ textAlign: 'center' }}>% VIT</span><span style={{ textAlign: 'center' }}>TORN</span><span style={{ textAlign: 'right' }}>PONTOS</span>
-                </div>
-                {rest.map((p, i) => (
-                  <div key={p.player_id} className="rk-row" onClick={() => setSelectedPlayerId(p.player_id)}>
-                    <span className="rk-display" style={{ fontSize: 24, color: 'var(--t-sub)' }}>{String(p.rank).padStart(2,'0')}</span>
-                    <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-                      <span className="avatar" style={{ backgroundImage: p.photo_url ? `url(${p.photo_url})` : 'none' }}>
-                        {!p.photo_url && initials(p.player_name)}
-                      </span>
-                      <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--t-ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.player_name}</span>
-                    </span>
-                    <span className="rk-mono hide-mobile" style={{ fontSize: 11, color: 'var(--t-sub)' }}>—</span>
-                    <span className="hide-mobile" style={{ textAlign: 'center' }}><Trend value={p.position_change} /></span>
-                    <span className="rk-mono hide-mobile" style={{ textAlign: 'center', fontSize: 13, color: p.win_rate >= 70 ? 'var(--t-accent2)' : 'var(--t-ink)' }}>{p.win_rate != null ? `${p.win_rate}%` : '—'}</span>
-                    <span className="rk-mono hide-mobile" style={{ textAlign: 'center', fontSize: 13, color: 'var(--t-sub)' }}>{p.results_count}</span>
-                    <span className="rk-display" style={{ textAlign: 'right', fontSize: 26, color: 'var(--t-accent)' }}>{p.total_points}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* POST GENERATOR MODAL */}
-      <Dialog open={postOpen} onOpenChange={setPostOpen}>
-        <DialogContent className="max-w-6xl" style={{ background: 'var(--t-surface)', border: '1px solid var(--t-line)', color: 'var(--t-ink)', maxHeight: '90vh', overflow: 'auto' }}>
-          <DialogHeader>
-            <DialogTitle className="rk-display" style={{ fontSize: 28, letterSpacing: '0.08em' }}>GERAR POST DO RANKING</DialogTitle>
-          </DialogHeader>
-
-          <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 20, marginTop: 16 }}>
-            {/* Controls */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-              <ControlGroup label="Template">
-                {Object.entries(POST_TEMPLATES).map(([k, v]) => (
-                  <button key={k} onClick={() => setTemplate(k)} className={`rk-chip ${template===k?'active':''}`} style={{ textAlign: 'left', width: '100%' }}>{v.label}</button>
-                ))}
-              </ControlGroup>
-
-              <ControlGroup label="Formato">
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                  <button onClick={() => setFormat('feed')} className={`rk-chip ${format==='feed'?'active':''}`}>1:1 FEED</button>
-                  <button onClick={() => setFormat('story')} className={`rk-chip ${format==='story'?'active':''}`}>9:16 STORY</button>
-                </div>
-              </ControlGroup>
-
-              <ControlGroup label="Paleta">
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
-                  {PALETTE_OPTIONS.map(p => (
-                    <button key={p.key} onClick={() => setTheme(p.key)} style={{
-                      padding: 10, border: `1px solid ${theme===p.key ? p.swatch[1] : 'var(--t-line)'}`,
-                      background: theme===p.key ? 'color-mix(in srgb, var(--t-ink) 5%, transparent)' : 'transparent',
-                      borderRadius: 6, cursor: 'pointer', textAlign: 'left', color: 'var(--t-ink)',
-                      display: 'flex', flexDirection: 'column', gap: 8, fontFamily: 'Space Grotesk, sans-serif', fontSize: 11, letterSpacing: '0.1em',
-                    }}>
-                      <div style={{ display: 'flex', gap: 3 }}>
-                        {p.swatch.map((c, i) => <span key={i} style={{ width: 16, height: 16, background: c, borderRadius: 3, border: '1px solid rgba(255,255,255,0.15)' }} />)}
-                      </div>
-                      {p.label.toUpperCase()}
-                    </button>
-                  ))}
-                </div>
-              </ControlGroup>
-
-              <ControlGroup label="Conteúdo">
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--t-ink)' }}>
-                  <input type="checkbox" checked={showSecondHalf} onChange={(e) => setShowSecondHalf(e.target.checked)} />
-                  Mostrar Top 6–10
-                </label>
-              </ControlGroup>
-
-              <button onClick={handleExport} disabled={exporting} style={{
-                background: 'var(--t-accent2)', color: 'var(--t-bg)', border: 'none', padding: '14px 18px',
-                fontFamily: 'Anton, sans-serif', fontSize: 14, letterSpacing: '0.16em', cursor: exporting?'wait':'pointer', borderRadius: 4,
-                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, opacity: exporting?0.6:1,
-              }}>
-                <Download size={16}/> {exporting ? 'GERANDO...' : 'BAIXAR PNG'}
-              </button>
-            </div>
-
-            {/* Preview */}
-            <PreviewBox format={format}>
-              <div ref={exportRef} data-theme={theme}>
-                <Template
-                  players={rankings}
-                  theme={theme}
-                  format={format}
-                  classLabel={selectedClass}
-                  categoryLabel={categoryLabel}
-                  showSecondHalf={showSecondHalf}
-                  monthLabel={monthLabel}
-                  logoSrc="/fsp.jpeg"
-                />
-              </div>
-            </PreviewBox>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <PlayerModal playerId={selectedPlayerId} onClose={() => setSelectedPlayerId(null)} />
+      <Footer palette={palette} />
     </div>
   );
 };
 
-// ─── Subcomponents ──────────────────────────────
-const Trend = ({ value }) => {
-  if (value == null || value === 0) return <span style={{ color: 'var(--t-sub)', fontSize: 12 }}>—</span>;
-  const up = value > 0;
-  return <span className="rk-mono" style={{ color: up ? 'var(--t-accent2)' : '#ff5577', fontSize: 12, fontWeight: 700 }}>{up ? '▲' : '▼'}{Math.abs(value)}</span>;
+export const POST_TEMPLATES = {
+  ultimate:  { Component: PostUltimate,  label: 'Ultimate Card' },
+  stadium:   { Component: PostStadium,   label: 'Stadium' },
+  editorial: { Component: PostEditorial, label: 'Editorial' },
+  podium:    { Component: PostPodium,    label: 'Podium Royale' },
 };
 
-const StatRow = ({ label, value, big, accent }) => (
-  <div className="rk-stat-row">
-    <span className="rk-mono" style={{ fontSize: 11, color: 'var(--t-sub)' }}>{label}</span>
-    <span className="rk-display" style={{ fontSize: big ? 44 : 28, color: accent ? 'var(--t-accent)' : 'var(--t-ink)' }}>{value}</span>
-  </div>
-);
-
-const SectionHeader = ({ label, sub, inline }) => (
-  <div style={{ display: inline ? 'flex' : 'block', gap: 16, alignItems: 'baseline', marginBottom: inline ? 0 : 14 }}>
-    <div className="rk-display" style={{ fontSize: 26 }}>{label}</div>
-    {sub && <div className="rk-mono" style={{ fontSize: 11, color: 'var(--t-sub)' }}>{sub}</div>}
-  </div>
-);
-
-const PodiumCard = ({ player, pos, onClick }) => {
-  const medalVar = `var(--t-podium-${pos+1})`;
-  const isOne = pos === 0;
-  const initials = ((player.player_name||'').trim().split(/\s+/).map(p=>p[0]||'').filter((_,i,a)=>i===0||i===a.length-1).join('')).toUpperCase();
-  return (
-    <div onClick={onClick} style={{
-      position: 'relative', border: `2px solid ${medalVar}`, borderRadius: 12, overflow: 'hidden',
-      background: 'color-mix(in srgb, var(--t-surface) 80%, transparent)',
-      height: isOne ? 320 : 280, marginTop: isOne ? 0 : 20, cursor: 'pointer',
-    }}>
-      <div style={{ width: '100%', height: '62%', background: 'var(--t-surface2)', backgroundImage: player.photo_url ? `url(${player.photo_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'top', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        {!player.photo_url && <div className="rk-display" style={{ fontSize: 72, color: 'var(--t-line)' }}>{initials}</div>}
-        <div className="rk-display" style={{ position: 'absolute', top: 10, right: 10, width: 38, height: 38, borderRadius: 8, background: medalVar, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: '#1a1200' }}>{pos+1}</div>
-      </div>
-      <div style={{ padding: '12px 16px 14px' }}>
-        <div className="rk-display" style={{ fontSize: isOne ? 24 : 20 }}>{player.player_name.toUpperCase()}</div>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 8 }}>
-          <span className="rk-display" style={{ fontSize: 28, color: 'var(--t-accent)' }}>{player.total_points}</span>
-          <span className="rk-mono" style={{ fontSize: 10, color: 'var(--t-sub)' }}>PTS · {player.results_count} TORN.{player.win_rate != null ? ` · ${player.win_rate}% VIT.` : ''}</span>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const ControlGroup = ({ label, children }) => (
-  <div>
-    <div className="rk-mono" style={{ fontSize: 10, color: 'var(--t-sub)', marginBottom: 8 }}>{label.toUpperCase()}</div>
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{children}</div>
-  </div>
-);
-
-const PreviewBox = ({ format, children }) => {
-  const containerRef = useRef(null);
-  const [scale, setScale] = useState(0.5);
-  const W = 1080, H = format === 'feed' ? 1080 : 1920;
-  useEffect(() => {
-    const fit = () => {
-      if (!containerRef.current) return;
-      const r = containerRef.current.getBoundingClientRect();
-      const sx = (r.width - 40) / W;
-      const sy = (r.height - 40) / H;
-      setScale(Math.max(0.1, Math.min(sx, sy, 1)));
-    };
-    fit();
-    window.addEventListener('resize', fit);
-    return () => window.removeEventListener('resize', fit);
-  }, [format]);
-  return (
-    <div ref={containerRef} style={{ background: 'var(--t-surface2)', border: '1px solid var(--t-line)', borderRadius: 8, minHeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
-      <div style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: 'center center', flexShrink: 0 }}>
-        {children}
-      </div>
-      <div className="rk-mono" style={{ position: 'absolute', bottom: 8, right: 12, fontSize: 10, color: 'var(--t-sub)' }}>{W}×{H} · {Math.round(scale*100)}%</div>
-    </div>
-  );
-};
-
-export default Rankings;
+export const PALETTE_OPTIONS = [
+  { key: 'storm',    label: 'FSP Storm',    swatch: ['#070d1a','#4aa3ff','#22e1ff'] },
+  { key: 'inferno',  label: 'Court Inferno',swatch: ['#0a0a0c','#ff2d6f','#c6f432'] },
+  { key: 'champion', label: 'Champion Gold',swatch: ['#0e0c08','#d4a017','#f5d36b'] },
+  { key: 'glacier',  label: 'Glacier',      swatch: ['#f4f1ea','#2d8a3e','#0d6e7b'] },
+];

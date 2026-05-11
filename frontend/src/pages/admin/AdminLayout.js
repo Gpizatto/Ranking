@@ -76,6 +76,20 @@ const AdminLayout = () => {
       const fspTheme = theme?.fspTheme || themeId;
       document.documentElement.setAttribute('data-theme', fspTheme);
       
+      // Invalida o cache do tema para forçar reload
+      const themeUrl = `${API}/theme`;
+      if (typeof localStorage !== 'undefined') {
+        // Remove cache antigo
+        const cacheKey = `cache:${themeUrl}`;
+        localStorage.removeItem(cacheKey);
+        
+        // Salva novo cache
+        localStorage.setItem(cacheKey, JSON.stringify({
+          data: { theme: themeId },
+          timestamp: Date.now()
+        }));
+      }
+      
       toast.success('Tema aplicado com sucesso!');
     } catch (error) {
       console.error('Erro ao salvar tema:', error);

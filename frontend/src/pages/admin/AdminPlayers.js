@@ -19,28 +19,21 @@ const photoCache = {};
 
 // Card de jogador admin com foto lazy
 const AdminPlayerCard = React.memo(({ player, onEdit, onDelete }) => {
-  const [photoUrl, setPhotoUrl] = React.useState(photoCache[player.id] || null);
+  // Usa photo_url que já vem no player (endpoint /players retorna a foto)
+  // photoCache serve como fallback para foto atualizada após upload
+  const [photoUrl, setPhotoUrl] = React.useState(
+    photoCache[player.id] || player.photo_url || null
+  );
   const cardRef = React.useRef(null);
 
   React.useEffect(() => {
-    const el = cardRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      async (entries) => {
-        if (!entries[0].isIntersecting) return;
-        observer.disconnect();
-        if (photoCache[player.id]) { setPhotoUrl(photoCache[player.id]); return; }
-        try {
-          const res = await axios.get(`${API}/players/photo/${player.id}`);
-          photoCache[player.id] = res.data.photo_url;
-          setPhotoUrl(res.data.photo_url);
-        } catch { /* sem foto */ }
-      },
-      { rootMargin: '150px' }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [player.id]);
+    // Atualiza se o cache tiver uma foto mais recente (ex: após upload)
+    if (photoCache[player.id] && photoCache[player.id] !== photoUrl) {
+      setPhotoUrl(photoCache[player.id]);
+    } else if (player.photo_url && !photoUrl) {
+      setPhotoUrl(player.photo_url);
+    }
+  }, [player.id, player.photo_url]);
 
   return (
     <Card ref={cardRef} className="bg-slate-800/50 border-blue-500/20" data-testid={`player-admin-card-${player.id}`}>
@@ -134,8 +127,8 @@ const PREVIEW_W = 150;
 const PREVIEW_H = 230;
 
 // Resolução real exportada
-const EXPORT_W = 400;
-const EXPORT_H = 600;
+const EXPORT_W = 800;
+const EXPORT_H = 1200;
 
   const drawCropCanvas = useCallback(() => {
   const canvas = cropCanvasRef.current;
@@ -348,17 +341,10 @@ const cy = PREVIEW_H / 2;
     }
   };
 
-  const handleEdit = async (player) => {
+  const handleEdit = (player) => {
     setEditingPlayer(player);
-    // Busca foto do endpoint dedicado (não vem mais no /players)
-    let photoUrl = photoCache[player.id] || '';
-    if (!photoUrl) {
-      try {
-        const res = await axios.get(`${API}/players/photo/${player.id}`);
-        photoUrl = res.data.photo_url || '';
-        photoCache[player.id] = photoUrl;
-      } catch { photoUrl = ''; }
-    }
+    // photo_url já vem no player do endpoint /players
+    const photoUrl = photoCache[player.id] || player.photo_url || '';
     setFormData({
       name: player.name,
       photo_url: photoUrl,
@@ -370,6 +356,20 @@ const cy = PREVIEW_H / 2;
       is_federated: player.is_federated !== undefined ? player.is_federated : true
     });
     setDialogOpen(true);
+  };
+
+  const migratePhotos = async () => {
+    if (!window.confirm('Isso vai re-processar todas as fotos existentes para maior resolução. Pode demorar alguns segundos. Continuar?')) return;
+    try {
+      toast.loading('Migrando fotos...');
+      const res = await axios.post(`${API}/admin/migrate-photos`);
+      toast.dismiss();
+      toast.success(`Fotos migradas: ${res.data.updated} atualizadas, ${res.data.skipped} já ok, ${res.data.errors} erros`);
+      fetchPlayers();
+    } catch (err) {
+      toast.dismiss();
+      toast.error('Erro ao migrar fotos');
+    }
   };
 
   const handleDelete = async (id) => {
@@ -532,6 +532,13 @@ const cy = PREVIEW_H / 2;
             onChange={handleImportExcel}
             className="hidden"
           />
+          <Button
+            onClick={migratePhotos}
+            className="bg-indigo-600 hover:bg-indigo-700 text-white"
+            title="Melhorar resolução de todas as fotos existentes"
+          >
+            🖼️ <span className="hidden sm:inline ml-1">Melhorar Fotos</span>
+          </Button>
           
           <Dialog open={dialogOpen} onOpenChange={(open) => {
             setDialogOpen(open);

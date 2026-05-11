@@ -1,142 +1,20 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+// frontend/src/pages/Rankings.js
+// Redesign completo: sport-card aesthetic + 4 templates de post
+// Mantém: cache, PlayerModal, toast, html2canvas, axios
+
+import React, { useState, useEffect, useRef } from 'react';
 import axios from '../lib/api';
 import { API } from '../lib/api';
 import { cachedGet, getCached, TTL } from '../lib/cache';
-import { Trophy, Medal, Download, MapPin, GraduationCap, User, TrendingUp } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
-import { Button } from '../components/ui/button';
+import { Download, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
-import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
 import PlayerModal from '../components/PlayerModal';
 import html2canvas from 'html2canvas';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { POST_TEMPLATES, PALETTE_OPTIONS } from '../components/PostTemplates';
 
 const CLASSES = ['1ª', '2ª', '3ª', '4ª', '5ª', '6ª', 'Duplas'];
 const CATEGORIES = ['Feminina', 'Masculina'];
-
-// Cache de fotos compartilhado entre todos os componentes
-const photoCache = {};
-
-// Hook para carregar foto de um jogador sob demanda
-function usePlayerPhoto(playerId, eager = false) {
-  const [photoUrl, setPhotoUrl] = useState(photoCache[playerId] || null);
-  const ref = useRef(null);
-
-  const load = useCallback(async () => {
-    if (photoCache[playerId]) { setPhotoUrl(photoCache[playerId]); return; }
-    try {
-      const res = await axios.get(`${API}/players/photo/${playerId}`);
-      photoCache[playerId] = res.data.photo_url;
-      setPhotoUrl(res.data.photo_url);
-    } catch { /* sem foto */ }
-  }, [playerId]);
-
-  useEffect(() => {
-    if (!playerId) return;
-    if (eager) { load(); return; }
-
-    const el = ref.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => { if (entries[0].isIntersecting) { load(); observer.disconnect(); } },
-      { rootMargin: '150px' }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [playerId, eager, load]);
-
-  return { photoUrl, ref };
-}
-
-// Card do Top 5 com foto lazy
-const TopPlayerCard = ({ player, index, onClick }) => {
-  const { photoUrl, ref } = usePlayerPhoto(player.player_id, index < 3); // top 3 carrega eager
-  const borderColors = ['border-yellow-400', 'border-gray-300', 'border-orange-400', 'border-blue-400', 'border-green-400'];
-  const badgeBg = ['bg-yellow-400 text-yellow-900', 'bg-gray-300 text-gray-900', 'bg-orange-400 text-orange-900', 'bg-blue-400 text-blue-900', 'bg-green-400 text-green-900'];
-
-  return (
-    <div ref={ref} onClick={() => onClick(player.player_id)}
-      className={`relative overflow-hidden rounded-xl cursor-pointer group border-2 ${borderColors[index]} h-[280px] sm:h-[360px] ${index >= 3 ? "hidden sm:block" : ""} transition-transform duration-200 hover:-translate-y-1`}
-      data-testid={`top-player-card-${index + 1}`}>
-      <img
-        src={photoUrl || "/fsp.jpeg"}
-        alt={player.player_name}
-        className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
-      />
-      <div className={`absolute top-3 left-3 z-10 w-10 h-10 rounded-full flex items-center justify-center font-black text-lg leading-none ${badgeBg[index]} shadow-lg`}>{index + 1}</div>
-      <div className="absolute bottom-0 left-0 right-0 z-10 bg-black/60 backdrop-blur-sm px-3 py-2.5">
-        <p className="text-white font-bold text-sm leading-tight line-clamp-2 mb-0.5">{player.player_name}</p>
-        <p className="text-green-400 font-bold text-base leading-none">{player.total_points} <span className="text-xs font-normal text-gray-300">pts</span></p>
-        <p className="text-gray-300 text-xs mt-0.5">{player.results_count} torneios</p>
-      </div>
-      <div className="absolute inset-0 bg-black/85 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex flex-col items-center justify-center gap-3 p-4">
-        {player.last_match && (
-          <div className="text-center space-y-1">
-            <div className="text-xs text-green-400 font-semibold uppercase tracking-wide">Última Partida</div>
-            <div className="text-base text-white font-medium">vs {player.last_match.opponent_name}</div>
-            <div className="text-gray-300 font-mono text-sm">{player.last_match.score_formatted}</div>
-            <Badge className={player.last_match.result === 'Win' ? 'bg-green-500' : 'bg-red-500'}>{player.last_match.result === 'Win' ? 'Vitória' : 'Derrota'}</Badge>
-          </div>
-        )}
-        <Button variant="outline" className="border-green-500 text-green-400 hover:bg-green-500 hover:text-white text-sm">Ver Perfil →</Button>
-      </div>
-    </div>
-  );
-};
-
-// Linha da tabela com avatar lazy
-const RankingRow = ({ player, index, onPlayerClick }) => {
-  const { photoUrl, ref } = usePlayerPhoto(player.player_id);
-  const isTop3 = index < 3;
-  const medalColors = ['text-yellow-400', 'text-gray-300', 'text-orange-400'];
-
-  return (
-    <tr ref={ref} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-all cursor-pointer group" data-testid={`ranking-row-${index}`}>
-      <td className="py-3 px-2 sm:px-4">
-        <div className="flex items-center">
-          {isTop3 ? (
-            <>
-              {index === 0 && <Trophy className="w-5 h-5 text-yellow-400 mr-2" />}
-              {index === 1 && <Medal className="w-5 h-5 text-gray-300 mr-2" />}
-              {index === 2 && <Medal className="w-5 h-5 text-orange-400 mr-2" />}
-              <span className={`font-black text-xl ${medalColors[index]}`}>{player.rank}</span>
-            </>
-          ) : (
-            <span className="text-white font-bold text-lg">{player.rank}</span>
-          )}
-        </div>
-      </td>
-      <td className="py-4 px-4">
-        <div className="flex items-center space-x-3 group-hover:text-green-400 transition-colors" onClick={() => onPlayerClick(player.player_id)}>
-          <Avatar className="w-12 h-12 ring-2 ring-transparent group-hover:ring-green-500 transition-all">
-            <AvatarImage src={photoUrl || "/fsp.jpeg"} className="object-cover object-top" />
-            <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover" /></AvatarFallback>
-          </Avatar>
-          <span className="text-white font-semibold group-hover:underline">{player.player_name}</span>
-        </div>
-      </td>
-      <td className="py-4 px-4 hidden md:table-cell"><Badge className="bg-blue-500">{player.class_category}</Badge></td>
-      <td className="py-4 px-4 hidden lg:table-cell"><Badge className="bg-purple-500">{player.gender_category}</Badge></td>
-      <td className="py-4 px-3 text-center hidden sm:table-cell">
-        {player.position_change > 0 && <span className="text-green-400 text-xs font-bold">▲{player.position_change}</span>}
-        {player.position_change < 0 && <span className="text-red-400 text-xs font-bold">▼{Math.abs(player.position_change)}</span>}
-        {(!player.position_change || player.position_change === 0) && <span className="text-slate-600 text-xs">—</span>}
-      </td>
-      <td className="py-4 px-3 text-center hidden md:table-cell">
-        {player.win_rate != null ? (
-          <span className={`text-sm font-bold ${player.win_rate >= 70 ? 'text-green-400' : player.win_rate >= 50 ? 'text-gray-300' : 'text-slate-500'}`}>
-            {player.win_rate}%
-          </span>
-        ) : <span className="text-slate-600 text-xs">—</span>}
-      </td>
-      <td className="py-4 px-4 text-right"><span className="text-green-400 font-bold text-xl">{player.total_points}</span></td>
-      <td className="py-4 px-4 text-center hidden sm:table-cell"><span className="text-gray-400 font-medium">{player.results_count}</span></td>
-    </tr>
-  );
-};
 
 const Rankings = () => {
   const [rankings, setRankings] = useState([]);
@@ -144,8 +22,19 @@ const Rankings = () => {
   const [selectedCategory, setSelectedCategory] = useState('Feminina');
   const [loading, setLoading] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState(null);
-  const [logoBase64, setLogoBase64] = useState('');
-  const [imageFormatOpen, setImageFormatOpen] = useState(false);
+
+  // Estado do gerador de post
+  const [postOpen, setPostOpen] = useState(false);
+  const [template, setTemplate] = useState(() => localStorage.getItem('fsp_post_template') || 'ultimate');
+  const [format, setFormat] = useState(() => localStorage.getItem('fsp_post_format') || 'feed');
+  const [theme, setTheme] = useState(() => localStorage.getItem('fsp_post_theme') || 'storm');
+  const [showSecondHalf, setShowSecondHalf] = useState(true);
+  const [exporting, setExporting] = useState(false);
+  const exportRef = useRef(null);
+
+  useEffect(() => { localStorage.setItem('fsp_post_template', template); }, [template]);
+  useEffect(() => { localStorage.setItem('fsp_post_format', format); }, [format]);
+  useEffect(() => { localStorage.setItem('fsp_post_theme', theme); }, [theme]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -169,247 +58,339 @@ const Rankings = () => {
     return () => controller.abort();
   }, [selectedClass, selectedCategory]);
 
-  useEffect(() => {
-    if (logoBase64) return;
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = img.width; canvas.height = img.height;
-      canvas.getContext('2d').drawImage(img, 0, 0);
-      setLogoBase64(canvas.toDataURL('image/png'));
-    };
-    img.src = '/fsp.jpeg';
-  }, []);
+  const champ = rankings[0];
+  const top3 = rankings.slice(0, 3);
+  const rest = rankings.slice(3);
+  const categoryLabel = selectedClass === 'Duplas' ? 'Mista' : selectedCategory;
+  const monthLabel = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
+  const Template = POST_TEMPLATES[template].Component;
 
-  const handlePlayerClick = (playerId) => { setSelectedPlayerId(playerId); };
-
-  const IMAGE_FORMATS = [
-    { id: 'feed', label: 'Feed Instagram', desc: '1080×1080', w: 1080, h: 1080 },
-    { id: 'story', label: 'Story / Reels', desc: '1080×1920', w: 1080, h: 1920 },
-    { id: 'landscape', label: 'Paisagem', desc: '1280×720', w: 1280, h: 720 },
-    { id: 'original', label: 'Original', desc: '800×auto', w: 800, h: null },
-  ];
-
-  const generateTop10Image = async (imageFormat) => {
-    const element = document.getElementById('top10-card');
-    if (!element) return;
-    setImageFormatOpen(false);
-    const FINAL_W = imageFormat.w;
-    const FINAL_H = imageFormat.h;
-    const BASE_W = 800;
-    const BASE_H = FINAL_H ? Math.round(BASE_W * (FINAL_H / FINAL_W)) : null;
-    const SCALE = Math.max(2, FINAL_W / BASE_W);
-    const originalStyle = element.getAttribute('style');
-    const noShadowStyle = document.createElement('style');
-    noShadowStyle.id = 'no-shadow-capture';
-    noShadowStyle.textContent = `
-      #top10-card, #top10-card * { box-shadow: none !important; text-shadow: none !important; filter: none !important; }
-      #top10-card img { border-radius: 0 !important; image-rendering: -webkit-optimize-contrast !important; }
-    `;
+  const handleExport = async () => {
+    const el = exportRef.current;
+    if (!el) return;
+    setExporting(true);
     try {
-      document.head.appendChild(noShadowStyle);
-      element.style.width = `${BASE_W}px`;
-      element.style.height = BASE_H ? `${BASE_H}px` : 'auto';
-      element.style.overflow = 'hidden';
-      element.setAttribute('data-format', imageFormat.id);
-      await new Promise(resolve => requestAnimationFrame(resolve));
-      const canvas = await html2canvas(element, {
-        backgroundColor: '#0a1628', scale: SCALE, useCORS: true,
-        allowTaint: true, logging: false, width: BASE_W,
-        height: BASE_H || element.offsetHeight, imageTimeout: 0, removeContainer: false,
-      });
-      document.head.removeChild(noShadowStyle);
-      element.setAttribute('style', originalStyle || '');
-      element.removeAttribute('data-format');
-      const link = document.createElement('a');
-      link.download = `ranking-fsp-${selectedClass}-${(selectedClass === 'Duplas' ? 'Mista' : selectedCategory)}-${imageFormat.id}.png`;
-      link.href = canvas.toDataURL('image/png', 1.0);
-      link.click();
-      toast.success('Imagem gerada com sucesso!');
-    } catch (error) {
-      const tag = document.getElementById('no-shadow-capture');
-      if (tag) document.head.removeChild(tag);
-      element && element.setAttribute('style', originalStyle || '');
-      element && element.removeAttribute('data-format');
-      toast.error('Erro ao gerar imagem');
+      const canvas = await html2canvas(el, { scale: 2, backgroundColor: null, useCORS: true, allowTaint: true, logging: false, imageTimeout: 0 });
+      const a = document.createElement('a');
+      a.download = `ranking-fsp-${selectedClass}-${categoryLabel}-${template}-${format}.png`;
+      a.href = canvas.toDataURL('image/png', 1.0);
+      a.click();
+      toast.success('Imagem gerada!');
+    } catch (e) {
+      toast.error('Erro ao gerar imagem: ' + e.message);
+    } finally {
+      setExporting(false);
     }
   };
 
-  const top5 = rankings.slice(0, 5);
-  const top6to10 = rankings.slice(5, 10);
+  const initials = (n='') => {
+    const p = n.trim().split(/\s+/);
+    return ((p[0]?.[0]||'') + (p[p.length-1]?.[0]||'')).toUpperCase();
+  };
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-1" data-testid="rankings-title">Rankings Oficiais</h1>
-          <p className="text-gray-400 text-sm">Classificação atualizada dos jogadores</p>
-        </div>
-        <Button onClick={() => setImageFormatOpen(true)} className="bg-purple-500 hover:bg-purple-600 shrink-0" data-testid="generate-image-button">
-          <Download className="w-4 h-4 sm:mr-2" />
-          <span className="hidden sm:inline">Gerar Imagem Top 10</span>
-        </Button>
-      </div>
+    <div className="rk-root" style={{ background: 'var(--t-grad, var(--t-bg))', minHeight: '100%', padding: '32px 8px 60px' }}>
+      <style>{`
+        .rk-root { font-family: 'Space Grotesk', system-ui, sans-serif; color: var(--t-ink); }
+        .rk-display { font-family: 'Anton', Impact, sans-serif; letter-spacing: 0.01em; line-height: 0.95; }
+        .rk-mono { font-family: 'JetBrains Mono', monospace; letter-spacing: 0.22em; }
+        .rk-card { background: color-mix(in srgb, var(--t-surface) 85%, transparent); border: 1px solid var(--t-line); border-radius: 14px; }
+        .rk-chip { padding: 6px 14px; font-family: 'Anton', sans-serif; font-size: 14px; letter-spacing: 0.08em; border: 1px solid var(--t-line); border-radius: 4px; background: transparent; color: var(--t-ink); cursor: pointer; transition: all 0.15s; }
+        .rk-chip:hover { border-color: var(--t-accent); }
+        .rk-chip.active { background: var(--t-accent); color: var(--t-bg); border-color: var(--t-accent); }
+        .rk-stat-row { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 14px; background: color-mix(in srgb, var(--t-bg) 50%, transparent); border: 1px solid var(--t-line); border-radius: 8px; }
+        .rk-row { display: grid; grid-template-columns: 70px 1fr 160px 70px 90px 60px 110px; align-items: center; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--t-line); cursor: pointer; transition: background 0.15s; }
+        .rk-row:hover { background: color-mix(in srgb, var(--t-accent) 8%, transparent); }
+        .rk-row:last-child { border-bottom: none; }
+        .rk-row .avatar { width: 38px; height: 38px; border-radius: 6px; background: var(--t-surface2); background-size: cover; background-position: top; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--t-sub); flex-shrink: 0; overflow: hidden; }
+        @media (max-width: 900px) {
+          .rk-hero { grid-template-columns: 1fr !important; }
+          .rk-hero .photo { width: 100% !important; height: 320px !important; }
+          .rk-podium { grid-template-columns: 1fr !important; }
+          .rk-row { grid-template-columns: 50px 1fr 100px; padding: 12px; }
+          .rk-row .hide-mobile { display: none; }
+        }
+      `}</style>
 
-      <div className="bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex flex-wrap gap-1.5 flex-1">
-            {CLASSES.map((cls) => (
-              <button key={cls} onClick={() => setSelectedClass(cls)} data-testid={`class-filter-${cls}`}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${selectedClass === cls ? 'bg-green-500 text-white' : 'text-slate-400 hover:text-white outline outline-1 outline-slate-700 hover:outline-slate-500'}`}>
-                {cls}
-              </button>
+      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 24px' }}>
+        {/* TITLE */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 28, gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <div className="rk-mono" style={{ fontSize: 11, color: 'var(--t-sub)', marginBottom: 10 }}>● TEMPORADA ATIVA · {monthLabel}</div>
+            <h1 className="rk-display" style={{ fontSize: 'clamp(48px, 8vw, 80px)', margin: 0 }}>
+              RANKINGS<br/><span style={{ color: 'var(--t-accent)' }}>OFICIAIS</span>
+            </h1>
+          </div>
+          <button onClick={() => setPostOpen(true)} style={{
+            background: 'var(--t-accent)', color: 'var(--t-bg)', border: 'none', padding: '16px 24px',
+            fontFamily: 'Anton, sans-serif', fontSize: 16, letterSpacing: '0.16em', cursor: 'pointer', borderRadius: 4,
+            display: 'flex', alignItems: 'center', gap: 10,
+          }}>
+            <Download size={18} /> GERAR POST
+          </button>
+        </div>
+
+        {/* FILTERS */}
+        <div className="rk-card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 14, marginBottom: 28 }}>
+          <div className="rk-mono" style={{ fontSize: 10, color: 'var(--t-sub)' }}>CLASSE</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {CLASSES.map(cls => (
+              <button key={cls} className={`rk-chip ${selectedClass===cls?'active':''}`} onClick={() => setSelectedClass(cls)}>{cls}</button>
             ))}
           </div>
-          <div className="w-px h-6 bg-slate-700 shrink-0 hidden sm:block" />
+          <div style={{ width: 1, height: 20, background: 'var(--t-line)' }}/>
+          <div className="rk-mono" style={{ fontSize: 10, color: 'var(--t-sub)' }}>CATEGORIA</div>
           {selectedClass === 'Duplas' ? (
-            <div className="px-3 py-1.5 rounded-md text-xs font-semibold bg-purple-500 text-white shrink-0">Mista</div>
+            <div className="rk-mono" style={{ padding: '6px 12px', fontSize: 11, color: 'var(--t-accent2)', border: '1px solid var(--t-line)', borderRadius: 4 }}>MISTA</div>
           ) : (
-            <div className="flex gap-1.5 shrink-0">
-              {CATEGORIES.map((cat) => (
-                <button key={cat} onClick={() => setSelectedCategory(cat)} data-testid={`category-filter-${cat}`}
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${selectedCategory === cat ? 'bg-blue-500 text-white' : 'text-slate-400 hover:text-white outline outline-1 outline-slate-700 hover:outline-slate-500'}`}>
-                  {cat}
-                </button>
+            <div style={{ display: 'flex', gap: 6 }}>
+              {CATEGORIES.map(cat => (
+                <button key={cat} className={`rk-chip ${selectedCategory===cat?'active':''}`} onClick={() => setSelectedCategory(cat)}>{cat}</button>
               ))}
             </div>
           )}
         </div>
-      </div>
 
-      {!loading && rankings.length > 0 && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-3xl font-bold text-white"><span className="sm:hidden">Top 3</span><span className="hidden sm:inline">Top 5</span></h2>
-            <Badge className="bg-green-500 text-white px-3 py-1">{selectedClass} - {selectedClass === 'Duplas' ? 'Mista' : selectedCategory}</Badge>
-          </div>
-          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 items-end">
-            {top5.map((player, index) => (
-              <TopPlayerCard key={player.player_id} player={player} index={index} onClick={handlePlayerClick} />
-            ))}
-          </div>
-        </div>
-      )}
+        {loading && <div style={{ textAlign: 'center', padding: 60, color: 'var(--t-sub)' }}>Carregando...</div>}
+        {!loading && rankings.length === 0 && <div style={{ textAlign: 'center', padding: 60, color: 'var(--t-sub)' }}>Nenhum resultado encontrado</div>}
 
-      <Card className="bg-slate-800/50 border-green-500/20">
-        <CardHeader>
-          <CardTitle className="text-white text-2xl flex items-center justify-between">
-            <span>Ranking Completo - {selectedClass} {selectedClass === 'Duplas' ? 'Mista' : selectedCategory}</span>
-            <span className="text-sm text-gray-400 font-normal">{rankings.length} jogadores</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? <div className="text-center py-12 text-gray-400">Carregando...</div>
-            : rankings.length === 0 ? <div className="text-center py-12 text-gray-400">Nenhum resultado encontrado</div>
-            : (
-              <div className="overflow-x-auto">
-                <table className="w-full" data-testid="rankings-table">
-                  <thead>
-                    <tr className="border-b-2 border-slate-700">
-                      <th className="text-left py-4 px-4 text-gray-400 font-semibold uppercase text-xs">Rank</th>
-                      <th className="text-left py-4 px-4 text-gray-400 font-semibold uppercase text-xs">Jogador</th>
-                      <th className="text-left py-4 px-2 text-gray-400 font-semibold uppercase text-xs hidden md:table-cell">Classe</th>
-                      <th className="text-left py-4 px-2 text-gray-400 font-semibold uppercase text-xs hidden lg:table-cell">Categoria</th>
-                      <th className="text-center py-4 px-3 text-gray-400 font-semibold uppercase text-xs hidden sm:table-cell">Tend.</th>
-                      <th className="text-center py-4 px-3 text-gray-400 font-semibold uppercase text-xs hidden md:table-cell">% Vitórias</th>
-                      <th className="text-right py-4 px-4 text-gray-400 font-semibold uppercase text-xs">Pontos</th>
-                      <th className="text-center py-4 px-4 text-gray-400 font-semibold uppercase text-xs hidden sm:table-cell">Torneios</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {rankings.map((player, index) => (
-                      <RankingRow key={player.player_id} player={player} index={index} onPlayerClick={handlePlayerClick} />
-                    ))}
-                  </tbody>
-                </table>
+        {!loading && champ && (
+          <>
+            {/* HERO */}
+            <div className="rk-card rk-hero" style={{ position: 'relative', padding: 24, marginBottom: 32, display: 'grid', gridTemplateColumns: '320px 1fr 320px', gap: 28, overflow: 'hidden' }} onClick={() => setSelectedPlayerId(champ.player_id)}>
+              <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(115deg, transparent 40%, color-mix(in srgb, var(--t-accent) 12%, transparent) 55%, transparent 70%)`, pointerEvents: 'none' }}/>
+              <div className="photo" style={{ width: 320, height: 380, borderRadius: 12, border: '1px solid var(--t-line)', background: 'var(--t-surface2)', backgroundImage: champ.photo_url ? `url(${champ.photo_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'top', position: 'relative', overflow: 'hidden', cursor: 'pointer' }}>
+                {!champ.photo_url && <div className="rk-display" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 96, color: 'var(--t-line)' }}>{initials(champ.player_name)}</div>}
+              </div>
+
+              <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                    <span className="rk-display" style={{ background: 'var(--t-podium-1)', color: '#1a1200', padding: '4px 12px', fontSize: 14, letterSpacing: '0.18em', borderRadius: 4 }}>LÍDER ATUAL</span>
+                    <Trend value={champ.position_change} />
+                  </div>
+                  <div className="rk-display" style={{ fontSize: 'clamp(40px, 5vw, 64px)' }}>
+                    {champ.player_name.split(' ')[0].toUpperCase()}<br/>
+                    <span style={{ color: 'var(--t-accent)' }}>{champ.player_name.split(' ').slice(1).join(' ').toUpperCase()}</span>
+                  </div>
+                </div>
+                {champ.last_match && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, alignItems: 'center', padding: 14, background: 'color-mix(in srgb, var(--t-bg) 50%, transparent)', border: '1px solid var(--t-line)', borderRadius: 8, marginTop: 16 }}>
+                    <div className="rk-mono" style={{ fontSize: 10, color: 'var(--t-sub)' }}>ÚLT. PARTIDA</div>
+                    <div className="rk-display" style={{ fontSize: 18 }}>vs {champ.last_match.opponent_name}</div>
+                    <div className="rk-mono" style={{ fontSize: 16, color: 'var(--t-ink)' }}>{champ.last_match.score_formatted}</div>
+                    <div className="rk-display" style={{ padding: '3px 10px', background: champ.last_match.result === 'Win' ? 'var(--t-accent2)' : '#ff5577', color: 'var(--t-bg)', fontSize: 12, letterSpacing: '0.18em', borderRadius: 4 }}>{champ.last_match.result === 'Win' ? 'V' : 'D'}</div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <StatRow label="PONTOS" value={champ.total_points} big accent />
+                <StatRow label="TORNEIOS" value={champ.results_count} />
+                {champ.win_rate != null && <StatRow label="% VITÓRIAS" value={`${champ.win_rate}%`} />}
+                <StatRow label="VARIAÇÃO" value={champ.position_change > 0 ? `+${champ.position_change}` : (champ.position_change || 0)} />
+              </div>
+            </div>
+
+            {/* PODIUM */}
+            {top3.length === 3 && (
+              <div style={{ marginBottom: 32 }}>
+                <SectionHeader label="PÓDIO" sub="Top 3 da classe" />
+                <div className="rk-podium" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+                  {top3.map((p, i) => <PodiumCard key={p.player_id} player={p} pos={i} onClick={() => setSelectedPlayerId(p.player_id)} />)}
+                </div>
               </div>
             )}
-        </CardContent>
-      </Card>
 
-      <Dialog open={imageFormatOpen} onOpenChange={setImageFormatOpen}>
-        <DialogContent className="bg-slate-800 border-purple-500/20 max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-white flex items-center gap-2">
-              <Download className="w-5 h-5 text-purple-400" />
-              Escolha o formato
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2 mt-2">
-            {IMAGE_FORMATS.map(fmt => (
-              <button key={fmt.id} onClick={() => generateTop10Image(fmt)}
-                className="w-full flex items-center justify-between bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-purple-500/50 rounded-lg px-4 py-3 transition-all group">
-                <div className="text-left">
-                  <p className="text-white font-semibold text-sm group-hover:text-purple-300">{fmt.label}</p>
-                  <p className="text-gray-400 text-xs">{fmt.desc} px</p>
+            {/* RANKING COMPLETO */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+                <SectionHeader label="RANKING COMPLETO" sub={`${rankings.length} JOGADORES`} inline />
+                <div className="rk-mono" style={{ fontSize: 11, color: 'var(--t-sub)' }}>{selectedClass.toUpperCase()} · {categoryLabel.toUpperCase()}</div>
+              </div>
+
+              <div className="rk-card" style={{ overflow: 'hidden' }}>
+                <div className="rk-row rk-mono hide-mobile" style={{ padding: '12px 20px', fontSize: 10, color: 'var(--t-sub)', cursor: 'default', borderBottom: '1px solid var(--t-line)' }}>
+                  <span>POS</span><span>JOGADOR</span><span>CIDADE / CLUBE</span><span style={{ textAlign: 'center' }}>TEND</span><span style={{ textAlign: 'center' }}>% VIT</span><span style={{ textAlign: 'center' }}>TORN</span><span style={{ textAlign: 'right' }}>PONTOS</span>
                 </div>
-                <Download className="w-4 h-4 text-gray-400 group-hover:text-purple-400" />
+                {rest.map((p, i) => (
+                  <div key={p.player_id} className="rk-row" onClick={() => setSelectedPlayerId(p.player_id)}>
+                    <span className="rk-display" style={{ fontSize: 24, color: 'var(--t-sub)' }}>{String(p.rank).padStart(2,'0')}</span>
+                    <span style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+                      <span className="avatar" style={{ backgroundImage: p.photo_url ? `url(${p.photo_url})` : 'none' }}>
+                        {!p.photo_url && initials(p.player_name)}
+                      </span>
+                      <span style={{ fontWeight: 700, fontSize: 16, color: 'var(--t-ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.player_name}</span>
+                    </span>
+                    <span className="rk-mono hide-mobile" style={{ fontSize: 11, color: 'var(--t-sub)' }}>—</span>
+                    <span className="hide-mobile" style={{ textAlign: 'center' }}><Trend value={p.position_change} /></span>
+                    <span className="rk-mono hide-mobile" style={{ textAlign: 'center', fontSize: 13, color: p.win_rate >= 70 ? 'var(--t-accent2)' : 'var(--t-ink)' }}>{p.win_rate != null ? `${p.win_rate}%` : '—'}</span>
+                    <span className="rk-mono hide-mobile" style={{ textAlign: 'center', fontSize: 13, color: 'var(--t-sub)' }}>{p.results_count}</span>
+                    <span className="rk-display" style={{ textAlign: 'right', fontSize: 26, color: 'var(--t-accent)' }}>{p.total_points}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {/* POST GENERATOR MODAL */}
+      <Dialog open={postOpen} onOpenChange={setPostOpen}>
+        <DialogContent className="max-w-6xl" style={{ background: 'var(--t-surface)', border: '1px solid var(--t-line)', color: 'var(--t-ink)', maxHeight: '90vh', overflow: 'auto' }}>
+          <DialogHeader>
+            <DialogTitle className="rk-display" style={{ fontSize: 28, letterSpacing: '0.08em' }}>GERAR POST DO RANKING</DialogTitle>
+          </DialogHeader>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 20, marginTop: 16 }}>
+            {/* Controls */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+              <ControlGroup label="Template">
+                {Object.entries(POST_TEMPLATES).map(([k, v]) => (
+                  <button key={k} onClick={() => setTemplate(k)} className={`rk-chip ${template===k?'active':''}`} style={{ textAlign: 'left', width: '100%' }}>{v.label}</button>
+                ))}
+              </ControlGroup>
+
+              <ControlGroup label="Formato">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  <button onClick={() => setFormat('feed')} className={`rk-chip ${format==='feed'?'active':''}`}>1:1 FEED</button>
+                  <button onClick={() => setFormat('story')} className={`rk-chip ${format==='story'?'active':''}`}>9:16 STORY</button>
+                </div>
+              </ControlGroup>
+
+              <ControlGroup label="Paleta">
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  {PALETTE_OPTIONS.map(p => (
+                    <button key={p.key} onClick={() => setTheme(p.key)} style={{
+                      padding: 10, border: `1px solid ${theme===p.key ? p.swatch[1] : 'var(--t-line)'}`,
+                      background: theme===p.key ? 'color-mix(in srgb, var(--t-ink) 5%, transparent)' : 'transparent',
+                      borderRadius: 6, cursor: 'pointer', textAlign: 'left', color: 'var(--t-ink)',
+                      display: 'flex', flexDirection: 'column', gap: 8, fontFamily: 'Space Grotesk, sans-serif', fontSize: 11, letterSpacing: '0.1em',
+                    }}>
+                      <div style={{ display: 'flex', gap: 3 }}>
+                        {p.swatch.map((c, i) => <span key={i} style={{ width: 16, height: 16, background: c, borderRadius: 3, border: '1px solid rgba(255,255,255,0.15)' }} />)}
+                      </div>
+                      {p.label.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </ControlGroup>
+
+              <ControlGroup label="Conteúdo">
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', color: 'var(--t-ink)' }}>
+                  <input type="checkbox" checked={showSecondHalf} onChange={(e) => setShowSecondHalf(e.target.checked)} />
+                  Mostrar Top 6–10
+                </label>
+              </ControlGroup>
+
+              <button onClick={handleExport} disabled={exporting} style={{
+                background: 'var(--t-accent2)', color: 'var(--t-bg)', border: 'none', padding: '14px 18px',
+                fontFamily: 'Anton, sans-serif', fontSize: 14, letterSpacing: '0.16em', cursor: exporting?'wait':'pointer', borderRadius: 4,
+                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, opacity: exporting?0.6:1,
+              }}>
+                <Download size={16}/> {exporting ? 'GERANDO...' : 'BAIXAR PNG'}
               </button>
-            ))}
+            </div>
+
+            {/* Preview */}
+            <PreviewBox format={format}>
+              <div ref={exportRef} data-theme={theme}>
+                <Template
+                  players={rankings}
+                  theme={theme}
+                  format={format}
+                  classLabel={selectedClass}
+                  categoryLabel={categoryLabel}
+                  showSecondHalf={showSecondHalf}
+                  monthLabel={monthLabel}
+                  logoSrc="/fsp.jpeg"
+                />
+              </div>
+            </PreviewBox>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Card oculto para geração de imagem */}
-      <div id="top10-card" style={{ position: 'fixed', left: '-9999px', width: '800px', background: '#080f1e', fontFamily: 'Arial, sans-serif', overflow: 'hidden' }}>
-        {logoBase64 && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1, pointerEvents: 'none' }}>
-            <img src={logoBase64} alt="" style={{ width: '500px', height: '500px', objectFit: 'contain', opacity: 0.05 }} />
-          </div>
-        )}
-        <div style={{ position: 'relative', zIndex: 2 }}>
-          <div style={{ padding: '18px 24px', display: 'flex', alignItems: 'center', gap: '16px', background: 'linear-gradient(90deg, #0d1f3c 0%, #0a1628 100%)', borderBottom: '2px solid rgba(74,163,255,0.2)' }}>
-            {logoBase64
-              ? <img src={logoBase64} alt="FSP" style={{ width: '60px', height: '60px', borderRadius: '12px', objectFit: 'cover', flexShrink: 0 }} />
-              : <div style={{ width: '60px', height: '60px', borderRadius: '12px', background: '#1a3a6e', flexShrink: 0 }} />
-            }
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '24px', fontWeight: '900', color: 'white', letterSpacing: '3px', lineHeight: 1 }}>RANKING FSP</div>
-              <div style={{ fontSize: '11px', color: '#7ab3f0', letterSpacing: '1px', marginTop: '4px' }}>FEDERAÇÃO DE SQUASH DO PARANÁ</div>
-            </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: '11px', color: '#7ab3f0', letterSpacing: '1px', marginBottom: '4px' }}>{selectedClass.toUpperCase()} CLASSE · {(selectedClass === 'Duplas' ? 'Mista' : selectedCategory).toUpperCase()}</div>
-              <div style={{ fontSize: '15px', fontWeight: '700', color: 'white' }}>{new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}</div>
-            </div>
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', padding: '16px 16px 8px' }}>
-            {rankings.slice(0, 5).map((player, index) => {
-              const cachedPhoto = photoCache[player.player_id] || null;
-              const badgeStyle = index === 0 ? { background: '#d4a017', color: '#3a2800' } : index === 1 ? { background: '#9e9e9e', color: '#1a1a1a' } : index === 2 ? { background: '#cd7f32', color: '#2a1500' } : { background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.3)' };
-              const borderColor = index === 0 ? '#d4a017' : index === 1 ? '#9e9e9e' : index === 2 ? '#cd7f32' : 'rgba(255,255,255,0.1)';
-              const cardH = index === 0 ? '320px' : index <= 2 ? '300px' : '280px';
-              return (
-                <div key={player.player_id} style={{ position: 'relative', height: cardH, borderRadius: '8px', overflow: 'hidden', border: `2px solid ${borderColor}`, background: '#0d1f3c', alignSelf: 'end' }}>
-                  <img src={cachedPhoto || "/fsp.jpeg"} alt={player.player_name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
-                  <div style={{ position: 'absolute', top: '8px', left: '8px', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '900', ...badgeStyle }}>{index + 1}</div>
-                  <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px 10px 10px', background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '800', color: 'white', lineHeight: '1.25', marginBottom: '4px', wordBreak: 'break-word' }}>{player.player_name}</div>
-                    <div style={{ fontSize: '13px', color: '#4fc3f7', fontWeight: '700' }}>{player.total_points} <span style={{ fontSize: '10px', color: '#90caf9', fontWeight: '400' }}>pts</span></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          {top6to10.length > 0 && (
-            <div style={{ margin: '0 16px 16px', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(74,163,255,0.15)', background: 'rgba(13,31,60,0.6)' }}>
-              {top6to10.map((player, i) => {
-                const isLast = i === top6to10.length - 1;
-                return (
-                  <div key={player.player_id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '10px 16px', borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.06)', background: i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '800', color: '#94a3b8', flexShrink: 0 }}>{i + 6}</div>
-                    <div style={{ flex: 1, fontSize: '14px', fontWeight: '700', color: 'white' }}>{player.player_name}</div>
-                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#4fc3f7' }}>{player.total_points} <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '400' }}>pts</span></div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          <div style={{ textAlign: 'center', padding: '10px 20px', fontSize: '10px', color: '#2a4a72', letterSpacing: '2px', borderTop: '1px solid rgba(74,163,255,0.12)' }}>FEDERACAOSQUASHPR.COM.BR</div>
+      <PlayerModal playerId={selectedPlayerId} onClose={() => setSelectedPlayerId(null)} />
+    </div>
+  );
+};
+
+// ─── Subcomponents ──────────────────────────────
+const Trend = ({ value }) => {
+  if (value == null || value === 0) return <span style={{ color: 'var(--t-sub)', fontSize: 12 }}>—</span>;
+  const up = value > 0;
+  return <span className="rk-mono" style={{ color: up ? 'var(--t-accent2)' : '#ff5577', fontSize: 12, fontWeight: 700 }}>{up ? '▲' : '▼'}{Math.abs(value)}</span>;
+};
+
+const StatRow = ({ label, value, big, accent }) => (
+  <div className="rk-stat-row">
+    <span className="rk-mono" style={{ fontSize: 11, color: 'var(--t-sub)' }}>{label}</span>
+    <span className="rk-display" style={{ fontSize: big ? 44 : 28, color: accent ? 'var(--t-accent)' : 'var(--t-ink)' }}>{value}</span>
+  </div>
+);
+
+const SectionHeader = ({ label, sub, inline }) => (
+  <div style={{ display: inline ? 'flex' : 'block', gap: 16, alignItems: 'baseline', marginBottom: inline ? 0 : 14 }}>
+    <div className="rk-display" style={{ fontSize: 26 }}>{label}</div>
+    {sub && <div className="rk-mono" style={{ fontSize: 11, color: 'var(--t-sub)' }}>{sub}</div>}
+  </div>
+);
+
+const PodiumCard = ({ player, pos, onClick }) => {
+  const medalVar = `var(--t-podium-${pos+1})`;
+  const isOne = pos === 0;
+  const initials = ((player.player_name||'').trim().split(/\s+/).map(p=>p[0]||'').filter((_,i,a)=>i===0||i===a.length-1).join('')).toUpperCase();
+  return (
+    <div onClick={onClick} style={{
+      position: 'relative', border: `2px solid ${medalVar}`, borderRadius: 12, overflow: 'hidden',
+      background: 'color-mix(in srgb, var(--t-surface) 80%, transparent)',
+      height: isOne ? 320 : 280, marginTop: isOne ? 0 : 20, cursor: 'pointer',
+    }}>
+      <div style={{ width: '100%', height: '62%', background: 'var(--t-surface2)', backgroundImage: player.photo_url ? `url(${player.photo_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'top', position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {!player.photo_url && <div className="rk-display" style={{ fontSize: 72, color: 'var(--t-line)' }}>{initials}</div>}
+        <div className="rk-display" style={{ position: 'absolute', top: 10, right: 10, width: 38, height: 38, borderRadius: 8, background: medalVar, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, color: '#1a1200' }}>{pos+1}</div>
+      </div>
+      <div style={{ padding: '12px 16px 14px' }}>
+        <div className="rk-display" style={{ fontSize: isOne ? 24 : 20 }}>{player.player_name.toUpperCase()}</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 8 }}>
+          <span className="rk-display" style={{ fontSize: 28, color: 'var(--t-accent)' }}>{player.total_points}</span>
+          <span className="rk-mono" style={{ fontSize: 10, color: 'var(--t-sub)' }}>PTS · {player.results_count} TORN.{player.win_rate != null ? ` · ${player.win_rate}% VIT.` : ''}</span>
         </div>
       </div>
+    </div>
+  );
+};
 
-      <PlayerModal playerId={selectedPlayerId} onClose={() => setSelectedPlayerId(null)} />
+const ControlGroup = ({ label, children }) => (
+  <div>
+    <div className="rk-mono" style={{ fontSize: 10, color: 'var(--t-sub)', marginBottom: 8 }}>{label.toUpperCase()}</div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>{children}</div>
+  </div>
+);
+
+const PreviewBox = ({ format, children }) => {
+  const containerRef = useRef(null);
+  const [scale, setScale] = useState(0.5);
+  const W = 1080, H = format === 'feed' ? 1080 : 1920;
+  useEffect(() => {
+    const fit = () => {
+      if (!containerRef.current) return;
+      const r = containerRef.current.getBoundingClientRect();
+      const sx = (r.width - 40) / W;
+      const sy = (r.height - 40) / H;
+      setScale(Math.max(0.1, Math.min(sx, sy, 1)));
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    return () => window.removeEventListener('resize', fit);
+  }, [format]);
+  return (
+    <div ref={containerRef} style={{ background: 'var(--t-surface2)', border: '1px solid var(--t-line)', borderRadius: 8, minHeight: 600, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
+      <div style={{ width: W, height: H, transform: `scale(${scale})`, transformOrigin: 'center center', flexShrink: 0 }}>
+        {children}
+      </div>
+      <div className="rk-mono" style={{ position: 'absolute', bottom: 8, right: 12, fontSize: 10, color: 'var(--t-sub)' }}>{W}×{H} · {Math.round(scale*100)}%</div>
     </div>
   );
 };

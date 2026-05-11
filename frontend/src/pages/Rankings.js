@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from '../lib/api';
 import { API } from '../lib/api';
 import { cachedGet, getCached, TTL } from '../lib/cache';
@@ -17,8 +17,128 @@ import { ptBR } from 'date-fns/locale';
 const CLASSES = ['1ª', '2ª', '3ª', '4ª', '5ª', '6ª', 'Duplas'];
 const CATEGORIES = ['Feminina', 'Masculina'];
 
-const Rankings = () => {
+// Cache de fotos compartilhado entre todos os componentes
+const photoCache = {};
 
+// Hook para carregar foto de um jogador sob demanda
+function usePlayerPhoto(playerId, eager = false) {
+  const [photoUrl, setPhotoUrl] = useState(photoCache[playerId] || null);
+  const ref = useRef(null);
+
+  const load = useCallback(async () => {
+    if (photoCache[playerId]) { setPhotoUrl(photoCache[playerId]); return; }
+    try {
+      const res = await axios.get(`${API}/players/photo/${playerId}`);
+      photoCache[playerId] = res.data.photo_url;
+      setPhotoUrl(res.data.photo_url);
+    } catch { /* sem foto */ }
+  }, [playerId]);
+
+  useEffect(() => {
+    if (!playerId) return;
+    if (eager) { load(); return; }
+
+    const el = ref.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => { if (entries[0].isIntersecting) { load(); observer.disconnect(); } },
+      { rootMargin: '150px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [playerId, eager, load]);
+
+  return { photoUrl, ref };
+}
+
+// Card do Top 5 com foto lazy
+const TopPlayerCard = ({ player, index, onClick }) => {
+  const { photoUrl, ref } = usePlayerPhoto(player.player_id, index < 3); // top 3 carrega eager
+  const borderColors = ['border-yellow-400', 'border-gray-300', 'border-orange-400', 'border-blue-400', 'border-green-400'];
+  const badgeBg = ['bg-yellow-400 text-yellow-900', 'bg-gray-300 text-gray-900', 'bg-orange-400 text-orange-900', 'bg-blue-400 text-blue-900', 'bg-green-400 text-green-900'];
+
+  return (
+    <div ref={ref} onClick={() => onClick(player.player_id)}
+      className={`relative overflow-hidden rounded-xl cursor-pointer group border-2 ${borderColors[index]} h-[280px] sm:h-[360px] ${index >= 3 ? "hidden sm:block" : ""} transition-transform duration-200 hover:-translate-y-1`}
+      data-testid={`top-player-card-${index + 1}`}>
+      <img
+        src={photoUrl || "/fsp.jpeg"}
+        alt={player.player_name}
+        className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105"
+      />
+      <div className={`absolute top-3 left-3 z-10 w-10 h-10 rounded-full flex items-center justify-center font-black text-lg leading-none ${badgeBg[index]} shadow-lg`}>{index + 1}</div>
+      <div className="absolute bottom-0 left-0 right-0 z-10 bg-black/60 backdrop-blur-sm px-3 py-2.5">
+        <p className="text-white font-bold text-sm leading-tight line-clamp-2 mb-0.5">{player.player_name}</p>
+        <p className="text-green-400 font-bold text-base leading-none">{player.total_points} <span className="text-xs font-normal text-gray-300">pts</span></p>
+        <p className="text-gray-300 text-xs mt-0.5">{player.results_count} torneios</p>
+      </div>
+      <div className="absolute inset-0 bg-black/85 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex flex-col items-center justify-center gap-3 p-4">
+        {player.last_match && (
+          <div className="text-center space-y-1">
+            <div className="text-xs text-green-400 font-semibold uppercase tracking-wide">Última Partida</div>
+            <div className="text-base text-white font-medium">vs {player.last_match.opponent_name}</div>
+            <div className="text-gray-300 font-mono text-sm">{player.last_match.score_formatted}</div>
+            <Badge className={player.last_match.result === 'Win' ? 'bg-green-500' : 'bg-red-500'}>{player.last_match.result === 'Win' ? 'Vitória' : 'Derrota'}</Badge>
+          </div>
+        )}
+        <Button variant="outline" className="border-green-500 text-green-400 hover:bg-green-500 hover:text-white text-sm">Ver Perfil →</Button>
+      </div>
+    </div>
+  );
+};
+
+// Linha da tabela com avatar lazy
+const RankingRow = ({ player, index, onPlayerClick }) => {
+  const { photoUrl, ref } = usePlayerPhoto(player.player_id);
+  const isTop3 = index < 3;
+  const medalColors = ['text-yellow-400', 'text-gray-300', 'text-orange-400'];
+
+  return (
+    <tr ref={ref} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-all cursor-pointer group" data-testid={`ranking-row-${index}`}>
+      <td className="py-3 px-2 sm:px-4">
+        <div className="flex items-center">
+          {isTop3 ? (
+            <>
+              {index === 0 && <Trophy className="w-5 h-5 text-yellow-400 mr-2" />}
+              {index === 1 && <Medal className="w-5 h-5 text-gray-300 mr-2" />}
+              {index === 2 && <Medal className="w-5 h-5 text-orange-400 mr-2" />}
+              <span className={`font-black text-xl ${medalColors[index]}`}>{player.rank}</span>
+            </>
+          ) : (
+            <span className="text-white font-bold text-lg">{player.rank}</span>
+          )}
+        </div>
+      </td>
+      <td className="py-4 px-4">
+        <div className="flex items-center space-x-3 group-hover:text-green-400 transition-colors" onClick={() => onPlayerClick(player.player_id)}>
+          <Avatar className="w-12 h-12 ring-2 ring-transparent group-hover:ring-green-500 transition-all">
+            <AvatarImage src={photoUrl || "/fsp.jpeg"} className="object-cover object-top" />
+            <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover" /></AvatarFallback>
+          </Avatar>
+          <span className="text-white font-semibold group-hover:underline">{player.player_name}</span>
+        </div>
+      </td>
+      <td className="py-4 px-4 hidden md:table-cell"><Badge className="bg-blue-500">{player.class_category}</Badge></td>
+      <td className="py-4 px-4 hidden lg:table-cell"><Badge className="bg-purple-500">{player.gender_category}</Badge></td>
+      <td className="py-4 px-3 text-center hidden sm:table-cell">
+        {player.position_change > 0 && <span className="text-green-400 text-xs font-bold">▲{player.position_change}</span>}
+        {player.position_change < 0 && <span className="text-red-400 text-xs font-bold">▼{Math.abs(player.position_change)}</span>}
+        {(!player.position_change || player.position_change === 0) && <span className="text-slate-600 text-xs">—</span>}
+      </td>
+      <td className="py-4 px-3 text-center hidden md:table-cell">
+        {player.win_rate != null ? (
+          <span className={`text-sm font-bold ${player.win_rate >= 70 ? 'text-green-400' : player.win_rate >= 50 ? 'text-gray-300' : 'text-slate-500'}`}>
+            {player.win_rate}%
+          </span>
+        ) : <span className="text-slate-600 text-xs">—</span>}
+      </td>
+      <td className="py-4 px-4 text-right"><span className="text-green-400 font-bold text-xl">{player.total_points}</span></td>
+      <td className="py-4 px-4 text-center hidden sm:table-cell"><span className="text-gray-400 font-medium">{player.results_count}</span></td>
+    </tr>
+  );
+};
+
+const Rankings = () => {
   const [rankings, setRankings] = useState([]);
   const [selectedClass, setSelectedClass] = useState('1ª');
   const [selectedCategory, setSelectedCategory] = useState('Feminina');
@@ -29,20 +149,11 @@ const Rankings = () => {
 
   useEffect(() => {
     const controller = new AbortController();
-
     const fetchRankings = async () => {
       const effectiveCategory = selectedClass === 'Duplas' ? 'Mista' : selectedCategory;
       const url = `${API}/rankings?class_category=${selectedClass}&gender_category=${effectiveCategory}`;
-
-      // 1. Mostrar dados do cache IMEDIATAMENTE (síncrono — sem travar a UI)
       const cached = getCached(url);
-      if (cached) {
-        setRankings(cached);
-        setLoading(false);
-        return; // cache válido — não vai ao servidor
-      }
-
-      // 2. Sem cache — mostrar loading e buscar do servidor
+      if (cached) { setRankings(cached); setLoading(false); return; }
       setLoading(true);
       try {
         const data = await cachedGet(url, TTL.RANKINGS, axios);
@@ -54,20 +165,17 @@ const Rankings = () => {
         if (!controller.signal.aborted) setLoading(false);
       }
     };
-
     fetchRankings();
     return () => controller.abort();
   }, [selectedClass, selectedCategory]);
 
-  // Logo convertida uma única vez por sessão (fora do ciclo de render)
   useEffect(() => {
-    if (logoBase64) return; // já foi processada, não repete
+    if (logoBase64) return;
     const img = new Image();
     img.crossOrigin = 'anonymous';
     img.onload = () => {
       const canvas = document.createElement('canvas');
-      canvas.width = img.width;
-      canvas.height = img.height;
+      canvas.width = img.width; canvas.height = img.height;
       canvas.getContext('2d').drawImage(img, 0, 0);
       setLogoBase64(canvas.toDataURL('image/png'));
     };
@@ -87,68 +195,33 @@ const Rankings = () => {
     const element = document.getElementById('top10-card');
     if (!element) return;
     setImageFormatOpen(false);
-
-    // Dimensões finais desejadas
     const FINAL_W = imageFormat.w;
     const FINAL_H = imageFormat.h;
-
-    // BASE_W é o tamanho de layout do card oculto (800px)
     const BASE_W = 800;
     const BASE_H = FINAL_H ? Math.round(BASE_W * (FINAL_H / FINAL_W)) : null;
-
-    // Scale = razão entre o tamanho final e o layout base
-    // Usar mínimo 2x para garantir nitidez em qualquer formato
     const SCALE = Math.max(2, FINAL_W / BASE_W);
-
     const originalStyle = element.getAttribute('style');
-
-    // Remove sombras e filtros que prejudicam a captura
     const noShadowStyle = document.createElement('style');
     noShadowStyle.id = 'no-shadow-capture';
     noShadowStyle.textContent = `
-      #top10-card, #top10-card * {
-        box-shadow: none !important;
-        text-shadow: none !important;
-        filter: none !important;
-        -webkit-filter: none !important;
-      }
-      #top10-card img {
-        border-radius: 0 !important;
-        box-shadow: none !important;
-        filter: none !important;
-        image-rendering: -webkit-optimize-contrast !important;
-        image-rendering: crisp-edges !important;
-      }
+      #top10-card, #top10-card * { box-shadow: none !important; text-shadow: none !important; filter: none !important; }
+      #top10-card img { border-radius: 0 !important; image-rendering: -webkit-optimize-contrast !important; }
     `;
-
     try {
       document.head.appendChild(noShadowStyle);
-
-      element.style.width    = `${BASE_W}px`;
-      element.style.height   = BASE_H ? `${BASE_H}px` : 'auto';
+      element.style.width = `${BASE_W}px`;
+      element.style.height = BASE_H ? `${BASE_H}px` : 'auto';
       element.style.overflow = 'hidden';
       element.setAttribute('data-format', imageFormat.id);
-
-      // Aguarda um frame para garantir que o layout foi aplicado
       await new Promise(resolve => requestAnimationFrame(resolve));
-
       const canvas = await html2canvas(element, {
-        backgroundColor: '#0a1628',
-        scale: SCALE,          // scale alto = mais pixels = mais nitidez
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
-        width: BASE_W,
-        height: BASE_H || element.offsetHeight,
-        imageTimeout: 0,       // sem timeout para imagens base64 grandes
-        removeContainer: false,
+        backgroundColor: '#0a1628', scale: SCALE, useCORS: true,
+        allowTaint: true, logging: false, width: BASE_W,
+        height: BASE_H || element.offsetHeight, imageTimeout: 0, removeContainer: false,
       });
-
       document.head.removeChild(noShadowStyle);
       element.setAttribute('style', originalStyle || '');
       element.removeAttribute('data-format');
-
-      // Exportar como PNG com qualidade máxima
       const link = document.createElement('a');
       link.download = `ranking-fsp-${selectedClass}-${(selectedClass === 'Duplas' ? 'Mista' : selectedCategory)}-${imageFormat.id}.png`;
       link.href = canvas.toDataURL('image/png', 1.0);
@@ -179,46 +252,24 @@ const Rankings = () => {
         </Button>
       </div>
 
-      {/* ── Filtros compactos em uma linha ── */}
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3">
         <div className="flex items-center gap-3 flex-wrap">
-          {/* Classes */}
           <div className="flex flex-wrap gap-1.5 flex-1">
             {CLASSES.map((cls) => (
-              <button
-                key={cls}
-                onClick={() => setSelectedClass(cls)}
-                data-testid={`class-filter-${cls}`}
-                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                  selectedClass === cls
-                    ? 'bg-green-500 text-white'
-                    : 'text-slate-400 hover:text-white outline outline-1 outline-slate-700 hover:outline-slate-500'
-                }`}
-              >
+              <button key={cls} onClick={() => setSelectedClass(cls)} data-testid={`class-filter-${cls}`}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${selectedClass === cls ? 'bg-green-500 text-white' : 'text-slate-400 hover:text-white outline outline-1 outline-slate-700 hover:outline-slate-500'}`}>
                 {cls}
               </button>
             ))}
           </div>
-
-          {/* Divisor vertical */}
           <div className="w-px h-6 bg-slate-700 shrink-0 hidden sm:block" />
-
-          {/* Categoria */}
           {selectedClass === 'Duplas' ? (
             <div className="px-3 py-1.5 rounded-md text-xs font-semibold bg-purple-500 text-white shrink-0">Mista</div>
           ) : (
             <div className="flex gap-1.5 shrink-0">
               {CATEGORIES.map((cat) => (
-                <button
-                  key={cat}
-                  onClick={() => setSelectedCategory(cat)}
-                  data-testid={`category-filter-${cat}`}
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    selectedCategory === cat
-                      ? 'bg-blue-500 text-white'
-                      : 'text-slate-400 hover:text-white outline outline-1 outline-slate-700 hover:outline-slate-500'
-                  }`}
-                >
+                <button key={cat} onClick={() => setSelectedCategory(cat)} data-testid={`category-filter-${cat}`}
+                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${selectedCategory === cat ? 'bg-blue-500 text-white' : 'text-slate-400 hover:text-white outline outline-1 outline-slate-700 hover:outline-slate-500'}`}>
                   {cat}
                 </button>
               ))}
@@ -227,7 +278,6 @@ const Rankings = () => {
         </div>
       </div>
 
-      {/* Top 5 Cards — SEM overlay escuro nas fotos */}
       {!loading && rankings.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -235,46 +285,13 @@ const Rankings = () => {
             <Badge className="bg-green-500 text-white px-3 py-1">{selectedClass} - {selectedClass === 'Duplas' ? 'Mista' : selectedCategory}</Badge>
           </div>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3 items-end">
-            {top5.map((player, index) => {
-              const borderColors = ['border-yellow-400', 'border-gray-300', 'border-orange-400', 'border-blue-400', 'border-green-400'];
-              const badgeBg = ['bg-yellow-400 text-yellow-900', 'bg-gray-300 text-gray-900', 'bg-orange-400 text-orange-900', 'bg-blue-400 text-blue-900', 'bg-green-400 text-green-900'];
-              return (
-                <div key={player.player_id} onClick={() => handlePlayerClick(player.player_id)}
-                  className={`relative overflow-hidden rounded-xl cursor-pointer group border-2 ${borderColors[index]} h-[280px] sm:h-[360px] ${index >= 3 ? "hidden sm:block" : ""} transition-transform duration-200 hover:-translate-y-1`}
-                  data-testid={`top-player-card-${index + 1}`}>
-                  {/* Foto sem overlay escuro */}
-                  {player.photo_url
-                    ? <img src={player.photo_url} alt={player.player_name} className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-500 group-hover:scale-105" />
-                    : <img src="/fsp.jpeg" alt="FSP" className="absolute inset-0 w-full h-full object-cover object-top" />
-                  }
-                  {/* Badge de posição */}
-                  <div className={`absolute top-3 left-3 z-10 w-10 h-10 rounded-full flex items-center justify-center font-black text-lg leading-none ${badgeBg[index]} shadow-lg`}>{index + 1}</div>
-                  {/* Info na parte inferior — fundo sólido semi-transparente para legibilidade */}
-                  <div className="absolute bottom-0 left-0 right-0 z-10 bg-black/60 backdrop-blur-sm px-3 py-2.5">
-                    <p className="text-white font-bold text-sm leading-tight line-clamp-2 mb-0.5">{player.player_name}</p>
-                    <p className="text-green-400 font-bold text-base leading-none">{player.total_points} <span className="text-xs font-normal text-gray-300">pts</span></p>
-                    <p className="text-gray-300 text-xs mt-0.5">{player.results_count} torneios</p>
-                  </div>
-                  {/* Hover overlay com info adicional */}
-                  <div className="absolute inset-0 bg-black/85 opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-20 flex flex-col items-center justify-center gap-3 p-4">
-                    {player.last_match && (
-                      <div className="text-center space-y-1">
-                        <div className="text-xs text-green-400 font-semibold uppercase tracking-wide">Última Partida</div>
-                        <div className="text-base text-white font-medium">vs {player.last_match.opponent_name}</div>
-                        <div className="text-gray-300 font-mono text-sm">{player.last_match.score_formatted}</div>
-                        <Badge className={player.last_match.result === 'Win' ? 'bg-green-500' : 'bg-red-500'}>{player.last_match.result === 'Win' ? 'Vitória' : 'Derrota'}</Badge>
-                      </div>
-                    )}
-                    <Button variant="outline" className="border-green-500 text-green-400 hover:bg-green-500 hover:text-white text-sm">Ver Perfil →</Button>
-                  </div>
-                </div>
-              );
-            })}
+            {top5.map((player, index) => (
+              <TopPlayerCard key={player.player_id} player={player} index={index} onClick={handlePlayerClick} />
+            ))}
           </div>
         </div>
       )}
 
-      {/* Ranking Completo */}
       <Card className="bg-slate-800/50 border-green-500/20">
         <CardHeader>
           <CardTitle className="text-white text-2xl flex items-center justify-between">
@@ -301,70 +318,9 @@ const Rankings = () => {
                     </tr>
                   </thead>
                   <tbody>
-                    {rankings.map((player, index) => {
-                      const isTop3 = index < 3;
-                      const medalColors = ['text-yellow-400', 'text-gray-300', 'text-orange-400'];
-                      return (
-                        <tr key={player.player_id} className="border-b border-slate-700/50 hover:bg-slate-700/30 transition-all cursor-pointer group" data-testid={`ranking-row-${index}`}>
-                          <td className="py-3 px-2 sm:px-4">
-                            <div className="flex items-center">
-                              {isTop3 ? (
-                                <>
-                                  {index === 0 && <Trophy className="w-5 h-5 text-yellow-400 mr-2" />}
-                                  {index === 1 && <Medal className="w-5 h-5 text-gray-300 mr-2" />}
-                                  {index === 2 && <Medal className="w-5 h-5 text-orange-400 mr-2" />}
-                                  <span className={`font-black text-xl ${medalColors[index]}`}>{player.rank}</span>
-                                </>
-                              ) : (
-                                <span className="text-white font-bold text-lg">{player.rank}</span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-4 px-4">
-                            <div className="flex items-center space-x-3 group-hover:text-green-400 transition-colors" onClick={() => handlePlayerClick(player.player_id)}>
-                              <Avatar className="w-12 h-12 ring-2 ring-transparent group-hover:ring-green-500 transition-all">
-                                <AvatarImage src={player.photo_url || "/fsp.jpeg"} />
-                                <AvatarFallback><img src="/fsp.jpeg" alt="FSP" className="w-full h-full object-cover" /></AvatarFallback>
-                              </Avatar>
-                              <span className="text-white font-semibold group-hover:underline">{player.player_name}</span>
-                            </div>
-                          </td>
-                          <td className="py-4 px-4 hidden md:table-cell"><Badge className="bg-blue-500">{selectedClass}</Badge></td>
-                          <td className="py-4 px-4 hidden lg:table-cell"><Badge className="bg-purple-500">{selectedClass === 'Duplas' ? 'Mista' : selectedCategory}</Badge></td>
-
-                          {/* Tendência */}
-                          <td className="py-4 px-3 text-center hidden sm:table-cell">
-                            {player.position_change > 0 && (
-                              <span className="text-green-400 text-xs font-bold">▲{player.position_change}</span>
-                            )}
-                            {player.position_change < 0 && (
-                              <span className="text-red-400 text-xs font-bold">▼{Math.abs(player.position_change)}</span>
-                            )}
-                            {(!player.position_change || player.position_change === 0) && (
-                              <span className="text-slate-600 text-xs">—</span>
-                            )}
-                          </td>
-
-                          {/* % Vitórias */}
-                          <td className="py-4 px-3 text-center hidden md:table-cell">
-                            {player.win_rate != null ? (
-                              <span className={`text-sm font-bold ${
-                                player.win_rate >= 70 ? 'text-green-400'
-                                : player.win_rate >= 50 ? 'text-gray-300'
-                                : 'text-slate-500'
-                              }`}>
-                                {player.win_rate}%
-                              </span>
-                            ) : (
-                              <span className="text-slate-600 text-xs">—</span>
-                            )}
-                          </td>
-
-                          <td className="py-4 px-4 text-right"><span className="text-green-400 font-bold text-xl">{player.total_points}</span></td>
-                          <td className="py-4 px-4 text-center hidden sm:table-cell"><span className="text-gray-400 font-medium">{player.results_count}</span></td>
-                        </tr>
-                      );
-                    })}
+                    {rankings.map((player, index) => (
+                      <RankingRow key={player.player_id} player={player} index={index} onPlayerClick={handlePlayerClick} />
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -372,7 +328,6 @@ const Rankings = () => {
         </CardContent>
       </Card>
 
-      {/* Format Picker Dialog */}
       <Dialog open={imageFormatOpen} onOpenChange={setImageFormatOpen}>
         <DialogContent className="bg-slate-800 border-purple-500/20 max-w-sm">
           <DialogHeader>
@@ -383,11 +338,8 @@ const Rankings = () => {
           </DialogHeader>
           <div className="space-y-2 mt-2">
             {IMAGE_FORMATS.map(fmt => (
-              <button
-                key={fmt.id}
-                onClick={() => generateTop10Image(fmt)}
-                className="w-full flex items-center justify-between bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-purple-500/50 rounded-lg px-4 py-3 transition-all group"
-              >
+              <button key={fmt.id} onClick={() => generateTop10Image(fmt)}
+                className="w-full flex items-center justify-between bg-slate-700/50 hover:bg-slate-700 border border-slate-600 hover:border-purple-500/50 rounded-lg px-4 py-3 transition-all group">
                 <div className="text-left">
                   <p className="text-white font-semibold text-sm group-hover:text-purple-300">{fmt.label}</p>
                   <p className="text-gray-400 text-xs">{fmt.desc} px</p>
@@ -399,11 +351,8 @@ const Rankings = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Hidden Card para geração de imagem */}
-      <div
-        id="top10-card"
-        style={{ position: 'fixed', left: '-9999px', width: '800px', background: '#080f1e', fontFamily: 'Arial, sans-serif', overflow: 'hidden' }}
-      >
+      {/* Card oculto para geração de imagem */}
+      <div id="top10-card" style={{ position: 'fixed', left: '-9999px', width: '800px', background: '#080f1e', fontFamily: 'Arial, sans-serif', overflow: 'hidden' }}>
         {logoBase64 && (
           <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1, pointerEvents: 'none' }}>
             <img src={logoBase64} alt="" style={{ width: '500px', height: '500px', objectFit: 'contain', opacity: 0.05 }} />
@@ -421,41 +370,22 @@ const Rankings = () => {
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '11px', color: '#7ab3f0', letterSpacing: '1px', marginBottom: '4px' }}>{selectedClass.toUpperCase()} CLASSE · {(selectedClass === 'Duplas' ? 'Mista' : selectedCategory).toUpperCase()}</div>
-              <div style={{ fontSize: '15px', fontWeight: '700', color: 'white' }}>
-                {new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}
-              </div>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: 'white' }}>{new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase()}</div>
             </div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', padding: '16px 16px 8px' }}>
             {rankings.slice(0, 5).map((player, index) => {
-              const badgeStyle =
-                index === 0 ? { background: '#d4a017', color: '#3a2800' }
-                : index === 1 ? { background: '#9e9e9e', color: '#1a1a1a' }
-                : index === 2 ? { background: '#cd7f32', color: '#2a1500' }
-                : { background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.3)' };
-              const borderColor =
-                index === 0 ? '#d4a017'
-                : index === 1 ? '#9e9e9e'
-                : index === 2 ? '#cd7f32'
-                : 'rgba(255,255,255,0.1)';
+              const cachedPhoto = photoCache[player.player_id] || null;
+              const badgeStyle = index === 0 ? { background: '#d4a017', color: '#3a2800' } : index === 1 ? { background: '#9e9e9e', color: '#1a1a1a' } : index === 2 ? { background: '#cd7f32', color: '#2a1500' } : { background: 'rgba(255,255,255,0.15)', color: 'white', border: '1px solid rgba(255,255,255,0.3)' };
+              const borderColor = index === 0 ? '#d4a017' : index === 1 ? '#9e9e9e' : index === 2 ? '#cd7f32' : 'rgba(255,255,255,0.1)';
               const cardH = index === 0 ? '320px' : index <= 2 ? '300px' : '280px';
               return (
                 <div key={player.player_id} style={{ position: 'relative', height: cardH, borderRadius: '8px', overflow: 'hidden', border: `2px solid ${borderColor}`, background: '#0d1f3c', alignSelf: 'end' }}>
-                  {player.photo_url
-                    ? <img src={player.photo_url} alt={player.player_name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
-                    : <img src="/fsp.jpeg" alt="FSP" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block', opacity: 0.5 }} />
-                  }
-
-                  <div style={{ position: 'absolute', top: '8px', left: '8px', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '900', ...badgeStyle }}>
-                    {index + 1}
-                  </div>
+                  <img src={cachedPhoto || "/fsp.jpeg"} alt={player.player_name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top', display: 'block' }} />
+                  <div style={{ position: 'absolute', top: '8px', left: '8px', width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', fontWeight: '900', ...badgeStyle }}>{index + 1}</div>
                   <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, padding: '8px 10px 10px', background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(4px)' }}>
-                    <div style={{ fontSize: '13px', fontWeight: '800', color: 'white', lineHeight: '1.25', marginBottom: '4px', wordBreak: 'break-word' }}>
-                      {player.player_name}
-                    </div>
-                    <div style={{ fontSize: '13px', color: '#4fc3f7', fontWeight: '700' }}>
-                      {player.total_points} <span style={{ fontSize: '10px', color: '#90caf9', fontWeight: '400' }}>pts</span>
-                    </div>
+                    <div style={{ fontSize: '13px', fontWeight: '800', color: 'white', lineHeight: '1.25', marginBottom: '4px', wordBreak: 'break-word' }}>{player.player_name}</div>
+                    <div style={{ fontSize: '13px', color: '#4fc3f7', fontWeight: '700' }}>{player.total_points} <span style={{ fontSize: '10px', color: '#90caf9', fontWeight: '400' }}>pts</span></div>
                   </div>
                 </div>
               );
@@ -464,27 +394,18 @@ const Rankings = () => {
           {top6to10.length > 0 && (
             <div style={{ margin: '0 16px 16px', borderRadius: '8px', overflow: 'hidden', border: '1px solid rgba(74,163,255,0.15)', background: 'rgba(13,31,60,0.6)' }}>
               {top6to10.map((player, i) => {
-                const pos = i + 6;
                 const isLast = i === top6to10.length - 1;
                 return (
                   <div key={player.player_id} style={{ display: 'flex', alignItems: 'center', gap: '14px', padding: '10px 16px', borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.06)', background: i % 2 === 0 ? 'rgba(255,255,255,0.02)' : 'transparent' }}>
-                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '800', color: '#94a3b8', flexShrink: 0 }}>
-                      {pos}
-                    </div>
-                    <div style={{ flex: 1, fontSize: '14px', fontWeight: '700', color: 'white', letterSpacing: '0.3px' }}>
-                      {player.player_name}
-                    </div>
-                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#4fc3f7' }}>
-                      {player.total_points} <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '400' }}>pts</span>
-                    </div>
+                    <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: '800', color: '#94a3b8', flexShrink: 0 }}>{i + 6}</div>
+                    <div style={{ flex: 1, fontSize: '14px', fontWeight: '700', color: 'white' }}>{player.player_name}</div>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#4fc3f7' }}>{player.total_points} <span style={{ fontSize: '11px', color: '#64748b', fontWeight: '400' }}>pts</span></div>
                   </div>
                 );
               })}
             </div>
           )}
-          <div style={{ textAlign: 'center', padding: '10px 20px', fontSize: '10px', color: '#2a4a72', letterSpacing: '2px', borderTop: '1px solid rgba(74,163,255,0.12)' }}>
-            FEDERACAOSQUASHPR.COM.BR
-          </div>
+          <div style={{ textAlign: 'center', padding: '10px 20px', fontSize: '10px', color: '#2a4a72', letterSpacing: '2px', borderTop: '1px solid rgba(74,163,255,0.12)' }}>FEDERACAOSQUASHPR.COM.BR</div>
         </div>
       </div>
 

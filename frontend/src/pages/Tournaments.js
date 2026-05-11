@@ -1,34 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import axios, { API } from '../lib/api';
+import { cachedGet, getCached, TTL } from '../lib/cache';
 import { Calendar, MapPin, Trophy, CheckCircle, Clock, Users, ChevronRight } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+const sortByDate = arr => [...arr].sort((a, b) => new Date(b.date) - new Date(a.date));
 
 const Tournaments = () => {
-
-  const [tournaments, setTournaments] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Inicializa direto do cache no primeiro render — sem ciclo extra
+  const [tournaments, setTournaments] = useState(() => {
+    const cached = getCached(`${API}/tournaments`);
+    return cached ? sortByDate(cached) : [];
+  });
+  const [loading, setLoading] = useState(() => !getCached(`${API}/tournaments`));
   const [filter, setFilter] = useState('all');
 
   useEffect(() => {
-  fetchTournaments();
-}, []);
+    let cancelled = false;
 
-  const fetchTournaments = async () => {
-  try {
-   const response = await axios.get(`${API}/tournaments`);
-    console.log('Dados recebidos:', response.data);
-    setTournaments(response.data);
-    } catch (error) {
-      toast.error('Erro ao carregar torneios');
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchTournaments = async () => {
+      const cached = getCached(`${API}/tournaments`);
+      if (cached) {
+        setTournaments(sortByDate(cached));
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+      try {
+        const data = await cachedGet(`${API}/tournaments`, TTL.TOURNAMENTS, axios);
+        if (!cancelled) setTournaments(sortByDate(data));
+      } catch {
+        if (!cancelled) toast.error('Erro ao carregar torneios');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    fetchTournaments();
+    return () => { cancelled = true; };
+  }, []);
 
   const filtered = tournaments.filter(t => {
     if (filter === 'completed') return t.is_completed;
@@ -42,7 +56,6 @@ const Tournaments = () => {
   return (
     <div className="space-y-8">
 
-      {/* Header */}
       <div className="flex items-end justify-between">
         <div>
           <h1 className="text-4xl font-bold text-white mb-2" data-testid="tournaments-title">Torneios</h1>
@@ -64,7 +77,6 @@ const Tournaments = () => {
         </div>
       </div>
 
-      {/* Filter pills */}
       <div className="flex gap-2">
         {[
           { key: 'all', label: 'Todos' },
@@ -121,12 +133,6 @@ const Tournaments = () => {
                       <div className="flex items-center text-gray-400 text-sm">
                         <MapPin className="w-4 h-4 mr-2 flex-shrink-0 text-green-500/60" />
                         {tournament.location}
-                      </div>
-                    )}
-                    {tournament.total_players > 0 && (
-                      <div className="flex items-center text-gray-400 text-sm">
-                        <Users className="w-4 h-4 mr-2 flex-shrink-0 text-green-500/60" />
-                        {tournament.total_players} jogadores
                       </div>
                     )}
                   </div>

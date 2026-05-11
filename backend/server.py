@@ -664,9 +664,16 @@ async def revoke_user(username: str, current_user: User = Depends(get_current_us
     return {"message": f"Acesso de {username} revogado"}
 
 # Player Routes
+@api_router.get("/players/photo/{player_id}")
+async def get_player_photo(player_id: str):
+    player = await db.players.find_one({"id": player_id}, {"_id": 0, "photo_url": 1})
+    if not player or not player.get("photo_url"):
+        raise HTTPException(status_code=404, detail="Foto não encontrada")
+    return {"photo_url": player["photo_url"]}
+
 @api_router.get("/players", response_model=List[Player])
 async def get_players():
-    players = await db.players.find({}, {"_id": 0}).sort("name", 1).to_list(1000)
+    players = await db.players.find({}, {"_id": 0, "photo_url": 0}).sort("name", 1).to_list(1000)
     for player in players:
         if isinstance(player.get('created_at'), str):
             player['created_at'] = datetime.fromisoformat(player['created_at'])
@@ -805,10 +812,10 @@ async def upload_photo(file: UploadFile = File(...), current_user: User = Depend
         # Reabrir após verify() que fecha o buffer interno
         img = PILImage.open(BytesIO(contents))
         img = img.convert("RGB")
-        # Redimensionar mantendo proporção dentro de 800x1200px
-        img.thumbnail((800, 1200), PILImage.LANCZOS)
+        # Redimensionar mantendo proporção dentro de 400x600px
+        img.thumbnail((400, 600), PILImage.LANCZOS)
         output = BytesIO()
-        img.save(output, format="JPEG", quality=95, optimize=True)
+        img.save(output, format="JPEG", quality=90, optimize=True)
         output.seek(0)
         compressed = output.read()
         logger.info(f"Foto comprimida: {len(contents) // 1024}KB -> {len(compressed) // 1024}KB")

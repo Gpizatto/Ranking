@@ -105,8 +105,15 @@ const Rankings = () => {
         .rk-row .avatar { width: 38px; height: 38px; border-radius: 6px; background: var(--t-surface2); background-size: cover; background-position: top; display: flex; align-items: center; justify-content: center; font-family: 'JetBrains Mono', monospace; font-size: 11px; color: var(--t-sub); flex-shrink: 0; overflow: hidden; }
         
         /* Fix Dialog background */
-        [role="dialog"] { background: var(--t-surface) !important; }
+        [role="dialog"] { background: var(--t-surface) !important; color: var(--t-ink) !important; }
         [data-radix-dialog-content] { background: var(--t-surface) !important; }
+        
+        /* Dialog overlay escuro */
+        [data-radix-dialog-overlay] { background: rgba(0,0,0,0.8) !important; }
+        
+        /* Força tema escuro nos controles do modal */
+        .max-w-6xl input[type="checkbox"] { accent-color: var(--t-accent); }
+        .max-w-6xl label { color: var(--t-ink) !important; }
         
         @media (max-width: 900px) {
           .rk-hero { grid-template-columns: 1fr !important; }

@@ -1,232 +1,102 @@
-import React, { useState, useEffect } from 'react';
-import axios, { API } from '../lib/api';
-import { Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
-import { Trophy, Users, Calendar, Settings, LogOut, Shield, Menu, X, LayoutDashboard, FileText, Swords, Palette, UserCheck } from 'lucide-react';
-import { isAuthenticated, logout } from '../lib/api';
-import { getCached, cachedGet, TTL } from '../lib/cache';
+// frontend/src/components/Layout.js
+// Top nav FIFA-style com chips de seção + barra de paleta para admin.
+// Mantém logica de auth e rotas existentes (ajuste imports conforme seu projeto).
 
-const Layout = () => {
+import React, { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext'; // AJUSTE caminho se necessário
+import StyleBar, { useTheme } from './fsp/StyleBar';
+import { Mono } from './fsp';
+import { Menu, X, LogOut } from 'lucide-react';
+
+const NAV = [
+  { to: '/', label: 'HOME' },
+  { to: '/rankings', label: 'RANKINGS' },
+  { to: '/players', label: 'JOGADORES' },
+  { to: '/tournaments', label: 'TORNEIOS' },
+];
+
+const Layout = ({ children }) => {
+  const { user, logout } = useAuth() || {};
+  useTheme(); // garante data-theme aplicado no <html>
   const location = useLocation();
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [isOwner, setIsOwner] = useState(false);
+  const isAdmin = !!(user && (user.role === 'admin' || user.is_admin === true));
+  const [open, setOpen] = useState(false);
 
-  // Inicializa tema do cache imediatamente — sem flash de tema padrão
-  useEffect(() => {
-    const themeUrl = `${API}/theme`;
-
-    // 1. Aplicar tema do cache imediatamente (síncrono)
-    const cachedTheme = getCached(themeUrl);
-    if (cachedTheme) {
-      document.documentElement.setAttribute('data-theme', cachedTheme.theme || 'green');
-    }
-
-    // 2. Buscar tema do servidor em background (só na primeira vez ou expirado)
-    cachedGet(themeUrl, TTL.THEME, axios).then(data => {
-      document.documentElement.setAttribute('data-theme', data.theme || 'green');
-    }).catch(() => {});
-  }, []); // roda UMA vez — não a cada navegação
-
-  // Verificar owner status — também com cache, não a cada clique
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (!token) return;
-
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-
-    const statusUrl = `${API}/auth/approval-status`;
-
-    // 1. Usar cache imediatamente se disponível
-    const cached = getCached(statusUrl);
-    if (cached) {
-      setIsOwner(cached.is_owner || false);
-      return;
-    }
-
-    // 2. Buscar do servidor e cachear por 5 minutos
-    cachedGet(statusUrl, 300, axios)
-      .then(res => setIsOwner(res.is_owner || false))
-      .catch(() => setIsOwner(false));
-  }, []); // roda UMA vez por sessão — não a cada navegação
-
-  const isAuth = isAuthenticated();
-  const isAdminPage = location.pathname.includes('/admin');
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-    setMenuOpen(false);
-  };
-
-  const isActive = (path) => {
-    if (path === '') return location.pathname === '/' || location.pathname === '/rankings';
-    return location.pathname.startsWith(`/${path}`);
-  };
-
-  const isAdminActive = (path) => location.pathname === path;
-
-  const navLinks = [
-    { to: '/rankings', label: 'Rankings', icon: Trophy },
-    { to: '/tournaments', label: 'Torneios', icon: Calendar },
-    { to: '/players', label: 'Jogadores', icon: Users },
-  ];
-
-  const adminLinks = [
-    { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-    { to: '/admin/tournaments', label: 'Torneios', icon: Calendar },
-    { to: '/admin/players', label: 'Jogadores', icon: Users },
-    { to: '/admin/results', label: 'Resultados', icon: FileText },
-    { to: '/admin/matches', label: 'Partidas', icon: Swords },
-    { to: '/admin/layout', label: 'Layout', icon: Palette },
-    { to: '/admin/users', label: 'Usuários', icon: UserCheck, ownerOnly: true },
-    { to: '/admin/config', label: 'Config', icon: Settings },
-  ];
+  const isActive = (to) => to === '/' ? location.pathname === '/' : location.pathname.startsWith(to);
 
   return (
-    <div className="min-h-screen theme-bg">
+    <div style={{ minHeight: '100vh', background: 'var(--t-grad, var(--t-bg))', display: 'flex', flexDirection: 'column' }}>
+      <style>{`
+        .fsp-nav { position: sticky; top: 0; z-index: 50; background: color-mix(in srgb, var(--t-bg) 92%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--t-line); }
+        .fsp-nav-inner { max-width: 1480px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 18px; }
+        .fsp-nav-link { font-family: var(--font-display); font-size: 14px; letter-spacing: 0.16em; padding: 8px 16px; border-radius: 4px; color: var(--t-sub); border: 1px solid transparent; text-decoration: none; transition: all .15s; }
+        .fsp-nav-link:hover { color: var(--t-ink); border-color: var(--t-line); }
+        .fsp-nav-link.active { color: var(--t-bg); background: var(--t-accent); border-color: var(--t-accent); }
+        .fsp-burger { display: none; }
+        @media (max-width: 880px) {
+          .fsp-nav-links { display: none !important; }
+          .fsp-burger { display: flex !important; }
+          .fsp-nav-mobile { padding: 12px 24px 18px; display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--t-line); }
+        }
+      `}</style>
 
-      {/* Hero */}
-      {(location.pathname === '/' || location.pathname === '/rankings') && (
-        <div className="relative h-40 sm:h-56 lg:h-64 overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-900/70 to-transparent z-10" />
-          <img
-            src="https://i0.wp.com/worldsquashchamps.com/wp-content/uploads/world-champs-finals-62-of-74-scaled.jpg?ssl=1"
-            alt="Squash"
-            className="w-full h-full object-cover opacity-40"
-          />
-          <div className="absolute inset-0 z-20 flex items-center justify-center">
-            <div className="text-center">
-              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-bold text-white mb-2">SquashRank Pro</h1>
-              <p className="text-lg sm:text-xl theme-accent">Federação de Squash do Paraná</p>
+      <header className="fsp-nav">
+        <div className="fsp-nav-inner">
+          <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: 12, textDecoration: 'none', color: 'var(--t-ink)' }}>
+            <img src="/fsp.jpeg" alt="FSP" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover' }} onError={(e) => { e.target.style.display = 'none'; }} />
+            <div>
+              <div className="fsp-display" style={{ fontSize: 20, letterSpacing: '0.12em', lineHeight: 1 }}>FSP</div>
+              <Mono size={9}>SQUASH PARANÁ</Mono>
             </div>
-          </div>
-        </div>
-      )}
+          </Link>
 
-      {/* Header */}
-      <header className="bg-slate-900/50 backdrop-blur-lg border-b theme-border sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
+          <nav className="fsp-nav-links" style={{ display: 'flex', gap: 4, marginLeft: 16 }}>
+            {NAV.map(item => (
+              <Link key={item.to} to={item.to} className={`fsp-nav-link ${isActive(item.to) ? 'active' : ''}`}>{item.label}</Link>
+            ))}
+          </nav>
 
-            {/* Logo */}
-            <Link to="/" className="flex items-center space-x-2 sm:space-x-3">
-              <img
-                src="/fsp.jpeg"
-                alt="FSP"
-                className="w-9 h-9 sm:w-12 sm:h-12 rounded-lg object-cover shrink-0"
-              />
-              <div>
-                <h1 className="text-sm sm:text-xl font-bold text-white leading-tight">Federação de Squash do Paraná</h1>
-                <p className="text-xs theme-accent">Rankings Oficiais</p>
-              </div>
-            </Link>
-
-            {/* Desktop nav */}
-            <nav className="hidden sm:flex items-center gap-1">
-              {navLinks.map(({ to, label, icon: Icon }) => (
-                <Link key={to} to={to}
-                  className={`px-3 py-2 text-sm rounded-lg flex items-center gap-1.5 ${isActive(to.slice(1)) ? 'theme-accent-bg text-white' : 'text-gray-300 hover:bg-slate-800'}`}>
-                  <Icon className="w-4 h-4" />{label}
-                </Link>
-              ))}
-              {isAuth ? (
-                <>
-                  <Link to="/admin"
-                    className={`px-3 py-2 text-sm rounded-lg flex items-center gap-1.5 ${isAdminPage ? 'bg-blue-500 text-white' : 'text-gray-300 hover:bg-slate-800'}`}>
-                    <Shield className="w-4 h-4" />Admin
-                  </Link>
-                  <button onClick={handleLogout}
-                    className="px-3 py-2 text-sm rounded-lg text-gray-300 hover:bg-red-500/20 hover:text-red-400 flex items-center gap-1.5">
-                    <LogOut className="w-4 h-4" />Sair
-                  </button>
-                </>
-              ) : (
-                <Link to="/login" className="px-3 py-2 text-sm rounded-lg bg-blue-500 text-white hover:bg-blue-600">Login</Link>
-              )}
-            </nav>
-
-            {/* Mobile hamburger */}
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="sm:hidden p-2 rounded-lg text-gray-300 hover:bg-slate-800"
-            >
-              {menuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </button>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 12 }} className="fsp-nav-links">
+            <StyleBar isAdmin={isAdmin} />
+            {user ? (
+              <>
+                <Mono size={11} style={{ color: 'var(--t-ink)' }}>{(user.name || user.email || 'USER').toUpperCase()}</Mono>
+                {isAdmin && <span className="fsp-mono" style={{ fontSize: 9, padding: '3px 8px', background: 'var(--t-accent)', color: 'var(--t-bg)', borderRadius: 3 }}>ADMIN</span>}
+                <button onClick={() => { logout?.(); navigate('/login'); }} className="fsp-btn-ghost" title="Sair" style={{ padding: 8 }}>
+                  <LogOut size={14} />
+                </button>
+              </>
+            ) : (
+              <Link to="/login" className="fsp-btn-ghost" style={{ textDecoration: 'none' }}>ENTRAR</Link>
+            )}
           </div>
 
-          {/* Mobile menu dropdown */}
-          {menuOpen && (
-            <div className="sm:hidden mt-3 pb-2 border-t border-slate-700 pt-3 space-y-1">
-              {navLinks.map(({ to, label, icon: Icon }) => (
-                <Link key={to} to={to}
-                  onClick={() => setMenuOpen(false)}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm ${isActive(to.slice(1)) ? 'theme-accent-bg text-white' : 'text-gray-300 hover:bg-slate-800'}`}>
-                  <Icon className="w-4 h-4" />{label}
-                </Link>
-              ))}
-              {isAuth ? (
-                <>
-                  <Link to="/admin"
-                    onClick={() => setMenuOpen(false)}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm ${isAdminPage ? 'bg-blue-500 text-white' : 'text-gray-300 hover:bg-slate-800'}`}>
-                    <Shield className="w-4 h-4" />Admin
-                  </Link>
-                  <button onClick={handleLogout}
-                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-gray-300 hover:bg-red-500/20 hover:text-red-400">
-                    <LogOut className="w-4 h-4" />Sair
-                  </button>
-                </>
-              ) : (
-                <Link to="/login"
-                  onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm bg-blue-500 text-white">
-                  Login
-                </Link>
-              )}
-            </div>
-          )}
+          <button className="fsp-burger fsp-btn-ghost" style={{ marginLeft: 'auto', padding: 8 }} onClick={() => setOpen(o => !o)}>
+            {open ? <X size={18} /> : <Menu size={18} />}
+          </button>
         </div>
+
+        {open && (
+          <div className="fsp-nav-mobile">
+            {NAV.map(item => (
+              <Link key={item.to} to={item.to} className={`fsp-nav-link ${isActive(item.to) ? 'active' : ''}`} onClick={() => setOpen(false)}>{item.label}</Link>
+            ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+              <StyleBar isAdmin={isAdmin} />
+              {user && <button onClick={() => { logout?.(); navigate('/login'); }} className="fsp-btn-ghost"><LogOut size={14}/> SAIR</button>}
+            </div>
+          </div>
+        )}
       </header>
 
-      {/* Admin subnav */}
-      {isAuth && isAdminPage && (
-        <div className="bg-slate-800/50 border-b border-blue-500/20">
-          <div className="container mx-auto px-2">
-            {/* Mobile: grid 3x2 */}
-            <div className="grid grid-cols-3 sm:hidden gap-1 py-2">
-              {adminLinks.filter(l => !l.ownerOnly || isOwner).map(({ to, label, icon: Icon }) => (
-                <Link key={to} to={to}
-                  className={`flex flex-col items-center gap-0.5 px-2 py-2 rounded-lg text-xs transition-colors ${
-                    isAdminActive(to) ? 'bg-blue-500 text-white' : 'text-gray-400 hover:bg-slate-700 hover:text-white'
-                  }`}>
-                  <Icon className="w-4 h-4" />
-                  {label}
-                </Link>
-              ))}
-            </div>
-            {/* Desktop: row */}
-            <div className="hidden sm:flex space-x-1 py-2">
-              {adminLinks.filter(l => !l.ownerOnly || isOwner).map(({ to, label, icon: Icon }) => (
-                <Link key={to} to={to}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 text-sm rounded transition-colors ${
-                    isAdminActive(to) ? 'bg-blue-500 text-white' : 'text-gray-400 hover:bg-slate-700 hover:text-white'
-                  }`}>
-                  <Icon className="w-3.5 h-3.5" />{label}
-                </Link>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Conteúdo */}
-      <main className="max-w-6xl mx-auto px-3 sm:px-4 py-5 sm:py-8">
-        <Outlet />
+      <main style={{ flex: 1, width: '100%', maxWidth: 1480, margin: '0 auto', padding: '32px 24px 60px' }}>
+        {children}
       </main>
 
-      {/* Footer */}
-      <footer className="bg-slate-900/50 border-t theme-border py-6 mt-12 text-center text-gray-400 text-sm">
-        © {new Date().getFullYear()} Federação de Squash do Paraná — Powered by SquashRank Pro
+      <footer style={{ borderTop: '1px solid var(--t-line)', padding: '20px 24px', textAlign: 'center' }}>
+        <Mono size={10}>© FEDERAÇÃO DE SQUASH DO PARANÁ · FEDERACAOSQUASHPR.COM.BR</Mono>
       </footer>
     </div>
   );

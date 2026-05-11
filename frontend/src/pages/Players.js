@@ -73,7 +73,7 @@ const PlayerCard = React.memo(({ player, onClick }) => {
           background: 'var(--t-surface2)',
           backgroundImage: photoUrl ? `url(${photoUrl})` : 'none',
           backgroundSize: 'cover',
-          backgroundPosition: 'top',
+          backgroundPosition: 'center',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',

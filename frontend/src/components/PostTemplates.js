@@ -168,7 +168,7 @@ export const PostUltimate = ({ players, theme, format, classLabel, categoryLabel
           display: 'grid', gridTemplateColumns: '380px 1fr', gap: 28, overflow: 'hidden',
         }}>
           <div style={{ position:'absolute', inset:0, background:`linear-gradient(115deg, transparent 35%, ${alpha(palette.accent, 0.16)} 50%, transparent 65%)`, pointerEvents:'none' }}/>
-          <div style={{ position:'absolute', top:8, right:18, fontFamily:'Anton, sans-serif', fontSize:220, lineHeight:1, color: alpha(palette.accent, 0.10), letterSpacing:'-0.03em' }}>01</div>
+          <div style={{ position:'absolute', top:-20, right:18, fontFamily:'Anton, sans-serif', fontSize:220, lineHeight:1, color: alpha(palette.accent, 0.05), letterSpacing:'-0.03em' }}>01</div>
 
           <Photo player={champ} palette={palette} big style={{ width: 380, height: 520, borderRadius: 14, border: `1px solid ${palette.line}` }} />
 
@@ -291,6 +291,10 @@ export const PostEditorial = ({ players, theme, format, classLabel, categoryLabe
 
       <div style={{ fontFamily:'Anton, sans-serif', fontSize: isFeed?180:280, lineHeight:0.88, letterSpacing:'-0.02em', padding:'40px 60px 0', color:palette.ink }}>
         MELHOR DO<br/>PARANÁ<br/><span style={{ color:palette.accent }}>NA {classLabel.toUpperCase()}</span>
+      </div>
+      
+      <div style={{ fontFamily:'JetBrains Mono, monospace', fontSize:isFeed?13:16, letterSpacing:'0.24em', color:palette.sub, padding:'0 60px', marginTop:12 }}>
+        {categoryLabel.toUpperCase()} · {monthLabel.toUpperCase()}
       </div>
 
       <div style={{ position:'relative', margin:'20px 60px 0', display:'grid', gridTemplateColumns:'1fr 1.2fr', gap:36, alignItems:'end' }}>

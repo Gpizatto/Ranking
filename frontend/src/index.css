@@ -285,8 +285,9 @@ code {
 [data-theme] ::-webkit-scrollbar-thumb:hover {
   background: var(--t-500-30) !important;
 }
+
 /* ========================================
-   PALETAS FSP — Adicionar ao final do index.css
+   PALETAS FSP — Sistema completo de temas
    ======================================== */
 
 /* Storm (Azul FSP evoluído) */

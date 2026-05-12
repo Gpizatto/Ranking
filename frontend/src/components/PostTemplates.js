@@ -168,14 +168,13 @@ export const PostUltimate = ({ players, theme, format, classLabel, categoryLabel
           display: 'grid', gridTemplateColumns: '380px 1fr', gap: 28, overflow: 'hidden',
         }}>
           <div style={{ position:'absolute', inset:0, background:`linear-gradient(115deg, transparent 35%, ${alpha(palette.accent, 0.16)} 50%, transparent 65%)`, pointerEvents:'none' }}/>
-          <div style={{ position:'absolute', top:-60, right:18, fontFamily:'Anton, sans-serif', fontSize:220, lineHeight:1, color: alpha(palette.accent, 0.03), letterSpacing:'-0.03em' }}>01</div>
+          <div style={{ position:'absolute', top:20, right:28, fontFamily:'Anton, sans-serif', fontSize:80, lineHeight:1, color: alpha(palette.accent, 0.15), letterSpacing:'-0.03em' }}>01</div>
 
           <Photo player={champ} palette={palette} big style={{ width: 380, height: 520, borderRadius: 14, border: `1px solid ${palette.line}` }} />
 
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', position: 'relative' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-                <span style={{ background: palette.podium[0], color: palette.bg, padding: '4px 12px', fontFamily: 'Anton, sans-serif', fontSize: 16, letterSpacing: '0.18em', borderRadius: 4 }}>CAMPEÃO</span>
                 <Trend value={champ.position_change} palette={palette} size={14} />
               </div>
               <div style={{ fontFamily: 'Anton, sans-serif', fontSize: 64, lineHeight: 0.95, color: palette.ink }}>

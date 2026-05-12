@@ -168,7 +168,7 @@ export const PostUltimate = ({ players, theme, format, classLabel, categoryLabel
           display: 'grid', gridTemplateColumns: '380px 1fr', gap: 28, overflow: 'hidden',
         }}>
           <div style={{ position:'absolute', inset:0, background:`linear-gradient(115deg, transparent 35%, ${alpha(palette.accent, 0.16)} 50%, transparent 65%)`, pointerEvents:'none' }}/>
-          <div style={{ position:'absolute', top:-20, right:18, fontFamily:'Anton, sans-serif', fontSize:220, lineHeight:1, color: alpha(palette.accent, 0.05), letterSpacing:'-0.03em' }}>01</div>
+          <div style={{ position:'absolute', top:-60, right:18, fontFamily:'Anton, sans-serif', fontSize:220, lineHeight:1, color: alpha(palette.accent, 0.03), letterSpacing:'-0.03em' }}>01</div>
 
           <Photo player={champ} palette={palette} big style={{ width: 380, height: 520, borderRadius: 14, border: `1px solid ${palette.line}` }} />
 

@@ -1,191 +1,174 @@
 // frontend/src/components/PostTemplates.js
-// VERSÃO DEFINITIVA - TODOS OS BUGS CORRIGIDOS:
-// ✅ Podium: heights ajustadas + espaço para nomes longos
-// ✅ Podium: foto do 3º lugar mesmo tamanho que 2º
-// ✅ Podium: fontSize menor para caber nomes
-// ✅ Todos os textos com color explícito
-// ✅ Ultimate Story: número "01" menor e mais transparente
-// ✅ CachedPhoto integrado para qualidade consistente
-// ✅ Footer com background sólido
-// ✅ Padding bottom em todos os templates
+// VERSÃO REESCRITA — layout em FLUXO (flexbox), sem position:absolute transbordante.
+//
+// Por que foi reescrito:
+//   Os templates antigos usavam números gigantes com position:absolute + paddingTop
+//   para "empurrar" o conteúdo. Quando o conteúdo passava da altura fixa (1080/1920),
+//   ele transbordava e o html2canvas capturava isso de forma imprevisível —
+//   textos sobrepostos no PNG, layout quebrado ao trocar de formato.
+//
+// Como funciona agora:
+//   Cada template é um container flex-column com altura EXATA (1080 ou 1920).
+//   Cada seção (header, foto, stats, lista, footer) ocupa um espaço definido.
+//   O conteúdo da lista é limitado para nunca estourar. Resultado: o que aparece
+//   no preview é exatamente o que sai no PNG.
 
 import React, { useState, useEffect } from 'react';
 
-// ═════════════════════════════════════════════════════════════════════════════
-// CACHEDPHOTO COMPONENT
-// ═════════════════════════════════════════════════════════════════════════════
-const CachedPhoto = ({ url, style, fallbackInitials }) => {
+// ═══════════════════════════════════════════════════════════════════
+// CACHEDPHOTO — cache de fotos via blob URL (qualidade consistente)
+// ═══════════════════════════════════════════════════════════════════
+const CachedPhoto = ({ url, style, fallback }) => {
   const [objectUrl, setObjectUrl] = useState(null);
-  const [loading, setLoading] = useState(false);
-  
+
   useEffect(() => {
     if (!url || !url.startsWith('data:image')) {
       setObjectUrl(url || null);
       return;
     }
-    
     let cancelled = false;
-    setLoading(true);
-    
+    let created = null;
     fetch(url)
       .then(r => r.blob())
       .then(blob => {
-        if (!cancelled) {
-          const blobUrl = URL.createObjectURL(blob);
-          setObjectUrl(blobUrl);
-          setLoading(false);
-        }
+        if (cancelled) return;
+        created = URL.createObjectURL(blob);
+        setObjectUrl(created);
       })
-      .catch(err => {
-        console.warn('Failed to cache photo:', err);
-        if (!cancelled) {
-          setLoading(false);
-        }
-      });
-    
+      .catch(() => {});
     return () => {
       cancelled = true;
-      if (objectUrl && objectUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(objectUrl);
-      }
+      if (created) URL.revokeObjectURL(created);
     };
   }, [url]);
-  
+
   return (
     <div style={{
       ...style,
       backgroundImage: objectUrl ? `url(${objectUrl})` : 'none',
       backgroundSize: 'cover',
       backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
       position: 'relative',
       overflow: 'hidden',
     }}>
-      {!objectUrl && !loading && fallbackInitials}
+      {!objectUrl && fallback}
     </div>
   );
 };
 
-// ═════════════════════════════════════════════════════════════════════════════
-// UTILITY FUNCTIONS
-// ═════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
+// UTILITÁRIOS
+// ═══════════════════════════════════════════════════════════════════
 const alpha = (c, a) => {
   if (!c) return `rgba(0,0,0,${a})`;
   if (c.startsWith('rgba') || c.startsWith('rgb')) return c;
-  const h = c.replace('#','');
-  const full = h.length === 3 ? h.split('').map(x=>x+x).join('') : h.padEnd(6,'0');
-  const r = parseInt(full.slice(0,2),16);
-  const g = parseInt(full.slice(2,4),16);
-  const b = parseInt(full.slice(4,6),16);
+  const h = c.replace('#', '');
+  const full = h.length === 3 ? h.split('').map(x => x + x).join('') : h.padEnd(6, '0');
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
   return `rgba(${r},${g},${b},${a})`;
 };
 
 const PALETTE_DATA = {
   storm: {
     bg: '#070d1a', surface: '#0d1a30', surface2: '#13243f',
-    line: 'rgba(120,170,255,0.14)', ink: '#ffffff', sub: '#9bb6dd',
-    accent: '#4aa3ff', accent2: '#22e1ff', gold: '#f5b400',
+    line: 'rgba(120,170,255,0.18)', ink: '#ffffff', sub: '#9bb6dd',
+    accent: '#4aa3ff', accent2: '#22e1ff',
     podium: ['#f5b400', '#cdd5e0', '#cd7f32'],
     grad: 'linear-gradient(135deg,#070d1a 0%,#0d2347 55%,#070d1a 100%)',
   },
   inferno: {
-    bg: '#000000', surface: '#0a0008', surface2: '#14000f',
-    line: 'rgba(255,45,111,0.25)', ink: '#ffffff', sub: '#e0a8c5',
-    accent: '#ff0066', accent2: '#00ff00', gold: '#00ff00',
-    podium: ['#00ff00', '#ff0066', '#ff8800'],
+    bg: '#000000', surface: '#0c0008', surface2: '#1a000f',
+    line: 'rgba(255,45,111,0.3)', ink: '#ffffff', sub: '#e0a8c5',
+    accent: '#ff0066', accent2: '#00ff66',
+    podium: ['#00ff66', '#ff0066', '#ff8800'],
     grad: 'linear-gradient(135deg,#000000 0%,#1a0014 55%,#000000 100%)',
   },
   champion: {
     bg: '#1a1510', surface: '#2a2218', surface2: '#382e20',
-    line: 'rgba(255,215,0,0.25)', ink: '#ffe8b0', sub: '#d4b87a',
-    accent: '#ffd700', accent2: '#ffed4e', gold: '#ffd700',
+    line: 'rgba(255,215,0,0.3)', ink: '#ffe8b0', sub: '#d4b87a',
+    accent: '#ffd700', accent2: '#ffed4e',
     podium: ['#ffd700', '#e8e8e8', '#cd7f32'],
     grad: 'linear-gradient(135deg,#1a1510 0%,#3d2a10 55%,#1a1510 100%)',
   },
   glacier: {
-    bg: '#e8e5dc', surface: '#f8f5ed', surface2: '#d8d5cc',
-    line: 'rgba(13,20,24,0.18)', ink: '#000000', sub: '#4a4f55',
-    accent: '#0d5c1a', accent2: '#004d5c', gold: '#8b6914',
+    bg: '#e8e5dc', surface: '#f8f5ed', surface2: '#d4d0c4',
+    line: 'rgba(13,20,24,0.22)', ink: '#000000', sub: '#4a4f55',
+    accent: '#0d5c1a', accent2: '#004d5c',
     podium: ['#8b6914', '#6b7178', '#8b4513'],
     grad: 'linear-gradient(135deg,#e8e5dc 0%,#d0cdc4 55%,#e8e5dc 100%)',
   },
 };
 
-const getTokens = (theme) => {
-  if (PALETTE_DATA[theme]) return PALETTE_DATA[theme];
-  
-  if (typeof document === 'undefined') return PALETTE_DATA.storm;
-  const el = document.querySelector(`[data-theme="${theme}"]`) || document.documentElement;
-  const cs = getComputedStyle(el);
-  const get = (k) => cs.getPropertyValue(k).trim();
-  
-  const bg = get('--t-bg');
-  if (!bg) return PALETTE_DATA.storm;
-  
-  return {
-    bg, surface: get('--t-surface'), surface2: get('--t-surface2'),
-    line: get('--t-line'), ink: get('--t-ink'), sub: get('--t-sub'),
-    accent: get('--t-accent'), accent2: get('--t-accent2'), gold: get('--t-gold'),
-    podium: [get('--t-podium-1'), get('--t-podium-2'), get('--t-podium-3')],
-    grad: get('--t-grad'),
-  };
-};
+const getTokens = (theme) => PALETTE_DATA[theme] || PALETTE_DATA.storm;
 
-const initials = (name='') => {
+const initials = (name = '') => {
   const parts = name.trim().split(/\s+/);
-  return ((parts[0]?.[0]||'') + (parts[parts.length-1]?.[0]||'')).toUpperCase();
+  return ((parts[0]?.[0] || '') + (parts[parts.length - 1]?.[0] || '')).toUpperCase();
 };
 
-const Photo = ({ player, palette, style, big }) => {
+// Trunca nome para caber: pega primeiro + último sobrenome se for muito longo
+const fitName = (name = '', maxChars = 22) => {
+  const clean = name.trim();
+  if (clean.length <= maxChars) return clean.toUpperCase();
+  const parts = clean.split(/\s+/);
+  if (parts.length >= 2) {
+    const short = `${parts[0]} ${parts[parts.length - 1]}`;
+    if (short.length <= maxChars) return short.toUpperCase();
+    return short.slice(0, maxChars - 1).toUpperCase() + '…';
+  }
+  return clean.slice(0, maxChars - 1).toUpperCase() + '…';
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// COMPONENTES COMPARTILHADOS
+// ═══════════════════════════════════════════════════════════════════
+const Photo = ({ player, palette, height, width = '100%', big, border, radius = 0 }) => {
   const photoUrl = player?.photo_url || player?.photoUrl;
-  const playerInitials = initials(player?.player_name || player?.name || '');
-  
   return (
     <CachedPhoto
       url={photoUrl}
       style={{
-        ...style,
+        width,
+        height,
+        flexShrink: 0,
         backgroundColor: palette.surface2,
+        border: border || 'none',
+        borderRadius: radius,
       }}
-      fallbackInitials={
+      fallback={
         <div style={{
-          position: 'absolute',
-          inset: 0,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          position: 'absolute', inset: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontFamily: 'Anton, sans-serif',
-          fontSize: big ? 96 : 48,
-          color: alpha(palette.ink, 0.25),
-          letterSpacing: '0.02em'
+          fontSize: big ? 110 : 52,
+          color: alpha(palette.ink, 0.22),
+          letterSpacing: '0.02em',
         }}>
-          {playerInitials}
+          {initials(player?.player_name || player?.name || '')}
         </div>
       }
     />
   );
 };
 
-const Trend = ({ value, palette, size=12 }) => {
-  if (value == null || value === 0) return <span style={{ color: palette.sub, fontSize: size }}>—</span>;
-  const up = value > 0;
-  return <span style={{ color: up ? palette.accent2 : '#ff5577', fontFamily: 'JetBrains Mono, monospace', fontSize: size, fontWeight: 700 }}>
-    {up ? '▲' : '▼'}{Math.abs(value)}
-  </span>;
-};
-
+// Footer com altura FIXA — faz parte do fluxo, nunca sobrepõe nada.
+const FOOTER_H = 64;
 const Footer = ({ palette }) => (
   <div style={{
-    position: 'absolute', left: 0, right: 0, bottom: 0,
-    padding: '16px 60px',
+    height: FOOTER_H,
+    flexShrink: 0,
     borderTop: `1px solid ${palette.line}`,
     background: palette.bg,
-    zIndex: 100,
-    display: 'flex', 
-    justifyContent: 'space-between', 
+    display: 'flex',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    fontFamily: 'JetBrains Mono, monospace', 
-    fontSize: 11, 
-    letterSpacing: '0.28em', 
+    padding: '0 60px',
+    fontFamily: 'JetBrains Mono, monospace',
+    fontSize: 12,
+    letterSpacing: '0.26em',
     color: palette.sub,
   }}>
     <span>FEDERACAOSQUASHPR.COM.BR</span>
@@ -194,524 +177,646 @@ const Footer = ({ palette }) => (
   </div>
 );
 
-const FSPMark = ({ palette, size=56, logoSrc }) => (
+const FSPMark = ({ palette, size = 60, logoSrc }) => (
   logoSrc ? (
-    <img src={logoSrc} alt="FSP" style={{ width: size, height: size, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
+    <img
+      src={logoSrc}
+      alt="FSP"
+      crossOrigin="anonymous"
+      style={{ width: size, height: size, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }}
+    />
   ) : (
     <div style={{
-      width: size, height: size, borderRadius: 8, background: palette.accent,
+      width: size, height: size, borderRadius: 10, background: palette.accent,
       display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
     }}>
-      <span style={{ fontFamily: 'Anton, sans-serif', color: palette.bg, fontSize: size*0.42, letterSpacing: '0.04em', lineHeight: 1 }}>FSP</span>
+      <span style={{ fontFamily: 'Anton, sans-serif', color: palette.bg, fontSize: size * 0.4, lineHeight: 1 }}>FSP</span>
     </div>
   )
 );
 
-// ═════════════════════════════════════════════════════════════════════════════
-// TEMPLATE 1: ULTIMATE CARD (CORRIGIDO)
-// ═════════════════════════════════════════════════════════════════════════════
+// Linha de jogador para as listas — altura fixa, tudo em uma linha só.
+const ListRow = ({ pos, name, points, palette, accentPos, rowH = 56, fontSize = 18 }) => (
+  <div style={{
+    height: rowH,
+    flexShrink: 0,
+    display: 'flex',
+    alignItems: 'center',
+    gap: 16,
+    padding: '0 18px',
+    borderLeft: `3px solid ${accentPos || 'transparent'}`,
+    background: pos % 2 === 0 ? alpha(palette.surface, 0.45) : 'transparent',
+  }}>
+    <span style={{
+      fontFamily: 'Anton, sans-serif',
+      fontSize: fontSize + 6,
+      color: palette.sub,
+      lineHeight: 1,
+      width: 46,
+      flexShrink: 0,
+    }}>
+      {String(pos).padStart(2, '0')}
+    </span>
+    <span style={{
+      flex: 1,
+      minWidth: 0,
+      fontFamily: 'Space Grotesk, sans-serif',
+      fontWeight: 700,
+      fontSize,
+      color: palette.ink,
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    }}>
+      {name}
+    </span>
+    <span style={{
+      fontFamily: 'Anton, sans-serif',
+      fontSize: fontSize + 6,
+      color: palette.accent,
+      flexShrink: 0,
+    }}>
+      {points}
+    </span>
+  </div>
+);
+
+// Container raiz comum: altura EXATA, flex column, overflow hidden.
+const Frame = ({ palette, isFeed, bg, children }) => (
+  <div style={{
+    width: 1080,
+    height: isFeed ? 1080 : 1920,
+    background: bg || palette.bg,
+    color: palette.ink,
+    fontFamily: 'Space Grotesk, sans-serif',
+    display: 'flex',
+    flexDirection: 'column',
+    overflow: 'hidden',
+    position: 'relative',
+  }}>
+    {children}
+  </div>
+);
+
+// ═══════════════════════════════════════════════════════════════════
+// TEMPLATE 1 — ULTIMATE
+// Header · Foto grande · Bloco do campeão · Lista perseguidores · Footer
+// ═══════════════════════════════════════════════════════════════════
 export const PostUltimate = ({ players, theme, format, classLabel, categoryLabel, showSecondHalf, monthLabel, logoSrc }) => {
   const palette = getTokens(theme);
   const isFeed = format === 'feed';
-  const W = 1080, H = isFeed ? 1080 : 1920;
-  const champ = players[0]; if (!champ) return null;
-  const rest = players.slice(1, showSecondHalf ? 10 : 5);
-  
-  const heroHeight = isFeed ? 600 : 800;
-  const nameSize = isFeed ? 64 : 80;
-  // CORRIGIDO: Número "01" menor e mais transparente
-  const numberSize = isFeed ? 160 : 180;
-  const numberOpacity = 0.12; // era 0.15
+  const champ = players[0];
+  if (!champ) return null;
+
+  const maxList = isFeed ? (showSecondHalf ? 4 : 3) : (showSecondHalf ? 9 : 5);
+  const rest = players.slice(1, 1 + maxList);
+
+  const photoH = isFeed ? 420 : 760;
+  const rowH = isFeed ? 52 : 64;
 
   return (
-    <div style={{ 
-      width: W, 
-      height: H, 
-      background: palette.bg, 
-      position: 'relative', 
-      overflow: 'hidden', 
-      fontFamily: 'Space Grotesk, sans-serif', 
-      color: palette.ink,
-      paddingBottom: 70
-    }}>
-      <div style={{ padding: isFeed ? '40px 60px' : '60px 60px', borderBottom: `2px solid ${palette.line}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <FSPMark palette={palette} size={isFeed ? 56 : 72} logoSrc={logoSrc} />
+    <Frame palette={palette} isFeed={isFeed}>
+      {/* HEADER */}
+      <div style={{
+        flexShrink: 0,
+        padding: isFeed ? '34px 60px' : '54px 60px',
+        borderBottom: `2px solid ${palette.line}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <FSPMark palette={palette} size={isFeed ? 58 : 76} logoSrc={logoSrc} />
         <div style={{ textAlign: 'center' }}>
-          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 11 : 13, letterSpacing: '0.32em', color: palette.sub }}>RANKING OFICIAL · {monthLabel}</div>
-          <div style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 40 : 52, letterSpacing: '0.04em', marginTop: 6, color: palette.ink }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 12 : 15, letterSpacing: '0.3em', color: palette.sub }}>
+            RANKING OFICIAL · {monthLabel}
+          </div>
+          <div style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 44 : 58, marginTop: 8, color: palette.ink }}>
             {classLabel.toUpperCase()} <span style={{ color: palette.accent }}>{categoryLabel.toUpperCase()}</span>
           </div>
         </div>
-        <div style={{ width: isFeed ? 56 : 72 }} />
+        <div style={{ width: isFeed ? 58 : 76 }} />
       </div>
 
-      <Photo player={champ} palette={palette} big style={{ width: '100%', height: heroHeight, borderBottom: `1px solid ${palette.line}` }} />
+      {/* FOTO DO CAMPEÃO */}
+      <Photo player={champ} palette={palette} big height={photoH} />
 
-      <div style={{ position: 'relative', padding: isFeed ? '30px 60px' : '50px 60px 0' }}>
-        {/* CORRIGIDO: Número menor e mais transparente */}
-        <div style={{ 
-          position: 'absolute', 
-          top: isFeed ? -70 : -90, 
-          left: 60, 
-          fontFamily: 'Anton, sans-serif', 
-          fontSize: numberSize, 
-          color: alpha(palette.accent, numberOpacity), 
-          lineHeight: 0.85, 
-          letterSpacing: '-0.05em', 
-          zIndex: 0 
-        }}>01</div>
-        
-        <div style={{ position: 'relative', zIndex: 1 }}>
-          <div style={{ 
-            fontFamily: 'Anton, sans-serif', 
-            fontSize: nameSize, 
-            lineHeight: 0.95, 
-            color: palette.ink, 
-            marginBottom: 20,
+      {/* BLOCO DO CAMPEÃO */}
+      <div style={{
+        flexShrink: 0,
+        padding: isFeed ? '26px 60px' : '44px 60px',
+        borderBottom: `1px solid ${palette.line}`,
+        display: 'flex', alignItems: 'center', gap: isFeed ? 24 : 40,
+      }}>
+        <div style={{
+          fontFamily: 'Anton, sans-serif',
+          fontSize: isFeed ? 100 : 150,
+          color: palette.accent,
+          lineHeight: 0.8,
+          flexShrink: 0,
+        }}>
+          01
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontFamily: 'Anton, sans-serif',
+            fontSize: isFeed ? 52 : 76,
+            lineHeight: 1,
+            color: palette.ink,
+            whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
           }}>
-            {champ.player_name.toUpperCase()}
+            {fitName(champ.player_name, isFeed ? 20 : 24)}
           </div>
-          
-          <div style={{ display: 'flex', gap: isFeed ? 24 : 32, flexWrap: 'wrap' }}>
-            <div>
-              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.24em', color: palette.sub, marginBottom: 4 }}>PONTOS</div>
-              <div style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 52 : 64, color: palette.accent, lineHeight: 1 }}>{champ.total_points}</div>
-            </div>
-            <div>
-              <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.24em', color: palette.sub, marginBottom: 4 }}>TORNEIOS</div>
-              <div style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 52 : 64, color: palette.ink, lineHeight: 1 }}>{champ.results_count}</div>
-            </div>
+          <div style={{ display: 'flex', gap: isFeed ? 28 : 44, marginTop: isFeed ? 12 : 20 }}>
+            <Stat label="PONTOS" value={champ.total_points} palette={palette} accent big={!isFeed} isFeed={isFeed} />
+            <Stat label="TORNEIOS" value={champ.results_count} palette={palette} isFeed={isFeed} />
             {champ.win_rate != null && (
-              <div>
-                <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.24em', color: palette.sub, marginBottom: 4 }}>% VITÓRIAS</div>
-                <div style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 52 : 64, color: palette.ink, lineHeight: 1 }}>{champ.win_rate}%</div>
-              </div>
+              <Stat label="% VITÓRIAS" value={`${champ.win_rate}%`} palette={palette} isFeed={isFeed} />
             )}
           </div>
         </div>
       </div>
 
-      {rest.length > 0 && (
-        <div style={{ padding: isFeed ? '30px 60px 80px' : '40px 60px 80px' }}>
-          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.32em', color: palette.sub, marginBottom: 16 }}>PERSEGUIDORES</div>
-          <div style={{ display: 'grid', gridTemplateColumns: isFeed ? '1fr' : 'repeat(2, 1fr)', gap: isFeed ? 2 : 8 }}>
-            {rest.map((p, i) => (
-              <div key={p.player_id} style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 14, 
-                padding: isFeed ? '10px 12px' : '14px 16px', 
-                background: i % 2 ? 'transparent' : alpha(palette.surface, 0.5), 
-                borderLeft: `3px solid ${i < 2 ? palette.podium[i + 1] : 'transparent'}` 
-              }}>
-                <span style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 24 : 28, color: palette.sub, lineHeight: 1, minWidth: 40 }}>{String(i + 2).padStart(2, '0')}</span>
-                <span style={{ 
-                  flex: 1, 
-                  fontFamily: 'Space Grotesk, sans-serif', 
-                  fontWeight: 700, 
-                  fontSize: isFeed ? 15 : 17, 
-                  color: palette.ink,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}>{p.player_name}</span>
-                <span style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 22 : 26, color: palette.accent }}>{p.total_points}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* LISTA — ocupa o espaço restante */}
+      <div style={{ flex: 1, minHeight: 0, padding: isFeed ? '22px 60px' : '38px 60px', overflow: 'hidden' }}>
+        {rest.length > 0 && (
+          <>
+            <div style={{
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: 12, letterSpacing: '0.3em', color: palette.sub, marginBottom: 14,
+            }}>
+              PERSEGUIDORES
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {rest.map((p, i) => (
+                <ListRow
+                  key={p.player_id}
+                  pos={i + 2}
+                  name={fitName(p.player_name, isFeed ? 28 : 34)}
+                  points={p.total_points}
+                  palette={palette}
+                  accentPos={i < 2 ? palette.podium[i + 1] : null}
+                  rowH={rowH}
+                  fontSize={isFeed ? 16 : 19}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
 
       <Footer palette={palette} />
-    </div>
+    </Frame>
   );
 };
 
-// ═════════════════════════════════════════════════════════════════════════════
-// TEMPLATE 2: STADIUM
-// ═════════════════════════════════════════════════════════════════════════════
+// Stat pequeno reutilizável
+const Stat = ({ label, value, palette, accent, big, isFeed }) => (
+  <div>
+    <div style={{
+      fontFamily: 'JetBrains Mono, monospace',
+      fontSize: isFeed ? 10 : 12,
+      letterSpacing: '0.22em',
+      color: palette.sub,
+      marginBottom: 4,
+    }}>
+      {label}
+    </div>
+    <div style={{
+      fontFamily: 'Anton, sans-serif',
+      fontSize: big ? (isFeed ? 56 : 72) : (isFeed ? 44 : 60),
+      color: accent ? palette.accent : palette.ink,
+      lineHeight: 1,
+    }}>
+      {value}
+    </div>
+  </div>
+);
+
+// ═══════════════════════════════════════════════════════════════════
+// TEMPLATE 2 — STADIUM
+// Header · Foto grande com nome sobreposto na base · Lista · Footer
+// ═══════════════════════════════════════════════════════════════════
 export const PostStadium = ({ players, theme, format, classLabel, categoryLabel, showSecondHalf, monthLabel, logoSrc }) => {
   const palette = getTokens(theme);
   const isFeed = format === 'feed';
-  const W = 1080, H = isFeed ? 1080 : 1920;
-  const champ = players[0]; if (!champ) return null;
-  const rest = players.slice(1, showSecondHalf ? 10 : 5);
+  const champ = players[0];
+  if (!champ) return null;
+
+  const maxList = isFeed ? (showSecondHalf ? 4 : 3) : (showSecondHalf ? 9 : 5);
+  const rest = players.slice(1, 1 + maxList);
+
+  const photoH = isFeed ? 560 : 1000;
+  const rowH = isFeed ? 54 : 66;
 
   return (
-    <div style={{ 
-      width: W, 
-      height: H, 
-      background: palette.grad, 
-      position: 'relative', 
-      overflow: 'hidden', 
-      fontFamily: 'Space Grotesk, sans-serif', 
-      color: palette.ink,
-      paddingBottom: 70
-    }}>
-      <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(180deg, transparent 0%, ${alpha(palette.bg, 0.85)} 100%)`, pointerEvents: 'none' }} />
+    <Frame palette={palette} isFeed={isFeed} bg={palette.grad}>
+      {/* HEADER */}
+      <div style={{
+        flexShrink: 0,
+        padding: isFeed ? '34px 60px' : '54px 60px',
+        borderBottom: `1px solid ${palette.line}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <FSPMark palette={palette} size={isFeed ? 58 : 76} logoSrc={logoSrc} />
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 40 : 54, color: palette.ink, lineHeight: 1 }}>
+            {classLabel.toUpperCase()} <span style={{ color: palette.accent }}>{categoryLabel.toUpperCase()}</span>
+          </div>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 12 : 14, letterSpacing: '0.28em', color: palette.sub, marginTop: 6 }}>
+            {monthLabel} · RANKING FSP
+          </div>
+        </div>
+      </div>
 
-      <div style={{ position: 'relative', padding: isFeed ? '40px 60px' : '60px 60px', borderBottom: `1px solid ${palette.line}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <FSPMark palette={palette} size={isFeed ? 56 : 72} logoSrc={logoSrc} />
-        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 11 : 13, letterSpacing: '0.32em', color: palette.sub, textAlign: 'right' }}>
+      {/* FOTO COM NOME SOBREPOSTO NA BASE (gradiente garante legibilidade) */}
+      <div style={{ position: 'relative', flexShrink: 0, height: photoH }}>
+        <Photo player={champ} palette={palette} big height={photoH} />
+        <div style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          background: `linear-gradient(180deg, transparent 0%, ${alpha(palette.bg, 0.95)} 85%)`,
+          padding: isFeed ? '90px 60px 28px' : '160px 60px 44px',
+        }}>
+          <div style={{
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: isFeed ? 13 : 16, letterSpacing: '0.3em', color: palette.accent, marginBottom: 10,
+          }}>
+            CAMPEÃO · {classLabel.toUpperCase()} {categoryLabel.toUpperCase()}
+          </div>
+          <div style={{
+            fontFamily: 'Anton, sans-serif',
+            fontSize: isFeed ? 64 : 96,
+            lineHeight: 0.98,
+            color: palette.ink,
+            whiteSpace: 'nowrap',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+          }}>
+            {fitName(champ.player_name, isFeed ? 18 : 22)}
+          </div>
+          <div style={{ display: 'flex', gap: 14, alignItems: 'baseline', marginTop: isFeed ? 10 : 18 }}>
+            <span style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 60 : 88, color: palette.accent, lineHeight: 1 }}>
+              {champ.total_points}
+            </span>
+            <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 13 : 16, letterSpacing: '0.22em', color: palette.sub }}>
+              PONTOS · {champ.results_count} TORNEIOS{champ.win_rate != null ? ` · ${champ.win_rate}% VIT.` : ''}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* LISTA */}
+      <div style={{ flex: 1, minHeight: 0, padding: isFeed ? '22px 60px' : '40px 60px', overflow: 'hidden' }}>
+        {rest.length > 0 && (
+          <>
+            <div style={{
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: 12, letterSpacing: '0.3em', color: palette.sub, marginBottom: 14,
+            }}>
+              PERSEGUIDORES
+            </div>
+            <div style={{
+              display: 'flex', flexDirection: 'column',
+              border: `1px solid ${palette.line}`, borderRadius: 10, overflow: 'hidden',
+            }}>
+              {rest.map((p, i) => (
+                <ListRow
+                  key={p.player_id}
+                  pos={i + 2}
+                  name={fitName(p.player_name, isFeed ? 28 : 34)}
+                  points={p.total_points}
+                  palette={palette}
+                  accentPos={i < 2 ? palette.podium[i + 1] : null}
+                  rowH={rowH}
+                  fontSize={isFeed ? 16 : 19}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      <Footer palette={palette} />
+    </Frame>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// TEMPLATE 3 — EDITORIAL
+// Header · Título tipográfico · Foto + nome lado a lado · Lista · Footer
+// ═══════════════════════════════════════════════════════════════════
+export const PostEditorial = ({ players, theme, format, classLabel, categoryLabel, showSecondHalf, monthLabel }) => {
+  const palette = getTokens(theme);
+  const isFeed = format === 'feed';
+  const champ = players[0];
+  if (!champ) return null;
+
+  const maxList = isFeed ? (showSecondHalf ? 4 : 2) : (showSecondHalf ? 8 : 4);
+  const rest = players.slice(1, 1 + maxList);
+
+  const photoH = isFeed ? 360 : 620;
+  const rowH = isFeed ? 50 : 62;
+
+  return (
+    <Frame palette={palette} isFeed={isFeed}>
+      {/* HEADER */}
+      <div style={{
+        flexShrink: 0,
+        padding: isFeed ? '30px 60px' : '46px 60px',
+        borderBottom: `2px solid ${palette.line}`,
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <div style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 30 : 38, letterSpacing: '0.16em', color: palette.ink }}>
+          F · S · P
+        </div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 11 : 13, letterSpacing: '0.24em', color: palette.sub, textAlign: 'center' }}>
+          EDIÇÃO MENSAL · {monthLabel}
+        </div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 11 : 13, letterSpacing: '0.24em', color: palette.sub }}>
+          VOL. {new Date().getFullYear()}
+        </div>
+      </div>
+
+      {/* TÍTULO TIPOGRÁFICO — fontSize controlado para nunca estourar largura */}
+      <div style={{
+        flexShrink: 0,
+        padding: isFeed ? '28px 60px 0' : '46px 60px 0',
+      }}>
+        <div style={{
+          fontFamily: 'Anton, sans-serif',
+          fontSize: isFeed ? 116 : 150,
+          lineHeight: 0.9,
+          letterSpacing: '-0.01em',
+          color: palette.ink,
+        }}>
+          MELHOR DO<br />
+          PARANÁ <span style={{ color: palette.accent }}>NA {classLabel.toUpperCase()}</span>
+        </div>
+        <div style={{
+          fontFamily: 'JetBrains Mono, monospace',
+          fontSize: isFeed ? 13 : 16,
+          letterSpacing: '0.24em',
+          color: palette.sub,
+          marginTop: 14,
+        }}>
+          {categoryLabel.toUpperCase()} · {monthLabel.toUpperCase()}
+        </div>
+      </div>
+
+      {/* FOTO + NOME LADO A LADO */}
+      <div style={{
+        flexShrink: 0,
+        padding: isFeed ? '24px 60px' : '40px 60px',
+        display: 'flex', gap: isFeed ? 32 : 44, alignItems: 'stretch',
+      }}>
+        <Photo
+          player={champ}
+          palette={palette}
+          big
+          height={photoH}
+          width={isFeed ? 300 : 460}
+          border={`1px solid ${palette.line}`}
+        />
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+          <div style={{
+            fontFamily: 'Anton, sans-serif',
+            fontSize: isFeed ? 110 : 150,
+            color: palette.accent,
+            lineHeight: 0.8,
+          }}>
+            01
+          </div>
+          <div style={{
+            fontFamily: 'Anton, sans-serif',
+            fontSize: isFeed ? 46 : 64,
+            lineHeight: 1,
+            color: palette.ink,
+            marginTop: isFeed ? 10 : 18,
+            wordBreak: 'break-word',
+          }}>
+            {fitName(champ.player_name, isFeed ? 22 : 26)}
+          </div>
+          <div style={{
+            display: 'flex', gap: isFeed ? 20 : 30, marginTop: isFeed ? 14 : 22,
+            fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 12 : 14,
+            letterSpacing: '0.16em', color: palette.sub, flexWrap: 'wrap',
+          }}>
+            <span>
+              <b style={{ color: palette.accent, fontSize: isFeed ? 26 : 32, fontFamily: 'Anton, sans-serif' }}>{champ.total_points}</b> PTS
+            </span>
+            <span>
+              <b style={{ color: palette.ink, fontSize: isFeed ? 26 : 32, fontFamily: 'Anton, sans-serif' }}>{champ.results_count}</b> TORN.
+            </span>
+            {champ.win_rate != null && (
+              <span>
+                <b style={{ color: palette.ink, fontSize: isFeed ? 26 : 32, fontFamily: 'Anton, sans-serif' }}>{champ.win_rate}%</b> VIT.
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* LISTA */}
+      <div style={{ flex: 1, minHeight: 0, padding: isFeed ? '0 60px 22px' : '0 60px 38px', overflow: 'hidden' }}>
+        {rest.length > 0 && (
+          <>
+            <div style={{
+              borderTop: `1px solid ${palette.line}`,
+              borderBottom: `1px solid ${palette.line}`,
+              padding: '10px 0', marginBottom: 14,
+              display: 'flex', justifyContent: 'space-between',
+              fontFamily: 'JetBrains Mono, monospace', fontSize: 12,
+              letterSpacing: '0.3em', color: palette.sub,
+            }}>
+              <span>NESTA EDIÇÃO</span><span>PERSEGUIDORES</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {rest.map((p, i) => (
+                <ListRow
+                  key={p.player_id}
+                  pos={i + 2}
+                  name={fitName(p.player_name, isFeed ? 30 : 38)}
+                  points={p.total_points}
+                  palette={palette}
+                  accentPos={i < 2 ? palette.podium[i + 1] : null}
+                  rowH={rowH}
+                  fontSize={isFeed ? 16 : 18}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+
+      <Footer palette={palette} />
+    </Frame>
+  );
+};
+
+// ═══════════════════════════════════════════════════════════════════
+// TEMPLATE 4 — PODIUM
+// Header · 3 cards do pódio (alturas iguais nas fotos) · Lista · Footer
+// ═══════════════════════════════════════════════════════════════════
+export const PostPodium = ({ players, theme, format, classLabel, categoryLabel, showSecondHalf, monthLabel, logoSrc }) => {
+  const palette = getTokens(theme);
+  const isFeed = format === 'feed';
+  const podium = players.slice(0, 3);
+  if (podium.length < 3) return null;
+
+  // ordem visual: 2º, 1º, 3º
+  const order = [
+    { player: podium[1], rank: 2 },
+    { player: podium[0], rank: 1 },
+    { player: podium[2], rank: 3 },
+  ];
+
+  const maxList = isFeed ? (showSecondHalf ? 4 : 2) : (showSecondHalf ? 7 : 4);
+  const rest = players.slice(3, 3 + maxList);
+
+  // Fotos com a MESMA altura nas 3 colunas (resolve o "3º lugar cortado").
+  const photoH = isFeed ? 300 : 540;
+  // Card de info também com altura fixa igual nas 3 colunas.
+  const infoH = isFeed ? 210 : 320;
+  const rowH = isFeed ? 52 : 64;
+
+  return (
+    <Frame palette={palette} isFeed={isFeed} bg={palette.grad}>
+      {/* HEADER */}
+      <div style={{
+        flexShrink: 0,
+        padding: isFeed ? '36px 60px 0' : '54px 60px 0',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      }}>
+        <FSPMark palette={palette} size={isFeed ? 60 : 76} logoSrc={logoSrc} />
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 12 : 14, letterSpacing: '0.3em', color: palette.sub }}>
+            PÓDIO OFICIAL
+          </div>
+          <div style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 48 : 60, marginTop: 6, color: palette.ink }}>
+            {classLabel.toUpperCase()} <span style={{ color: palette.accent }}>{categoryLabel.toUpperCase()}</span>
+          </div>
+        </div>
+        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 12 : 14, letterSpacing: '0.24em', color: palette.sub, textAlign: 'right' }}>
           {monthLabel}<br />RANKING FSP
         </div>
       </div>
 
-      <div style={{ position: 'relative', padding: isFeed ? '60px 60px 40px' : '100px 60px 60px', display: 'grid', gridTemplateColumns: isFeed ? '1fr' : '1fr 1.2fr', gap: isFeed ? 32 : 48, alignItems: 'center' }}>
-        <div>
-          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 12 : 14, letterSpacing: '0.32em', color: palette.accent, marginBottom: 12 }}>CAMPEÃO {classLabel.toUpperCase()}</div>
-          <div style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 120 : 160, lineHeight: 0.88, letterSpacing: '-0.02em', color: palette.ink }}>
-            <span style={{ color: palette.accent }}>{categoryLabel.toUpperCase()}</span>
-          </div>
-        </div>
-
-        <div style={{ position: 'relative' }}>
-          <Photo player={champ} palette={palette} big style={{ width: '100%', height: isFeed ? 420 : 600, border: `2px solid ${palette.accent}`, borderRadius: 12 }} />
-          <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, background: `linear-gradient(180deg, transparent 0%, ${palette.bg} 100%)`, padding: isFeed ? '60px 24px 24px' : '80px 32px 32px' }}>
-            <div style={{ 
-              fontFamily: 'Anton, sans-serif', 
-              fontSize: isFeed ? 48 : 64, 
-              lineHeight: 1, 
-              color: palette.ink, 
-              marginBottom: 12,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap'
-            }}>
-              {champ.player_name.toUpperCase()}
-            </div>
-            <div style={{ display: 'flex', gap: 20, alignItems: 'baseline' }}>
-              <span style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 56 : 72, color: palette.accent, lineHeight: 1 }}>{champ.total_points}</span>
-              <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 12 : 14, letterSpacing: '0.24em', color: palette.sub }}>PONTOS · {champ.results_count} TORNEIOS</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {rest.length > 0 && (
-        <div style={{ position: 'relative', padding: isFeed ? '20px 60px 80px' : '40px 60px 80px' }}>
-          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.32em', color: palette.sub, marginBottom: 14 }}>PERSEGUIDORES</div>
-          <div style={{ border: `1px solid ${palette.line}`, borderRadius: 8, overflow: 'hidden', background: alpha(palette.surface, 0.3) }}>
-            {rest.map((p, i) => (
-              <div key={p.player_id} style={{ 
-                display: 'grid', 
-                gridTemplateColumns: '60px 1fr 90px', 
-                alignItems: 'center', 
-                gap: 16, 
-                padding: isFeed ? '12px 18px' : '16px 24px', 
-                borderBottom: i === rest.length - 1 ? 'none' : `1px solid ${palette.line}` 
-              }}>
-                <span style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 24 : 28, color: palette.sub, lineHeight: 1 }}>{String(i + 2).padStart(2, '0')}</span>
-                <span style={{ 
-                  fontFamily: 'Space Grotesk, sans-serif', 
-                  fontWeight: 700, 
-                  fontSize: isFeed ? 16 : 18, 
-                  color: palette.ink,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}>{p.player_name}</span>
-                <span style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 22 : 26, color: palette.accent, textAlign: 'right' }}>{p.total_points}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <Footer palette={palette} />
-    </div>
-  );
-};
-
-// ═════════════════════════════════════════════════════════════════════════════
-// TEMPLATE 3: EDITORIAL
-// ═════════════════════════════════════════════════════════════════════════════
-export const PostEditorial = ({ players, theme, format, classLabel, categoryLabel, showSecondHalf, monthLabel }) => {
-  const palette = getTokens(theme);
-  const isFeed = format === 'feed';
-  const W = 1080, H = isFeed ? 1080 : 1920;
-  const champ = players[0]; if (!champ) return null;
-  const list = players.slice(1, showSecondHalf ? 10 : 5);
-  
-  const titleSize = isFeed ? 180 : 160;
-  const photoHeight = isFeed ? 480 : 550;
-  const numberSize = isFeed ? 320 : 340;
-  const nameSize = isFeed ? 56 : 60;
-  const numberTop = isFeed ? -120 : -120;
-
-  return (
-    <div style={{ 
-      width: W, 
-      height: H, 
-      background: palette.bg, 
-      position: 'relative', 
-      overflow: 'hidden', 
-      fontFamily: 'Space Grotesk, sans-serif', 
-      color: palette.ink,
-      paddingBottom: 70
-    }}>
-      <div style={{ padding: isFeed ? '40px 60px' : '40px 60px', borderBottom: `2px solid ${palette.line}`, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <div style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 28 : 32, letterSpacing: '0.18em', color: palette.ink }}>F · S · P</div>
-        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 10 : 11, letterSpacing: '0.28em', color: palette.sub, flex: 1, textAlign: 'center' }}>
-          EDIÇÃO MENSAL · {monthLabel}
-        </div>
-        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 10 : 11, letterSpacing: '0.28em', color: palette.sub }}>VOL. {new Date().getFullYear()}</div>
-      </div>
-
-      <div style={{ 
-        fontFamily: 'Anton, sans-serif', 
-        fontSize: titleSize, 
-        lineHeight: 0.88, 
-        letterSpacing: '-0.02em', 
-        padding: isFeed ? '40px 60px 0' : '30px 60px 0', 
-        color: palette.ink 
+      {/* PÓDIO — 3 colunas, alturas idênticas */}
+      <div style={{
+        flexShrink: 0,
+        padding: isFeed ? '28px 60px' : '48px 60px',
+        display: 'flex', gap: isFeed ? 16 : 22, alignItems: 'flex-start',
       }}>
-        MELHOR DO<br />PARANÁ<br /><span style={{ color: palette.accent }}>NA {classLabel.toUpperCase()}</span>
-      </div>
-
-      <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 13 : 14, letterSpacing: '0.24em', color: palette.sub, padding: '0 60px', marginTop: 12 }}>
-        {categoryLabel.toUpperCase()} · {monthLabel.toUpperCase()}
-      </div>
-
-      <div style={{ position: 'relative', margin: isFeed ? '20px 60px 0' : '25px 60px 0', display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: isFeed ? 36 : 40, alignItems: 'end' }}>
-        <Photo player={champ} palette={palette} big style={{ width: '100%', height: photoHeight, border: `1px solid ${palette.line}` }} />
-        <div style={{ position: 'relative' }}>
-          <div style={{ position: 'absolute', top: numberTop, left: -20, fontFamily: 'Anton, sans-serif', fontSize: numberSize, color: palette.accent, lineHeight: 0.85, letterSpacing: '-0.05em', zIndex: 0, opacity: 0.12 }}>01</div>
-          <div style={{ position: 'relative', paddingTop: isFeed ? 220 : 240, zIndex: 1 }}>
-            <div style={{ 
-              fontFamily: 'Anton, sans-serif', 
-              fontSize: nameSize, 
-              lineHeight: 0.95, 
-              color: palette.ink,
+        {order.map(({ player, rank }) => {
+          const medal = palette.podium[rank - 1];
+          const isWinner = rank === 1;
+          return (
+            <div key={player.player_id} style={{
+              flex: 1, minWidth: 0,
+              display: 'flex', flexDirection: 'column',
+              border: `2px solid ${medal}`,
+              borderRadius: 12,
               overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              display: '-webkit-box',
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: 'vertical'
+              // o 1º sobe um pouco visualmente, mas SEM mudar altura total
+              marginTop: isWinner ? 0 : (isFeed ? 24 : 40),
             }}>
-              {champ.player_name.toUpperCase()}
-            </div>
-            <div style={{ display: 'flex', gap: isFeed ? 20 : 24, marginTop: 16, fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 11 : 12, letterSpacing: '0.18em', color: palette.sub, flexWrap: 'wrap' }}>
-              <span><b style={{ color: palette.accent, fontSize: isFeed ? 20 : 22, fontFamily: 'Anton, sans-serif' }}>{champ.total_points}</b> PTS</span>
-              <span><b style={{ color: palette.ink, fontSize: isFeed ? 20 : 22, fontFamily: 'Anton, sans-serif' }}>{champ.results_count}</b> TORN.</span>
-              {champ.win_rate != null && <span><b style={{ color: palette.ink, fontSize: isFeed ? 20 : 22, fontFamily: 'Anton, sans-serif' }}>{champ.win_rate}%</b> VIT.</span>}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div style={{ padding: isFeed ? '30px 60px 80px' : '40px 60px 80px' }}>
-        <div style={{ borderTop: `1px solid ${palette.line}`, borderBottom: `1px solid ${palette.line}`, padding: '10px 0', marginBottom: 18 }}>
-          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.32em', color: palette.sub, display: 'flex', justifyContent: 'space-between' }}>
-            <span>NESTA EDIÇÃO</span><span>PERSEGUIDORES</span>
-          </div>
-        </div>
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: showSecondHalf ? (isFeed ? 'repeat(2,1fr)' : 'repeat(2,1fr)') : 'repeat(2,1fr)',
-          gap: '4px 36px' 
-        }}>
-          {list.map((p, i) => (
-            <div key={p.player_id} style={{ display: 'flex', alignItems: 'baseline', gap: 14, padding: '10px 0', borderBottom: `1px dashed ${palette.line}` }}>
-              <span style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 28 : 26, color: i < 2 ? palette.podium[i + 1] : palette.sub, lineHeight: 1, minWidth: 42 }}>{String(i + 2).padStart(2, '0')}</span>
-              <span style={{ 
-                flex: 1, 
-                fontFamily: 'Space Grotesk, sans-serif', 
-                fontWeight: 600, 
-                fontSize: isFeed ? 16 : 15, 
-                color: palette.ink, 
-                whiteSpace: 'nowrap', 
-                overflow: 'hidden', 
-                textOverflow: 'ellipsis' 
-              }}>{p.player_name}</span>
-              <span style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 22 : 20, color: palette.accent }}>{p.total_points}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <Footer palette={palette} />
-    </div>
-  );
-};
-
-// ═════════════════════════════════════════════════════════════════════════════
-// TEMPLATE 4: PODIUM (TOTALMENTE CORRIGIDO)
-// ═════════════════════════════════════════════════════════════════════════════
-export const PostPodium = ({ players, theme, format, classLabel, categoryLabel, showSecondHalf, monthLabel, logoSrc }) => {
-  const palette = getTokens(theme);
-  const isFeed = format === 'feed';
-  const W = 1080, H = isFeed ? 1080 : 1920;
-  const podium = players.slice(0, 3);
-  if (podium.length < 3) return null;
-  const order = [podium[1], podium[0], podium[2]];
-  
-  // CORRIGIDO: Heights maiores + foto do 3º lugar mesmo tamanho do 2º
-  const photoHeights = [
-    isFeed ? 280 : 380,  // 2º lugar
-    isFeed ? 320 : 440,  // 1º lugar (maior)
-    isFeed ? 280 : 380   // 3º lugar (CORRIGIDO: era 220/300)
-  ];
-  
-  // CORRIGIDO: Mais espaço para texto
-  const cardHeights = [
-    isFeed ? 180 : 240,  // 2º lugar (era 260/340)
-    isFeed ? 200 : 280,  // 1º lugar (era 340/460)
-    isFeed ? 180 : 240   // 3º lugar (era 220/300)
-  ];
-  
-  const list = players.slice(3, showSecondHalf ? 10 : 5);
-
-  return (
-    <div style={{ 
-      width: W, 
-      height: H, 
-      background: palette.grad, 
-      position: 'relative', 
-      overflow: 'hidden', 
-      fontFamily: 'Space Grotesk, sans-serif', 
-      color: palette.ink,
-      paddingBottom: 70
-    }}>
-      <div style={{ padding: isFeed ? '50px 60px 0' : '60px 60px 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <FSPMark palette={palette} size={isFeed ? 64 : 72} logoSrc={logoSrc} />
-        <div style={{ textAlign: 'center' }}>
-          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 12 : 13, letterSpacing: '0.32em', color: palette.sub }}>PÓDIO OFICIAL</div>
-          <div style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 52 : 58, letterSpacing: '0.04em', marginTop: 6, color: palette.ink }}>
-            {classLabel.toUpperCase()} <span style={{ color: palette.accent }}>{categoryLabel.toUpperCase()}</span>
-          </div>
-        </div>
-        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 12 : 13, letterSpacing: '0.28em', color: palette.sub, textAlign: 'right' }}>{monthLabel}<br />RANKING FSP</div>
-      </div>
-
-      <div style={{ marginTop: isFeed ? 30 : 50, padding: '0 60px' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.15fr 1fr', gap: isFeed ? 14 : 16, alignItems: 'end' }}>
-          {order.map((p, idx) => {
-            const realIdx = idx === 0 ? 1 : idx === 1 ? 0 : 2;
-            const medal = palette.podium[realIdx];
-            
-            // CORRIGIDO: fontSize menor para caber nomes longos
-            const numberSize = realIdx === 0 ? (isFeed ? 120 : 140) : (isFeed ? 80 : 100);
-            const nameSize = realIdx === 0 ? (isFeed ? 26 : 30) : (isFeed ? 20 : 24);
-            const pointsSize = realIdx === 0 ? (isFeed ? 32 : 36) : (isFeed ? 24 : 28);
-            
-            return (
-              <div key={p.player_id} style={{ display: 'flex', flexDirection: 'column' }}>
-                <Photo 
-                  player={p} 
-                  palette={palette} 
-                  style={{ 
-                    width: '100%', 
-                    height: photoHeights[idx], 
-                    border: `2px solid ${medal}`, 
-                    borderBottom: 'none' 
-                  }} 
-                />
-                <div style={{ 
-                  background: realIdx === 0 ? `linear-gradient(180deg, ${alpha(medal, 0.25)} 0%, ${palette.surface} 60%)` : palette.surface, 
-                  border: `2px solid ${medal}`, 
-                  borderTop: 'none', 
-                  padding: isFeed ? '12px 14px' : '16px 18px',
-                  height: cardHeights[idx], 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  justifyContent: 'space-between' 
+              {/* Foto — mesma altura nas 3 */}
+              <Photo player={player} palette={palette} height={photoH} />
+              {/* Info — altura fixa, conteúdo organizado em flux */}
+              <div style={{
+                height: infoH,
+                flexShrink: 0,
+                background: isWinner
+                  ? `linear-gradient(180deg, ${alpha(medal, 0.28)} 0%, ${palette.surface} 65%)`
+                  : palette.surface,
+                padding: isFeed ? '12px 14px' : '20px 22px',
+                display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+              }}>
+                <div style={{
+                  fontFamily: 'Anton, sans-serif',
+                  fontSize: isWinner ? (isFeed ? 96 : 150) : (isFeed ? 70 : 110),
+                  color: medal,
+                  lineHeight: 0.8,
                 }}>
-                  {/* Número da posição */}
-                  <div style={{ 
-                    fontFamily: 'Anton, sans-serif', 
-                    fontSize: numberSize, 
-                    lineHeight: 0.85, 
-                    color: medal, 
-                    letterSpacing: '-0.03em' 
+                  {rank}
+                </div>
+                <div>
+                  <div style={{
+                    fontFamily: 'Anton, sans-serif',
+                    fontSize: isWinner ? (isFeed ? 24 : 34) : (isFeed ? 20 : 28),
+                    lineHeight: 1.05,
+                    color: palette.ink,
+                    // até 2 linhas, depois corta
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    marginBottom: isFeed ? 6 : 10,
                   }}>
-                    {realIdx + 1}
+                    {fitName(player.player_name, 26)}
                   </div>
-                  
-                  {/* Nome e pontos */}
-                  <div>
-                    <div style={{ 
-                      fontFamily: 'Anton, sans-serif', 
-                      fontSize: nameSize, 
-                      lineHeight: 1.1, 
-                      color: palette.ink,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      display: '-webkit-box',
-                      WebkitLineClamp: 2,
-                      WebkitBoxOrient: 'vertical',
-                      marginBottom: 8
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                    <span style={{
+                      fontFamily: 'Anton, sans-serif',
+                      fontSize: isWinner ? (isFeed ? 36 : 48) : (isFeed ? 28 : 38),
+                      color: palette.accent,
+                      lineHeight: 1,
                     }}>
-                      {p.player_name.toUpperCase()}
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                      <span style={{ 
-                        fontFamily: 'Anton, sans-serif', 
-                        fontSize: pointsSize, 
-                        color: palette.accent, 
-                        lineHeight: 1 
-                      }}>
-                        {p.total_points}
-                      </span>
-                      <span style={{ 
-                        fontFamily: 'JetBrains Mono, monospace', 
-                        fontSize: 9, 
-                        letterSpacing: '0.2em', 
-                        color: palette.sub 
-                      }}>
-                        PTS
-                      </span>
-                    </div>
+                      {player.total_points}
+                    </span>
+                    <span style={{
+                      fontFamily: 'JetBrains Mono, monospace',
+                      fontSize: isFeed ? 10 : 12,
+                      letterSpacing: '0.2em',
+                      color: palette.sub,
+                    }}>
+                      PTS
+                    </span>
                   </div>
                 </div>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
       </div>
 
-      {list.length > 0 && (
-        <div style={{ padding: isFeed ? '24px 60px 80px' : '50px 60px 80px' }}>
-          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11, letterSpacing: '0.32em', color: palette.sub, marginBottom: 10 }}>PERSEGUIDORES</div>
-          <div style={{ border: `1px solid ${palette.line}`, borderRadius: 8, overflow: 'hidden' }}>
-            {list.map((p, i) => (
-              <div key={p.player_id} style={{ 
-                display: 'grid', 
-                gridTemplateColumns: '60px 1fr 90px', 
-                alignItems: 'center', 
-                gap: 16, 
-                padding: isFeed ? '12px 18px' : '14px 20px', 
-                background: i % 2 ? 'transparent' : alpha(palette.surface, 0.6), 
-                borderBottom: i === list.length - 1 ? 'none' : `1px solid ${palette.line}` 
-              }}>
-                <span style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 28 : 30, color: palette.sub, lineHeight: 1 }}>{String(i + 4).padStart(2, '0')}</span>
-                <span style={{ 
-                  fontFamily: 'Space Grotesk, sans-serif', 
-                  fontWeight: 700, 
-                  fontSize: isFeed ? 18 : 19, 
-                  color: palette.ink,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}>{p.player_name}</span>
-                <span style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 24 : 26, color: palette.accent, textAlign: 'right' }}>{p.total_points}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* LISTA */}
+      <div style={{ flex: 1, minHeight: 0, padding: isFeed ? '0 60px 22px' : '0 60px 40px', overflow: 'hidden' }}>
+        {rest.length > 0 && (
+          <>
+            <div style={{
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: 12, letterSpacing: '0.3em', color: palette.sub, marginBottom: 14,
+            }}>
+              PERSEGUIDORES
+            </div>
+            <div style={{
+              display: 'flex', flexDirection: 'column',
+              border: `1px solid ${palette.line}`, borderRadius: 10, overflow: 'hidden',
+            }}>
+              {rest.map((p, i) => (
+                <ListRow
+                  key={p.player_id}
+                  pos={i + 4}
+                  name={fitName(p.player_name, isFeed ? 30 : 38)}
+                  points={p.total_points}
+                  palette={palette}
+                  rowH={rowH}
+                  fontSize={isFeed ? 16 : 19}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
 
       <Footer palette={palette} />
-    </div>
+    </Frame>
   );
 };
 
-// ═════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 // EXPORTS
-// ═════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════
 export const POST_TEMPLATES = {
   ultimate:  { Component: PostUltimate,  label: 'Ultimate Card' },
   stadium:   { Component: PostStadium,   label: 'Stadium' },
@@ -720,8 +825,8 @@ export const POST_TEMPLATES = {
 };
 
 export const PALETTE_OPTIONS = [
-  { key: 'storm',    label: 'FSP Storm',    swatch: ['#070d1a','#4aa3ff','#22e1ff'] },
-  { key: 'inferno',  label: 'Court Inferno',swatch: ['#0a0a0c','#ff2d6f','#c6f432'] },
-  { key: 'champion', label: 'Champion Gold',swatch: ['#0e0c08','#d4a017','#f5d36b'] },
-  { key: 'glacier',  label: 'Glacier',      swatch: ['#f4f1ea','#2d8a3e','#0d6e7b'] },
+  { key: 'storm',    label: 'FSP Storm',     swatch: ['#070d1a', '#4aa3ff', '#22e1ff'] },
+  { key: 'inferno',  label: 'Court Inferno', swatch: ['#000000', '#ff0066', '#00ff66'] },
+  { key: 'champion', label: 'Champion Gold', swatch: ['#1a1510', '#ffd700', '#ffed4e'] },
+  { key: 'glacier',  label: 'Glacier',       swatch: ['#e8e5dc', '#0d5c1a', '#004d5c'] },
 ];

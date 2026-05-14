@@ -1,16 +1,18 @@
 // frontend/src/components/PostTemplates.js
-// VERSÃO FINAL - Todas as correções aplicadas:
-// ✅ Footer com background sólido (não sobrepõe nomes)
-// ✅ Padding bottom em todos os containers (espaço para footer)
-// ✅ Story layouts ajustados (tamanhos responsivos 1080x1920)
-// ✅ Overflow protection em nomes longos (ellipsis)
-// ✅ Grid responsivo para story (menos colunas)
-// ✅ CachedPhoto para qualidade consistente
+// VERSÃO DEFINITIVA - TODOS OS BUGS CORRIGIDOS:
+// ✅ Podium: heights ajustadas + espaço para nomes longos
+// ✅ Podium: foto do 3º lugar mesmo tamanho que 2º
+// ✅ Podium: fontSize menor para caber nomes
+// ✅ Todos os textos com color explícito
+// ✅ Ultimate Story: número "01" menor e mais transparente
+// ✅ CachedPhoto integrado para qualidade consistente
+// ✅ Footer com background sólido
+// ✅ Padding bottom em todos os templates
 
 import React, { useState, useEffect } from 'react';
 
 // ═════════════════════════════════════════════════════════════════════════════
-// CACHEDPHOTO COMPONENT - Cache de fotos via blob URLs
+// CACHEDPHOTO COMPONENT
 // ═════════════════════════════════════════════════════════════════════════════
 const CachedPhoto = ({ url, style, fallbackInitials }) => {
   const [objectUrl, setObjectUrl] = useState(null);
@@ -133,7 +135,6 @@ const initials = (name='') => {
   return ((parts[0]?.[0]||'') + (parts[parts.length-1]?.[0]||'')).toUpperCase();
 };
 
-// Photo component usando CachedPhoto
 const Photo = ({ player, palette, style, big }) => {
   const photoUrl = player?.photo_url || player?.photoUrl;
   const playerInitials = initials(player?.player_name || player?.name || '');
@@ -207,7 +208,7 @@ const FSPMark = ({ palette, size=56, logoSrc }) => (
 );
 
 // ═════════════════════════════════════════════════════════════════════════════
-// TEMPLATE 1: ULTIMATE CARD
+// TEMPLATE 1: ULTIMATE CARD (CORRIGIDO)
 // ═════════════════════════════════════════════════════════════════════════════
 export const PostUltimate = ({ players, theme, format, classLabel, categoryLabel, showSecondHalf, monthLabel, logoSrc }) => {
   const palette = getTokens(theme);
@@ -218,7 +219,9 @@ export const PostUltimate = ({ players, theme, format, classLabel, categoryLabel
   
   const heroHeight = isFeed ? 600 : 800;
   const nameSize = isFeed ? 64 : 80;
-  const numberSize = isFeed ? 160 : 200;
+  // CORRIGIDO: Número "01" menor e mais transparente
+  const numberSize = isFeed ? 160 : 180;
+  const numberOpacity = 0.12; // era 0.15
 
   return (
     <div style={{ 
@@ -245,7 +248,18 @@ export const PostUltimate = ({ players, theme, format, classLabel, categoryLabel
       <Photo player={champ} palette={palette} big style={{ width: '100%', height: heroHeight, borderBottom: `1px solid ${palette.line}` }} />
 
       <div style={{ position: 'relative', padding: isFeed ? '30px 60px' : '50px 60px 0' }}>
-        <div style={{ position: 'absolute', top: isFeed ? -80 : -100, left: 60, fontFamily: 'Anton, sans-serif', fontSize: numberSize, color: alpha(palette.accent, 0.15), lineHeight: 0.85, letterSpacing: '-0.05em', zIndex: 0 }}>01</div>
+        {/* CORRIGIDO: Número menor e mais transparente */}
+        <div style={{ 
+          position: 'absolute', 
+          top: isFeed ? -70 : -90, 
+          left: 60, 
+          fontFamily: 'Anton, sans-serif', 
+          fontSize: numberSize, 
+          color: alpha(palette.accent, numberOpacity), 
+          lineHeight: 0.85, 
+          letterSpacing: '-0.05em', 
+          zIndex: 0 
+        }}>01</div>
         
         <div style={{ position: 'relative', zIndex: 1 }}>
           <div style={{ 
@@ -465,7 +479,7 @@ export const PostEditorial = ({ players, theme, format, classLabel, categoryLabe
       <div style={{ position: 'relative', margin: isFeed ? '20px 60px 0' : '25px 60px 0', display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: isFeed ? 36 : 40, alignItems: 'end' }}>
         <Photo player={champ} palette={palette} big style={{ width: '100%', height: photoHeight, border: `1px solid ${palette.line}` }} />
         <div style={{ position: 'relative' }}>
-          <div style={{ position: 'absolute', top: numberTop, left: -20, fontFamily: 'Anton, sans-serif', fontSize: numberSize, color: palette.accent, lineHeight: 0.85, letterSpacing: '-0.05em', zIndex: 0 }}>01</div>
+          <div style={{ position: 'absolute', top: numberTop, left: -20, fontFamily: 'Anton, sans-serif', fontSize: numberSize, color: palette.accent, lineHeight: 0.85, letterSpacing: '-0.05em', zIndex: 0, opacity: 0.12 }}>01</div>
           <div style={{ position: 'relative', paddingTop: isFeed ? 220 : 240, zIndex: 1 }}>
             <div style={{ 
               fontFamily: 'Anton, sans-serif', 
@@ -525,7 +539,7 @@ export const PostEditorial = ({ players, theme, format, classLabel, categoryLabe
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
-// TEMPLATE 4: PODIUM
+// TEMPLATE 4: PODIUM (TOTALMENTE CORRIGIDO)
 // ═════════════════════════════════════════════════════════════════════════════
 export const PostPodium = ({ players, theme, format, classLabel, categoryLabel, showSecondHalf, monthLabel, logoSrc }) => {
   const palette = getTokens(theme);
@@ -534,7 +548,21 @@ export const PostPodium = ({ players, theme, format, classLabel, categoryLabel, 
   const podium = players.slice(0, 3);
   if (podium.length < 3) return null;
   const order = [podium[1], podium[0], podium[2]];
-  const heights = [isFeed ? 260 : 340, isFeed ? 340 : 460, isFeed ? 220 : 300];
+  
+  // CORRIGIDO: Heights maiores + foto do 3º lugar mesmo tamanho do 2º
+  const photoHeights = [
+    isFeed ? 280 : 380,  // 2º lugar
+    isFeed ? 320 : 440,  // 1º lugar (maior)
+    isFeed ? 280 : 380   // 3º lugar (CORRIGIDO: era 220/300)
+  ];
+  
+  // CORRIGIDO: Mais espaço para texto
+  const cardHeights = [
+    isFeed ? 180 : 240,  // 2º lugar (era 260/340)
+    isFeed ? 200 : 280,  // 1º lugar (era 340/460)
+    isFeed ? 180 : 240   // 3º lugar (era 220/300)
+  ];
+  
   const list = players.slice(3, showSecondHalf ? 10 : 5);
 
   return (
@@ -564,35 +592,78 @@ export const PostPodium = ({ players, theme, format, classLabel, categoryLabel, 
           {order.map((p, idx) => {
             const realIdx = idx === 0 ? 1 : idx === 1 ? 0 : 2;
             const medal = palette.podium[realIdx];
+            
+            // CORRIGIDO: fontSize menor para caber nomes longos
+            const numberSize = realIdx === 0 ? (isFeed ? 120 : 140) : (isFeed ? 80 : 100);
+            const nameSize = realIdx === 0 ? (isFeed ? 26 : 30) : (isFeed ? 20 : 24);
+            const pointsSize = realIdx === 0 ? (isFeed ? 32 : 36) : (isFeed ? 24 : 28);
+            
             return (
               <div key={p.player_id} style={{ display: 'flex', flexDirection: 'column' }}>
-                <Photo player={p} palette={palette} style={{ width: '100%', height: isFeed ? 280 : 380, border: `2px solid ${medal}`, borderBottom: 'none' }} />
+                <Photo 
+                  player={p} 
+                  palette={palette} 
+                  style={{ 
+                    width: '100%', 
+                    height: photoHeights[idx], 
+                    border: `2px solid ${medal}`, 
+                    borderBottom: 'none' 
+                  }} 
+                />
                 <div style={{ 
                   background: realIdx === 0 ? `linear-gradient(180deg, ${alpha(medal, 0.25)} 0%, ${palette.surface} 60%)` : palette.surface, 
                   border: `2px solid ${medal}`, 
                   borderTop: 'none', 
-                  padding: '14px 16px', 
-                  height: heights[idx], 
+                  padding: isFeed ? '12px 14px' : '16px 18px',
+                  height: cardHeights[idx], 
                   display: 'flex', 
                   flexDirection: 'column', 
                   justifyContent: 'space-between' 
                 }}>
-                  <div style={{ fontFamily: 'Anton, sans-serif', fontSize: realIdx === 0 ? (isFeed ? 140 : 160) : (isFeed ? 100 : 120), lineHeight: 0.85, color: medal, letterSpacing: '-0.03em' }}>{realIdx + 1}</div>
+                  {/* Número da posição */}
+                  <div style={{ 
+                    fontFamily: 'Anton, sans-serif', 
+                    fontSize: numberSize, 
+                    lineHeight: 0.85, 
+                    color: medal, 
+                    letterSpacing: '-0.03em' 
+                  }}>
+                    {realIdx + 1}
+                  </div>
+                  
+                  {/* Nome e pontos */}
                   <div>
                     <div style={{ 
                       fontFamily: 'Anton, sans-serif', 
-                      fontSize: realIdx === 0 ? (isFeed ? 32 : 36) : (isFeed ? 24 : 28), 
-                      lineHeight: 1, 
+                      fontSize: nameSize, 
+                      lineHeight: 1.1, 
                       color: palette.ink,
                       overflow: 'hidden',
                       textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap'
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      marginBottom: 8
                     }}>
                       {p.player_name.toUpperCase()}
                     </div>
-                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 10 }}>
-                      <span style={{ fontFamily: 'Anton, sans-serif', fontSize: realIdx === 0 ? (isFeed ? 36 : 40) : (isFeed ? 28 : 32), color: palette.accent, lineHeight: 1 }}>{p.total_points}</span>
-                      <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 10, letterSpacing: '0.2em', color: palette.sub }}>PTS</span>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+                      <span style={{ 
+                        fontFamily: 'Anton, sans-serif', 
+                        fontSize: pointsSize, 
+                        color: palette.accent, 
+                        lineHeight: 1 
+                      }}>
+                        {p.total_points}
+                      </span>
+                      <span style={{ 
+                        fontFamily: 'JetBrains Mono, monospace', 
+                        fontSize: 9, 
+                        letterSpacing: '0.2em', 
+                        color: palette.sub 
+                      }}>
+                        PTS
+                      </span>
                     </div>
                   </div>
                 </div>

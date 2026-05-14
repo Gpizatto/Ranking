@@ -61,7 +61,7 @@ const Rankings = () => {
 
   const champ = rankings[0];
   const top3 = rankings.slice(0, 3);
-  const rest = rankings.slice(3);
+  const rest = rankings.slice(1);  // Mostra todos exceto o campeão (índice 0)
   const categoryLabel = selectedClass === 'Duplas' ? 'Mista' : selectedCategory;
   const monthLabel = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).toUpperCase();
   const Template = POST_TEMPLATES[template].Component;

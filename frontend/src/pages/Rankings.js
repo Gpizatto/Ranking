@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import PlayerModal from '../components/PlayerModal';
 import html2canvas from 'html2canvas';
 import { POST_TEMPLATES, PALETTE_OPTIONS } from '../components/PostTemplates';
+import CachedPhoto from '../components/CachedPhoto';
 
 const CLASSES = ['1ª', '2ª', '3ª', '4ª', '5ª', '6ª', 'Duplas'];
 const CATEGORIES = ['Feminina', 'Masculina'];
@@ -70,7 +71,7 @@ const Rankings = () => {
     if (!el) return;
     setExporting(true);
     try {
-      const canvas = await html2canvas(el, { scale: 2, backgroundColor: null, useCORS: true, allowTaint: true, logging: false, imageTimeout: 0 });
+      const canvas = await html2canvas(el, { scale: 1, backgroundColor: null, useCORS: true, allowTaint: true, logging: false, imageTimeout: 0 });
       const a = document.createElement('a');
       a.download = `ranking-fsp-${selectedClass}-${categoryLabel}-${template}-${format}.png`;
       a.href = canvas.toDataURL('image/png', 1.0);
@@ -175,9 +176,22 @@ const Rankings = () => {
             {/* HERO */}
             <div className="rk-card rk-hero" style={{ position: 'relative', padding: 24, marginBottom: 32, display: 'grid', gridTemplateColumns: '320px 1fr 320px', gap: 28, overflow: 'hidden' }} onClick={() => setSelectedPlayerId(champ.player_id)}>
               <div style={{ position: 'absolute', inset: 0, background: `linear-gradient(115deg, transparent 40%, color-mix(in srgb, var(--t-accent) 12%, transparent) 55%, transparent 70%)`, pointerEvents: 'none' }}/>
-              <div className="photo" style={{ width: 320, height: 450, borderRadius: 12, border: '1px solid var(--t-line)', background: 'var(--t-surface2)', backgroundImage: champ.photo_url ? `url(${champ.photo_url})` : 'none', backgroundSize: 'cover', backgroundPosition: 'center', position: 'relative', overflow: 'hidden', cursor: 'pointer' }}>
-                {!champ.photo_url && <div className="rk-display" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 96, color: 'var(--t-line)' }}>{initials(champ.player_name)}</div>}
-              </div>
+              <CachedPhoto
+                url={champ.photo_url}
+                style={{
+                  width: 320,
+                  height: 450,
+                  borderRadius: 12,
+                  border: '1px solid var(--t-line)',
+                  backgroundColor: 'var(--t-surface2)',
+                  cursor: 'pointer'
+                }}
+                fallbackInitials={
+                  <div className="rk-display" style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 96, color: 'var(--t-line)' }}>
+                    {initials(champ.player_name)}
+                  </div>
+                }
+              />
 
               <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
                 <div>

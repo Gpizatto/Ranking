@@ -31,7 +31,8 @@ const Rankings = () => {
   const [theme, setTheme] = useState(() => localStorage.getItem('fsp_post_theme') || 'storm');
   const [showSecondHalf, setShowSecondHalf] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const exportRef = useRef(null);
+  const exportRef = useRef(null);       // preview (escalado, só visualização)
+  const captureRef = useRef(null);      // render em tamanho real, fora da tela (usado no PNG)
 
   useEffect(() => { localStorage.setItem('fsp_post_template', template); }, [template]);
   useEffect(() => { localStorage.setItem('fsp_post_format', format); }, [format]);
@@ -67,11 +68,48 @@ const Rankings = () => {
   const Template = POST_TEMPLATES[template].Component;
 
   const handleExport = async () => {
-    const el = exportRef.current;
+    const el = captureRef.current;
     if (!el) return;
     setExporting(true);
     try {
-      const canvas = await html2canvas(el, { scale: 1, backgroundColor: null, useCORS: true, allowTaint: true, logging: false, imageTimeout: 0 });
+      // 1. Garantir que as fontes (Anton, Space Grotesk, JetBrains Mono) estão carregadas.
+      //    Sem isso, o html2canvas usa fonte fallback e o texto desalinha/sobrepõe.
+      if (document.fonts && document.fonts.ready) {
+        await document.fonts.ready;
+      }
+
+      // 2. Garantir que todas as imagens (fotos via blob/data URI) terminaram de carregar.
+      const imgs = Array.from(el.querySelectorAll('img'));
+      await Promise.all(
+        imgs.map(img => (img.complete ? Promise.resolve() : new Promise(res => {
+          img.onload = res;
+          img.onerror = res;
+        })))
+      );
+
+      // 3. Pequena espera extra para o layout estabilizar (backgrounds, gradientes).
+      await new Promise(res => setTimeout(res, 120));
+
+      const W = 1080;
+      const H = format === 'feed' ? 1080 : 1920;
+
+      // 4. Capturar o nó em tamanho REAL (sem transform: scale).
+      //    scale: 2 aqui é seguro porque o nó NÃO está escalado por CSS — gera PNG nítido.
+      const canvas = await html2canvas(el, {
+        width: W,
+        height: H,
+        windowWidth: W,
+        windowHeight: H,
+        scale: 2,
+        backgroundColor: null,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        imageTimeout: 0,
+        scrollX: 0,
+        scrollY: 0,
+      });
+
       const a = document.createElement('a');
       a.download = `ranking-fsp-${selectedClass}-${categoryLabel}-${template}-${format}.png`;
       a.href = canvas.toDataURL('image/png', 1.0);
@@ -359,7 +397,7 @@ const Rankings = () => {
               </button>
             </div>
 
-            {/* Preview */}
+            {/* Preview (escalado — apenas visualização) */}
             <PreviewBox format={format}>
               <div ref={exportRef} data-theme={theme}>
                 <Template
@@ -374,6 +412,38 @@ const Rankings = () => {
                 />
               </div>
             </PreviewBox>
+
+            {/*
+              Nó de CAPTURA em tamanho real (1080xH), posicionado fora da tela.
+              É ESTE que o html2canvas captura — sem transform:scale, o
+              posicionamento absoluto dos templates fica correto e os textos
+              não se sobrepõem no PNG.
+            */}
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'fixed',
+                top: 0,
+                left: '-99999px',
+                width: 1080,
+                height: format === 'feed' ? 1080 : 1920,
+                pointerEvents: 'none',
+                zIndex: -1,
+              }}
+            >
+              <div ref={captureRef} data-theme={theme} style={{ width: 1080, height: format === 'feed' ? 1080 : 1920 }}>
+                <Template
+                  players={rankings}
+                  theme={theme}
+                  format={format}
+                  classLabel={selectedClass}
+                  categoryLabel={categoryLabel}
+                  showSecondHalf={showSecondHalf}
+                  monthLabel={monthLabel}
+                  logoSrc="/fsp.jpeg"
+                />
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

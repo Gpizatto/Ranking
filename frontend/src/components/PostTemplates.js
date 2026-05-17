@@ -47,7 +47,7 @@ const CachedPhoto = ({ url, style, fallback }) => {
       ...style,
       backgroundImage: objectUrl ? `url(${objectUrl})` : 'none',
       backgroundSize: 'cover',
-      backgroundPosition: 'center',
+      backgroundPosition: 'top center',
       backgroundRepeat: 'no-repeat',
       position: 'relative',
       overflow: 'hidden',
@@ -502,7 +502,8 @@ export const PostStadium = ({ players, theme, format, classLabel, categoryLabel,
 
 // ═══════════════════════════════════════════════════════════════════
 // TEMPLATE 3 — EDITORIAL
-// Header · Título tipográfico · Foto + nome lado a lado · Lista · Footer
+// Masthead · Duas colunas (info tipográfica | foto) · Lista · Footer
+// Layout de revista/jornal — completamente diferente do Ultimate
 // ═══════════════════════════════════════════════════════════════════
 export const PostEditorial = ({ players, theme, format, classLabel, categoryLabel, showSecondHalf, monthLabel }) => {
   const palette = getTokens(theme);
@@ -513,118 +514,164 @@ export const PostEditorial = ({ players, theme, format, classLabel, categoryLabe
   const maxList = isFeed ? (showSecondHalf ? 4 : 2) : (showSecondHalf ? 8 : 4);
   const rest = players.slice(1, 1 + maxList);
 
-  const photoH = isFeed ? 360 : 620;
+  // Altura da seção hero de duas colunas
+  const heroH = isFeed ? 600 : 1120;
   const rowH = isFeed ? 50 : 62;
+
+  // Largura da coluna de info (esquerda)
+  const infoW = isFeed ? 420 : 460;
 
   return (
     <Frame palette={palette} isFeed={isFeed}>
-      {/* HEADER */}
-      <div style={{
-        flexShrink: 0,
-        padding: isFeed ? '30px 60px' : '46px 60px',
-        borderBottom: `2px solid ${palette.line}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      }}>
-        <div style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 30 : 38, letterSpacing: '0.16em', color: palette.ink }}>
-          F · S · P
+      {/* MASTHEAD — estilo jornal/revista: 3 faixas */}
+      <div style={{ flexShrink: 0 }}>
+        {/* Faixa superior: data + título + volume */}
+        <div style={{
+          padding: isFeed ? '14px 60px' : '22px 60px',
+          borderBottom: `1px solid ${palette.line}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        }}>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 10 : 12, letterSpacing: '0.3em', color: palette.sub }}>
+            EDIÇÃO MENSAL · {monthLabel}
+          </div>
+          <div style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 40 : 54, letterSpacing: '0.18em', color: palette.ink }}>
+            F · S · P
+          </div>
+          <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 10 : 12, letterSpacing: '0.3em', color: palette.sub }}>
+            VOL. {new Date().getFullYear()}
+          </div>
         </div>
-        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 11 : 13, letterSpacing: '0.24em', color: palette.sub, textAlign: 'center' }}>
-          EDIÇÃO MENSAL · {monthLabel}
-        </div>
-        <div style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 11 : 13, letterSpacing: '0.24em', color: palette.sub }}>
-          VOL. {new Date().getFullYear()}
+        {/* Faixa headline: manchete com borda dupla */}
+        <div style={{
+          padding: isFeed ? '12px 60px' : '18px 60px',
+          borderBottom: `4px double ${palette.ink}`,
+          display: 'flex', alignItems: 'baseline', gap: isFeed ? 16 : 24,
+          background: alpha(palette.accent, 0.06),
+        }}>
+          <div style={{
+            fontFamily: 'Anton, sans-serif',
+            fontSize: isFeed ? 46 : 62,
+            lineHeight: 0.92,
+            color: palette.ink,
+            letterSpacing: '-0.01em',
+          }}>
+            MELHOR DO PARANÁ
+          </div>
+          <div style={{
+            fontFamily: 'Anton, sans-serif',
+            fontSize: isFeed ? 46 : 62,
+            lineHeight: 0.92,
+            color: palette.accent,
+            letterSpacing: '-0.01em',
+          }}>
+            {classLabel.toUpperCase()}
+          </div>
+          <div style={{
+            marginLeft: 'auto',
+            fontFamily: 'JetBrains Mono, monospace',
+            fontSize: isFeed ? 10 : 13,
+            letterSpacing: '0.24em',
+            color: palette.sub,
+            flexShrink: 0,
+          }}>
+            {categoryLabel.toUpperCase()}
+          </div>
         </div>
       </div>
 
-      {/* TÍTULO TIPOGRÁFICO — fontSize controlado para nunca estourar largura */}
-      <div style={{
-        flexShrink: 0,
-        padding: isFeed ? '28px 60px 0' : '46px 60px 0',
-      }}>
+      {/* DUAS COLUNAS: info tipográfica (esq) | foto (dir) */}
+      <div style={{ flexShrink: 0, display: 'flex', height: heroH }}>
+        {/* Coluna esquerda — informação pura, sem foto */}
         <div style={{
-          fontFamily: 'Anton, sans-serif',
-          fontSize: isFeed ? 116 : 150,
-          lineHeight: 0.9,
-          letterSpacing: '-0.01em',
-          color: palette.ink,
+          width: infoW,
+          flexShrink: 0,
+          borderRight: `4px solid ${palette.ink}`,
+          padding: isFeed ? '28px 32px' : '44px 44px',
+          display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+          background: alpha(palette.surface, 0.7),
         }}>
-          MELHOR DO<br />
-          PARANÁ <span style={{ color: palette.accent }}>NA {classLabel.toUpperCase()}</span>
-        </div>
-        <div style={{
-          fontFamily: 'JetBrains Mono, monospace',
-          fontSize: isFeed ? 13 : 16,
-          letterSpacing: '0.24em',
-          color: palette.sub,
-          marginTop: 14,
-        }}>
-          {categoryLabel.toUpperCase()} · {monthLabel.toUpperCase()}
-        </div>
-      </div>
+          <div>
+            {/* Etiqueta de categoria */}
+            <div style={{
+              fontFamily: 'JetBrains Mono, monospace',
+              fontSize: isFeed ? 10 : 13,
+              letterSpacing: '0.3em',
+              color: palette.accent,
+              paddingBottom: isFeed ? 14 : 22,
+              borderBottom: `1px solid ${palette.line}`,
+              marginBottom: isFeed ? 14 : 22,
+            }}>
+              # 01 · CAMPEÃO OFICIAL
+            </div>
 
-      {/* FOTO + NOME LADO A LADO */}
-      <div style={{
-        flexShrink: 0,
-        padding: isFeed ? '24px 60px' : '40px 60px',
-        display: 'flex', gap: isFeed ? 32 : 44, alignItems: 'stretch',
-      }}>
+            {/* Número gigante como elemento gráfico */}
+            <div style={{
+              fontFamily: 'Anton, sans-serif',
+              fontSize: isFeed ? 180 : 300,
+              color: palette.accent,
+              lineHeight: 0.72,
+              marginBottom: isFeed ? 16 : 26,
+              letterSpacing: '-0.03em',
+            }}>
+              01
+            </div>
+
+            {/* Nome do campeão */}
+            <div style={{
+              fontFamily: 'Anton, sans-serif',
+              fontSize: isFeed ? 42 : 62,
+              lineHeight: 1.0,
+              color: palette.ink,
+              wordBreak: 'break-word',
+            }}>
+              {fitName(champ.player_name, isFeed ? 18 : 22)}
+            </div>
+          </div>
+
+          {/* Stats em tabela com réguas */}
+          <div>
+            <div style={{ height: 2, background: palette.ink, marginBottom: isFeed ? 18 : 28 }} />
+            {[
+              { label: 'PONTOS', value: champ.total_points, accent: true },
+              { label: 'TORNEIOS', value: champ.results_count, accent: false },
+              ...(champ.win_rate != null ? [{ label: '% VITÓRIAS', value: `${champ.win_rate}%`, accent: false }] : []),
+            ].map((stat, i, arr) => (
+              <div key={stat.label}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', padding: `${isFeed ? 8 : 12}px 0` }}>
+                  <span style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 10 : 12, letterSpacing: '0.24em', color: palette.sub }}>
+                    {stat.label}
+                  </span>
+                  <span style={{ fontFamily: 'Anton, sans-serif', fontSize: isFeed ? 38 : 54, color: stat.accent ? palette.accent : palette.ink, lineHeight: 1 }}>
+                    {stat.value}
+                  </span>
+                </div>
+                {i < arr.length - 1 && <div style={{ height: 1, background: palette.line }} />}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Coluna direita — foto ocupa toda a altura */}
         <Photo
           player={champ}
           palette={palette}
           big
-          height={photoH}
-          width={isFeed ? 300 : 460}
-          border={`1px solid ${palette.line}`}
+          height={heroH}
+          width={`calc(100% - ${infoW}px)`}
         />
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{
-            fontFamily: 'Anton, sans-serif',
-            fontSize: isFeed ? 110 : 150,
-            color: palette.accent,
-            lineHeight: 0.8,
-          }}>
-            01
-          </div>
-          <div style={{
-            fontFamily: 'Anton, sans-serif',
-            fontSize: isFeed ? 46 : 64,
-            lineHeight: 1,
-            color: palette.ink,
-            marginTop: isFeed ? 10 : 18,
-            wordBreak: 'break-word',
-          }}>
-            {fitName(champ.player_name, isFeed ? 22 : 26)}
-          </div>
-          <div style={{
-            display: 'flex', gap: isFeed ? 20 : 30, marginTop: isFeed ? 14 : 22,
-            fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 12 : 14,
-            letterSpacing: '0.16em', color: palette.sub, flexWrap: 'wrap',
-          }}>
-            <span>
-              <b style={{ color: palette.accent, fontSize: isFeed ? 26 : 32, fontFamily: 'Anton, sans-serif' }}>{champ.total_points}</b> PTS
-            </span>
-            <span>
-              <b style={{ color: palette.ink, fontSize: isFeed ? 26 : 32, fontFamily: 'Anton, sans-serif' }}>{champ.results_count}</b> TORN.
-            </span>
-            {champ.win_rate != null && (
-              <span>
-                <b style={{ color: palette.ink, fontSize: isFeed ? 26 : 32, fontFamily: 'Anton, sans-serif' }}>{champ.win_rate}%</b> VIT.
-              </span>
-            )}
-          </div>
-        </div>
       </div>
 
-      {/* LISTA */}
-      <div style={{ flex: 1, minHeight: 0, padding: isFeed ? '0 60px 22px' : '0 60px 38px', overflow: 'hidden' }}>
+      {/* LISTA DE PERSEGUIDORES */}
+      <div style={{ flex: 1, minHeight: 0, padding: isFeed ? '16px 60px 20px' : '28px 60px 36px', overflow: 'hidden' }}>
         {rest.length > 0 && (
           <>
             <div style={{
-              borderTop: `1px solid ${palette.line}`,
+              borderTop: `2px solid ${palette.ink}`,
               borderBottom: `1px solid ${palette.line}`,
-              padding: '10px 0', marginBottom: 14,
+              padding: `${isFeed ? 8 : 12}px 0`,
+              marginBottom: isFeed ? 10 : 16,
               display: 'flex', justifyContent: 'space-between',
-              fontFamily: 'JetBrains Mono, monospace', fontSize: 12,
+              fontFamily: 'JetBrains Mono, monospace', fontSize: isFeed ? 10 : 12,
               letterSpacing: '0.3em', color: palette.sub,
             }}>
               <span>NESTA EDIÇÃO</span><span>PERSEGUIDORES</span>

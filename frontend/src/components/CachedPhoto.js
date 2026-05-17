@@ -65,7 +65,7 @@ export const CachedPhoto = ({ url, style, fallbackInitials }) => {
       ...style,
       backgroundImage: objectUrl ? `url(${objectUrl})` : 'none',
       backgroundSize: 'cover',
-      backgroundPosition: 'center',
+      backgroundPosition: 'top center',
       position: 'relative',
       overflow: 'hidden',
     }}>
